@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Datos — Usuarios</title>
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+</head>
+<body data-modulo="usuarios">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Usuarios</h1>
+        <div class="topbar-subtitle" id="topbarSubtitle">QUIÉN PUEDE ENTRAR Y QUÉ PUEDE HACER</div>
+      </div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <main style="max-width:1116px;">
+      <section class="panel captura-panel" id="capturaSection" style="margin:24px 0 0;">
+        <div class="captura-header">
+          <h3>Cuentas</h3>
+          <div class="captura-header-acciones">
+            <button type="button" class="btn btn-ochre" id="btnNuevoUsuario" style="display:none;">+ Nuevo usuario</button>
+          </div>
+        </div>
+        <span id="formStatus" class="form-status"></span>
+        <div id="tablaUsuarios">Cargando…</div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script type="module">
+import { cargarConfigEmpresa } from '../js/config.js';
+import { renderSidebar } from '../components/sidebar.js';
+import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
+import { listarRegistros, crearRegistro, actualizarRegistro } from '../js/api.js';
+import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
+import { renderFormulario } from '../components/formularioRegistro.js';
+
+if (!haySesionActiva()) location.replace('login.html');
+
+let config;
+let roles = [];
+
+function renderSesionWidget() {
+  const cont = document.getElementById('sesionWidget');
+  const sesion = obtenerSesion();
+  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`; return; }
+  cont.innerHTML = `<span>${sesion.usuario.nombre}</span><span class="rol">${sesion.usuario.rol}</span>
+    <button type="button" class="topbar-bell" title="Notificaciones (próximamente)">🔔</button>`;
+}
+
+async function pedirRoles() {
+  const sesion = obtenerSesion();
+  try {
+    const res = await fetch(`${config.apiBaseUrl}/usuarios/roles`, { headers: { Authorization: `Bearer ${sesion.token}` } });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+function badgeRol(rol) {
+  return `<span class="role-badge role-categoria">${rol}</span>`;
+}
+function badgeEstado(activo) {
+  return activo
+    ? `<span class="role-badge role-numerico">Activo</span>`
+    : `<span class="role-badge role-fecha">Inactivo</span>`;
+}
+
+async function cargarTabla() {
+  const cont = document.getElementById('tablaUsuarios');
+  const usuarios = await listarRegistros(config.apiBaseUrl, 'usuarios');
+  if (!usuarios) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+  if (!usuarios.length) { cont.innerHTML = '<p class="tabla-vacia">No hay usuarios registrados todavía.</p>'; return; }
+
+  const puedeEditar = tienePermiso('usuarios.editar');
+
+  cont.innerHTML = `
+    <div class="tabla-registros-wrap" style="margin-top:14px;">
+      <table class="tabla-registros">
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th>${puedeEditar ? '<th class="col-acciones"></th>' : ''}</tr></thead>
+        <tbody>
+          ${usuarios.map(u => `
+            <tr data-id="${u.id}">
+              <td>${u.nombre}</td>
+              <td>${u.email}</td>
+              <td>${badgeRol(u.rol)}</td>
+              <td>${badgeEstado(u.activo)}</td>
+              ${puedeEditar ? `<td class="col-acciones"><div class="acciones-icono"><button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button></div></td>` : ''}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  if (!puedeEditar) return;
+  cont.querySelectorAll('[data-accion="editar"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.closest('tr').dataset.id;
+      const usuario = usuarios.find(u => String(u.id) === id);
+      abrirEdicion(usuario);
+    });
+  });
+}
+
+function abrirEdicion(usuario) {
+  abrirPanelLateral({
+    titulo: `Editar usuario`,
+    icono: '👤',
+    montar: (body) => {
+      body.innerHTML = `
+        <form class="form-registro" style="grid-template-columns:1fr;" id="formEditarUsuario">
+          <div class="campo"><label>Nombre</label><input type="text" id="editNombre" value="${usuario.nombre}" required></div>
+          <div class="campo"><label>Correo (no editable)</label><input type="text" value="${usuario.email}" disabled></div>
+          <div class="campo"><label>Rol</label>
+            <select id="editRol">${roles.map(r => `<option value="${r.nombre}" ${r.nombre === usuario.rol ? 'selected' : ''}>${r.nombre}</option>`).join('')}</select>
+          </div>
+          <div class="campo" style="flex-direction:row; align-items:center; gap:8px;">
+            <input type="checkbox" id="editActivo" ${usuario.activo ? 'checked' : ''} style="width:auto;">
+            <label style="text-transform:none; letter-spacing:normal;">Cuenta activa (una cuenta inactiva no puede iniciar sesión)</label>
+          </div>
+          <div class="campo campo-accion">
+            <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">Guardar cambios</button>
+            <span class="form-status" id="editStatus"></span>
+          </div>
+        </form>
+      `;
+      document.getElementById('formEditarUsuario').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const cambios = {
+          nombre: document.getElementById('editNombre').value.trim(),
+          rol: document.getElementById('editRol').value,
+          activo: document.getElementById('editActivo').checked
+        };
+        const res = await actualizarRegistro(config.apiBaseUrl, 'usuarios', usuario.id, cambios);
+        const statusEl = document.getElementById('editStatus');
+        if (!res) { statusEl.textContent = 'No se pudo guardar el cambio.'; statusEl.style.color = 'var(--coral)'; return; }
+        cerrarPanelLateral();
+        cargarTabla();
+      });
+    }
+  });
+}
+
+function abrirNuevoUsuario() {
+  abrirPanelLateral({
+    titulo: 'Nuevo usuario',
+    icono: '👤',
+    montar: (body) => {
+      body.innerHTML = '<div id="formNuevoUsuario"></div>';
+      renderFormulario('formNuevoUsuario', {
+        etiqueta: 'usuario',
+        campos: [
+          { id: 'nombre', label: 'Nombre completo', type: 'text', required: true },
+          { id: 'email', label: 'Correo', type: 'email', required: true },
+          { id: 'password', label: 'Contraseña', type: 'password', required: true, placeholder: 'Mínimo 6 caracteres' },
+          { id: 'rol', label: 'Rol', type: 'select', required: true, vacio: 'Selecciona un rol…',
+            opcionesResueltas: roles.map(r => ({ value: r.nombre, label: r.nombre })) }
+        ]
+      }, async (valores) => {
+        const res = await crearRegistro(config.apiBaseUrl, 'usuarios', valores);
+        if (res) { cerrarPanelLateral(); cargarTabla(); }
+        return res;
+      }, { puedeCrear: true });
+    }
+  });
+}
+
+(async function iniciar() {
+  config = await cargarConfigEmpresa();
+  renderSidebar(config, 'usuarios');
+  renderSesionWidget();
+
+  if (!tienePermiso('usuarios.ver')) {
+    document.getElementById('tablaUsuarios').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
+    return;
+  }
+
+  roles = await pedirRoles();
+
+  const btnNuevo = document.getElementById('btnNuevoUsuario');
+  if (tienePermiso('usuarios.crear')) {
+    btnNuevo.style.display = 'inline-flex';
+    btnNuevo.addEventListener('click', abrirNuevoUsuario);
+  }
+
+  cargarTabla();
+})();
+</script>
+</body>
+</html>

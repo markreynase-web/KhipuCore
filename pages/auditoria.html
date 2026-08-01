@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Datos — Auditoría</title>
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/tables.css">
+</head>
+<body data-modulo="auditoria">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Auditoría</h1>
+        <div class="topbar-subtitle">QUIÉN HIZO QUÉ, Y CUÁNDO</div>
+      </div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <select class="period" id="filtroModulo">
+          <option value="">Todos los módulos</option>
+          <option value="ventas">Ventas</option>
+          <option value="inventario">Inventario</option>
+          <option value="clientes">Clientes</option>
+          <option value="finanzas">Finanzas</option>
+          <option value="usuarios">Usuarios</option>
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <div class="date-range">
+          <input type="date" class="period" id="fechaDesde" title="Desde">
+          <span>→</span>
+          <input type="date" class="period" id="fechaHasta" title="Hasta">
+        </div>
+        <button class="btn btn-ochre" id="btnBuscarAuditoria">Buscar</button>
+      </div>
+    </div>
+
+    <main style="max-width:1116px;">
+      <section class="panel" style="margin-top:24px;">
+        <h3 style="font-family:'Fraunces', serif; font-size:16px; font-weight:600; margin:0 0 4px 0;">Registro de actividad</h3>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Últimos 200 movimientos, del más reciente al más antiguo.</div>
+        <div id="tablaAuditoria">Cargando…</div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script type="module">
+import { cargarConfigEmpresa } from '../js/config.js';
+import { renderSidebar } from '../components/sidebar.js';
+import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
+
+if (!haySesionActiva()) location.replace('login.html');
+
+let config;
+
+function renderSesionWidget() {
+  const cont = document.getElementById('sesionWidget');
+  const sesion = obtenerSesion();
+  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`; return; }
+  cont.innerHTML = `<span>${sesion.usuario.nombre}</span><span class="rol">${sesion.usuario.rol}</span>
+    <button type="button" class="topbar-bell" title="Notificaciones (próximamente)">🔔</button>`;
+}
+
+const ETIQUETA_ACCION = { crear: '➕ Creó', editar: '✏️ Editó', eliminar: '🗑️ Eliminó' };
+
+function formatoFechaHora(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function cargarAuditoria() {
+  const cont = document.getElementById('tablaAuditoria');
+  cont.innerHTML = 'Cargando…';
+
+  const sesion = obtenerSesion();
+  const qs = new URLSearchParams();
+  const modulo = document.getElementById('filtroModulo').value;
+  const desde = document.getElementById('fechaDesde').value;
+  const hasta = document.getElementById('fechaHasta').value;
+  if (modulo) qs.set('modulo', modulo);
+  if (desde) qs.set('desde', desde);
+  if (hasta) qs.set('hasta', hasta);
+
+  let filas;
+  try {
+    const res = await fetch(`${config.apiBaseUrl}/auditoria?${qs}`, { headers: { Authorization: `Bearer ${sesion.token}` } });
+    if (!res.ok) { cont.innerHTML = '<p class="tabla-vacia">No se pudo leer el registro de actividad (¿tienes permiso?).</p>'; return; }
+    filas = await res.json();
+  } catch {
+    cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>';
+    return;
+  }
+
+  if (!filas.length) { cont.innerHTML = '<p class="tabla-vacia">No hay actividad registrada con estos filtros.</p>'; return; }
+
+  cont.innerHTML = `
+    <div class="tabla-registros-wrap" style="margin-top:14px;">
+      <table class="tabla-registros">
+        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Registro</th><th>Detalle</th></tr></thead>
+        <tbody>
+          ${filas.map(f => `
+            <tr>
+              <td>${formatoFechaHora(f.creado_el)}</td>
+              <td>${f.usuario_nombre || '—'}</td>
+              <td>${ETIQUETA_ACCION[f.accion] || f.accion}</td>
+              <td><span class="role-badge role-categoria">${f.modulo}</span></td>
+              <td>#${f.registro_id ?? '—'}</td>
+              <td style="max-width:260px; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${f.detalle ? String(JSON.stringify(f.detalle)).replace(/"/g, '&quot;') : ''}">
+                ${f.detalle ? JSON.stringify(f.detalle) : '—'}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+(async function iniciar() {
+  config = await cargarConfigEmpresa();
+  renderSidebar(config, 'auditoria');
+  renderSesionWidget();
+
+  if (!tienePermiso('auditoria.ver')) {
+    document.getElementById('tablaAuditoria').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
+    return;
+  }
+
+  document.getElementById('btnBuscarAuditoria').addEventListener('click', cargarAuditoria);
+  cargarAuditoria();
+})();
+</script>
+</body>
+</html>

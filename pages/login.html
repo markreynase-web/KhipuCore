@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iniciar sesión — Panel de Datos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/forms.css">
+<style>
+  body{ background:var(--paper); }
+  .login-shell{ display:flex; min-height:100vh; }
+
+  /* Columna izquierda: marketing, oculta en pantallas chicas (el login
+     sigue funcionando igual, solo se prioriza el formulario en mobile). */
+  .login-marketing{
+    flex:1; padding:56px 64px; display:flex; flex-direction:column; justify-content:center;
+    max-width:640px;
+  }
+  .login-marketing .sidebar-brand{ display:flex; align-items:center; gap:12px; margin-bottom:40px; }
+  .login-marketing .mark{ width:40px; height:40px; font-size:16px; }
+  .login-marketing .brand-name{ font-family:'Fraunces', serif; font-weight:700; font-size:16px; color:var(--ink); }
+  .login-marketing .brand-tag{ font-size:11px; color:var(--muted); }
+  .login-marketing h1{ font-family:'Fraunces', serif; font-size:34px; line-height:1.15; margin:0 0 16px; color:var(--ink); }
+  .login-marketing p.lead{ font-size:15px; color:var(--muted); line-height:1.6; max-width:440px; margin:0 0 32px; }
+
+  .login-features{ display:flex; flex-direction:column; gap:18px; margin-bottom:36px; }
+  .login-feature{ display:flex; align-items:flex-start; gap:14px; }
+  .login-feature-icon{
+    width:38px; height:38px; border-radius:10px; background:#EDEBFB; color:#5B4FE0;
+    display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
+  }
+  .login-feature-title{ font-size:13.5px; font-weight:700; color:var(--ink); }
+  .login-feature-desc{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+
+  .login-preview{
+    border-radius:12px; box-shadow:var(--card-shadow); overflow:hidden; border:1px solid var(--paper-line);
+    background:#fff;
+  }
+  .login-preview img{ display:block; width:100%; height:auto; }
+
+  /* Columna derecha: el formulario en sí. */
+  .login-form-col{
+    width:460px; flex-shrink:0; background:#fff; display:flex; align-items:center; justify-content:center;
+    padding:40px; border-left:1px solid var(--paper-line);
+  }
+  .login-card{ width:100%; max-width:340px; }
+  .login-lock{
+    width:56px; height:56px; border-radius:50%; background:#FCEFD8; color:var(--ochre-deep);
+    display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 18px;
+  }
+  .login-card h2{ font-family:'Fraunces', serif; font-size:21px; margin:0 0 4px; text-align:center; color:var(--ink); }
+  .login-card p.sub{ color:var(--muted); font-size:13px; margin:0 0 26px; text-align:center; }
+  .login-card form{ display:flex; flex-direction:column; gap:14px; }
+  .login-card .campo{ display:flex; flex-direction:column; gap:5px; }
+  .login-card label{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; }
+  .login-input-wrap{ position:relative; }
+  .login-input-wrap span.ico{ position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--muted); }
+  .login-card input[type="email"], .login-card input[type="password"], .login-card input[type="text"]{
+    width:100%; font-family:'Inter', sans-serif; font-size:14px; padding:10px 12px 10px 32px;
+    border:1px solid var(--paper-line); border-radius:6px; background:var(--paper); color:var(--ink);
+  }
+  .login-card input:focus{ outline:none; border-color:var(--ochre-deep); }
+  .login-toggle-pass{ position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--muted); font-size:13px; }
+
+  .login-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
+  .login-row label{ display:flex; align-items:center; gap:6px; text-transform:none; letter-spacing:normal; font-weight:500; color:var(--ink); }
+  .login-forgot{ color:var(--muted); text-decoration:none; cursor:default; }
+  .login-forgot:hover{ text-decoration:underline; }
+
+  .login-card button[type="submit"]{ width:100%; justify-content:center; padding:11px; font-size:14px; margin-top:4px; }
+  .login-error{ font-size:13px; color:var(--coral); min-height:18px; text-align:center; }
+
+  .login-divider{ display:flex; align-items:center; gap:10px; margin:20px 0; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+  .login-divider::before, .login-divider::after{ content:''; flex:1; height:1px; background:var(--paper-line); }
+
+  .btn-google{
+    width:100%; justify-content:center; background:#fff; border:1px solid var(--paper-line); color:var(--ink);
+    padding:10px; opacity:0.55; cursor:not-allowed; position:relative;
+  }
+  .btn-google .g{ font-weight:700; }
+
+  .login-signup{ text-align:center; font-size:12.5px; color:var(--muted); margin-top:22px; }
+  .login-signup a{ color:var(--ochre-deep); font-weight:600; text-decoration:none; cursor:default; }
+  .login-signup a:hover{ text-decoration:underline; }
+
+  @media (max-width: 860px){
+    .login-marketing{ display:none; }
+    .login-form-col{ width:100%; border-left:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="login-shell">
+  <div class="login-marketing">
+    <div class="sidebar-brand">
+      <div class="mark">PD</div>
+      <div>
+        <div class="brand-name">Panel de Datos</div>
+        <div class="brand-tag">Gestor Empresarial</div>
+      </div>
+    </div>
+
+    <h1>Gestiona tu empresa,<br>toma mejores decisiones</h1>
+    <p class="lead">La plataforma todo en uno para controlar tus ventas, finanzas, clientes e inventario desde un solo lugar.</p>
+
+    <div class="login-features">
+      <div class="login-feature">
+        <div class="login-feature-icon">📊</div>
+        <div>
+          <div class="login-feature-title">Información en tiempo real</div>
+          <div class="login-feature-desc">Visualiza lo más importante de tu empresa al instante.</div>
+        </div>
+      </div>
+      <div class="login-feature">
+        <div class="login-feature-icon">🛡️</div>
+        <div>
+          <div class="login-feature-title">Seguridad y confianza</div>
+          <div class="login-feature-desc">Tus datos siempre protegidos, con permisos por rol.</div>
+        </div>
+      </div>
+      <div class="login-feature">
+        <div class="login-feature-icon">🤝</div>
+        <div>
+          <div class="login-feature-title">Todo en un solo lugar</div>
+          <div class="login-feature-desc">Clientes, ventas, inventario, finanzas y más.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-preview">
+      <img src="../assets/login-preview.jpg" alt="Vista previa del panel de ventas" loading="lazy">
+    </div>
+  </div>
+
+  <div class="login-form-col">
+    <div class="login-card">
+      <div class="login-lock">🔒</div>
+      <h2>Iniciar sesión</h2>
+      <p class="sub">Ingresa tus credenciales para continuar</p>
+
+      <form id="formLogin">
+        <div class="campo">
+          <label for="email">Correo electrónico</label>
+          <div class="login-input-wrap">
+            <span class="ico">✉️</span>
+            <input type="email" id="email" placeholder="ejemplo@empresa.com" required autocomplete="username">
+          </div>
+        </div>
+        <div class="campo">
+          <label for="password">Contraseña</label>
+          <div class="login-input-wrap">
+            <span class="ico">🔒</span>
+            <input type="password" id="password" placeholder="Ingresa tu contraseña" required autocomplete="current-password">
+            <button type="button" class="login-toggle-pass" id="btnTogglePass" title="Mostrar/ocultar contraseña">👁️</button>
+          </div>
+        </div>
+
+        <div class="login-row">
+          <label><input type="checkbox" id="recordarme" checked> Recordarme</label>
+          <!-- Sin backend de recuperación de contraseña todavía: queda visual,
+               no funcional (ver LEEME de esta fase). -->
+          <a href="#" class="login-forgot" id="linkOlvide" title="Próximamente">¿Olvidaste tu contraseña?</a>
+        </div>
+
+        <div class="login-error" id="loginError"></div>
+        <button type="submit" class="btn btn-ochre" id="btnLogin">Ingresar</button>
+      </form>
+
+      <div class="login-divider">o continúa con</div>
+
+      <!-- Google OAuth: decidido dejarlo solo visual por ahora (ver charla
+           de esta fase) -- botón deshabilitado, sin flujo real detrás. -->
+      <button type="button" class="btn btn-google" id="btnGoogle" disabled title="Próximamente: inicio de sesión con Google">
+        <span class="g">G</span>&nbsp; Continuar con Google
+      </button>
+
+      <div class="login-signup">
+        ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Solicita acceso</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { cargarConfigEmpresa } from '../js/config.js';
+  import { guardarSesion, haySesionActiva } from '../js/sesion.js';
+
+  if (haySesionActiva()) location.replace('../index.html');
+
+  const form = document.getElementById('formLogin');
+  const errorEl = document.getElementById('loginError');
+  const btn = document.getElementById('btnLogin');
+
+  document.getElementById('btnTogglePass').addEventListener('click', () => {
+    const input = document.getElementById('password');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.textContent = '';
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    const config = await cargarConfigEmpresa();
+    if (!config.apiBaseUrl) {
+      errorEl.textContent = 'Este proyecto no tiene un backend configurado (apiBaseUrl en company.json).';
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const cuerpo = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(cuerpo.error || 'No se pudo iniciar sesión.');
+      guardarSesion(cuerpo);
+      location.replace('../index.html');
+    } catch (err) {
+      errorEl.textContent = err.message.includes('fetch') || err.message.includes('Failed')
+        ? 'No se pudo conectar con el servidor. Revisa que el backend esté corriendo.'
+        : err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>

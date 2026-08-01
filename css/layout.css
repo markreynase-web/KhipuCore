@@ -1,0 +1,90 @@
+/* css/layout.css — Fase 6: rediseño a sidebar fijo.
+   Sustituye el header horizontal + module-nav de arriba por:
+     .sidebar   → columna fija a la izquierda (blanco, con el menú)
+     .topbar    → franja oscura arriba del contenido (título de módulo + sesión)
+     .toolbar   → franja clara debajo del topbar (tabs, filtros, exportar)
+   Todo lo de css/base.css (variables, .btn, .kpi-card, etc.) se sigue usando
+   tal cual — esto solo define el esqueleto nuevo alrededor. */
+
+.app-shell{ display:flex; align-items:flex-start; min-height:100vh; }
+
+.sidebar{
+  width:236px; flex-shrink:0; background:#fff; border-right:1px solid var(--paper-line);
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+}
+.sidebar-brand{ display:flex; align-items:center; gap:12px; padding:20px 18px 16px; border-bottom:1px solid var(--paper-line); }
+.sidebar-brand .mark{ width:36px; height:36px; font-size:15px; flex-shrink:0; }
+.sidebar-brand-text{ min-width:0; }
+.sidebar-brand .biz-name{
+  display:block; width:100%; border:none; background:transparent; padding:0;
+  font-family:'Fraunces', serif; font-weight:700; font-size:14px; color:var(--ink);
+}
+.sidebar-brand .biz-name:focus{ outline:none; }
+.sidebar-subtitle{ font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
+
+.sidebar-nav{ flex:1; padding:16px 12px; overflow-y:auto; }
+.sidebar-group{ margin-bottom:20px; }
+.sidebar-group-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700; padding:0 10px; margin-bottom:6px; }
+.sidebar-item{
+  display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px;
+  font-size:13px; font-weight:600; color:var(--ink); text-decoration:none; margin-bottom:2px;
+}
+.sidebar-item:hover{ background:var(--paper); }
+.sidebar-item.active{ background:#E8EFFC; color:#1A4FBF; }
+.sidebar-icon{ font-size:15px; line-height:1; width:18px; text-align:center; flex-shrink:0; }
+
+.sidebar-footer{ border-top:1px solid var(--paper-line); padding:14px 16px; display:flex; align-items:center; gap:10px; }
+.sidebar-avatar{
+  width:32px; height:32px; border-radius:50%; background:var(--ochre); color:var(--ink);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Fraunces', serif;
+  flex-shrink:0; font-size:13px;
+}
+.sidebar-footer-info{ min-width:0; flex:1; }
+.sidebar-footer-nombre{ font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-footer-rol{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.sidebar-logout{ font-size:15px; color:var(--coral); background:none; border:none; cursor:pointer; padding:2px; line-height:1; flex-shrink:0; }
+.sidebar-login-link{ font-size:13px; color:var(--ochre-deep); text-decoration:none; font-weight:600; }
+
+.main-area{ flex:1; min-width:0; }
+
+.topbar{
+  background:var(--ink); color:var(--paper); padding:18px 32px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.topbar-title h1{ font-family:'Fraunces', serif; font-size:18px; font-weight:700; margin:0; }
+.topbar-subtitle{ font-size:11px; color:rgba(250,247,240,0.6); letter-spacing:0.04em; margin-top:2px; }
+.topbar-bell{ background:none; border:none; color:var(--paper); font-size:16px; cursor:default; opacity:0.75; }
+
+.toolbar{
+  background:#fff; border-bottom:1px solid var(--paper-line); padding:12px 32px;
+  display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+}
+.toolbar-left{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.toolbar-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+/* Los botones/inputs "ghost" y "period" nacieron para el header oscuro de
+   antes; dentro del toolbar (fondo blanco) necesitan su propio contraste. */
+.toolbar .btn-ghost{ color:var(--muted); border-color:var(--paper-line); }
+.toolbar .btn-ghost:hover{ color:var(--ink); border-color:var(--ink); }
+.toolbar select.period, .toolbar input.period{
+  color:var(--ink); border-color:var(--paper-line); color-scheme:light;
+}
+.toolbar .date-range span{ color:var(--muted) !important; }
+
+main{ max-width:1180px; margin:0 auto; padding:28px 32px; }
+
+@media (max-width: 900px){
+  .app-shell{ flex-direction:column; }
+  .sidebar{ position:relative; width:100%; height:auto; flex-direction:row; align-items:center; overflow-x:auto; }
+  .sidebar-brand{ border-bottom:none; border-right:1px solid var(--paper-line); }
+  .sidebar-nav{ display:flex; padding:8px; overflow-x:auto; }
+  .sidebar-group{ display:flex; align-items:center; gap:4px; margin-bottom:0; white-space:nowrap; }
+  .sidebar-group-label{ display:none; }
+  .sidebar-footer{ display:none; }
+  main{ padding:20px 16px; }
+  .toolbar, .topbar{ padding:14px 16px; }
+}
+
+@media print{
+  .sidebar, .toolbar, .topbar{ display:none !important; }
+}

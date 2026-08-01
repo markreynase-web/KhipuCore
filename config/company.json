@@ -1,0 +1,16 @@
+{
+  "bizName": "Mi proyecto de datos",
+  "logo": "PD",
+"apiBaseUrl": "http://192.168.18.2:3001/api",
+  "modules": [
+    { "id": "ventas",      "label": "Ventas",      "icon": "💰", "page": "ventas.html",      "enabled": true, "baseDeDatos": true },
+    { "id": "inventario",  "label": "Inventario",  "icon": "📦", "page": "inventario.html",  "enabled": true, "baseDeDatos": true },
+    { "id": "clientes",    "label": "Clientes",    "icon": "🤝", "page": "clientes.html",    "enabled": true, "baseDeDatos": true },
+    { "id": "finanzas",    "label": "Finanzas",    "icon": "💵", "page": "finanzas.html",    "enabled": true, "baseDeDatos": true },
+    { "id": "compras",     "label": "Compras",     "icon": "🛒", "page": "compras.html",     "enabled": false },
+    { "id": "rrhh",        "label": "RRHH",        "icon": "👥", "page": "rrhh.html",        "enabled": false },
+    { "id": "produccion",  "label": "Producción",  "icon": "🏭", "page": "produccion.html",  "enabled": false },
+    { "id": "marketing",   "label": "Marketing",   "icon": "📣", "page": "marketing.html",   "enabled": false }
+  ]
+}
+
