@@ -29,7 +29,7 @@
   .login-features{ display:flex; flex-direction:column; gap:18px; margin-bottom:36px; }
   .login-feature{ display:flex; align-items:flex-start; gap:14px; }
   .login-feature-icon{
-    width:38px; height:38px; border-radius:10px; background:var(--purple-soft); color:var(--purple);
+    width:38px; height:38px; border-radius:10px;
     display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
   }
   .login-feature-title{ font-size:13.5px; font-weight:700; color:var(--ink); }
@@ -39,7 +39,29 @@
     border-radius:12px; box-shadow:var(--card-shadow); overflow:hidden; border:1px solid var(--paper-line);
     background:#fff;
   }
-  .login-preview img{ display:block; width:100%; height:auto; }
+
+  /* Vista previa del panel dentro del login: no es una captura de pantalla
+     estática (se habría desactualizado con cada rediseño) -- es una
+     miniatura hecha con las mismas variables de css/base.css, así que
+     envejece con el resto del tema en vez de quedar pegada a un look viejo. */
+  .lp-mock{ display:flex; height:220px; font-family:'Inter', sans-serif; }
+  .lp-mock-sidebar{ width:148px; flex-shrink:0; background:var(--ink); padding:14px 10px; display:flex; flex-direction:column; gap:12px; }
+  .lp-mock-brand{ display:flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#fff; }
+  .lp-mock-mark{ width:18px; height:18px; border-radius:5px; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800; flex-shrink:0; }
+  .lp-mock-nav{ display:flex; flex-direction:column; gap:3px; }
+  .lp-mock-item{ font-size:9.5px; font-weight:600; color:rgba(255,255,255,0.75); padding:5px 7px; border-radius:6px; white-space:nowrap; }
+  .lp-mock-item.activo{ background:var(--coral); color:#fff; }
+  .lp-mock-main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .lp-mock-topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--paper-line); font-size:10px; font-weight:700; color:var(--ink); }
+  .lp-mock-avatar{ width:16px; height:16px; border-radius:50%; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; }
+  .lp-mock-kpis{ display:flex; gap:8px; padding:10px 14px 0; }
+  .lp-mock-kpi{ flex:1; display:flex; align-items:center; gap:6px; background:var(--paper); border-radius:8px; padding:8px; min-width:0; }
+  .lp-mock-kpi-icon{ width:20px; height:20px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:9px; flex-shrink:0; }
+  .lp-mock-kpi-label{ font-size:7px; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lp-mock-kpi-value{ font-size:12px; font-weight:800; color:var(--ink); }
+  .lp-mock-chart{ flex:1; padding:10px 14px 14px; display:flex; flex-direction:column; min-height:0; }
+  .lp-mock-chart-label{ font-size:8.5px; font-weight:700; color:var(--ink); margin-bottom:4px; }
+  .lp-mock-chart svg{ flex:1; width:100%; }
 
   /* Columna derecha: el formulario en sí. */
   .login-form-col{
@@ -62,7 +84,7 @@
     width:100%; font-family:'Inter', sans-serif; font-size:14px; padding:10px 12px 10px 32px;
     border:1px solid var(--paper-line); border-radius:9px; background:var(--paper); color:var(--ink);
   }
-  .login-card input:focus{ outline:none; border-color:var(--ochre-deep); }
+  .login-card input:focus{ outline:none; border-color:var(--coral); }
   .login-toggle-pass{ position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--muted); font-size:13px; }
 
   .login-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
@@ -78,7 +100,7 @@
 
   .btn-google{
     width:100%; justify-content:center; background:#fff; border:1px solid var(--paper-line); color:var(--ink);
-    padding:10px; opacity:0.55; cursor:not-allowed; position:relative;
+    padding:10px; opacity:0.9; cursor:not-allowed; position:relative;
   }
   .btn-google .g{ font-weight:700; }
 
@@ -109,21 +131,21 @@
 
     <div class="login-features">
       <div class="login-feature">
-        <div class="login-feature-icon">📊</div>
+        <div class="login-feature-icon" style="background:var(--blue-soft); color:var(--blue);">📊</div>
         <div>
           <div class="login-feature-title">Información en tiempo real</div>
           <div class="login-feature-desc">Visualiza lo más importante de tu empresa al instante.</div>
         </div>
       </div>
       <div class="login-feature">
-        <div class="login-feature-icon">🛡️</div>
+        <div class="login-feature-icon" style="background:var(--purple-soft); color:var(--purple);">🛡️</div>
         <div>
           <div class="login-feature-title">Seguridad y confianza</div>
           <div class="login-feature-desc">Tus datos siempre protegidos, con permisos por rol.</div>
         </div>
       </div>
       <div class="login-feature">
-        <div class="login-feature-icon">🤝</div>
+        <div class="login-feature-icon" style="background:var(--orange-soft); color:var(--orange);">🤝</div>
         <div>
           <div class="login-feature-title">Todo en un solo lugar</div>
           <div class="login-feature-desc">Clientes, ventas, inventario, finanzas y más.</div>
@@ -132,7 +154,37 @@
     </div>
 
     <div class="login-preview">
-      <img src="../assets/login-preview.jpg" alt="Vista previa del panel de ventas" loading="lazy">
+      <div class="lp-mock">
+        <div class="lp-mock-sidebar">
+          <div class="lp-mock-brand"><span class="lp-mock-mark">PD</span><span>Mi proyecto de datos</span></div>
+          <div class="lp-mock-nav">
+            <div class="lp-mock-item activo">🏠 Inicio</div>
+            <div class="lp-mock-item">💰 Ventas</div>
+            <div class="lp-mock-item">📦 Inventario</div>
+            <div class="lp-mock-item">👥 Clientes</div>
+            <div class="lp-mock-item">📊 Finanzas</div>
+          </div>
+        </div>
+        <div class="lp-mock-main">
+          <div class="lp-mock-topbar"><span>Panel de Ventas</span><span class="lp-mock-avatar">A</span></div>
+          <div class="lp-mock-kpis">
+            <div class="lp-mock-kpi">
+              <span class="lp-mock-kpi-icon" style="background:var(--blue-soft); color:var(--blue);">💰</span>
+              <div><div class="lp-mock-kpi-label">Total de monto</div><div class="lp-mock-kpi-value">323</div></div>
+            </div>
+            <div class="lp-mock-kpi">
+              <span class="lp-mock-kpi-icon" style="background:var(--orange-soft); color:var(--orange);">📦</span>
+              <div><div class="lp-mock-kpi-label">Registros</div><div class="lp-mock-kpi-value">1</div></div>
+            </div>
+          </div>
+          <div class="lp-mock-chart">
+            <div class="lp-mock-chart-label">Evolución por fecha</div>
+            <svg viewBox="0 0 220 50" preserveAspectRatio="none">
+              <polyline points="0,42 30,30 60,35 90,15 120,22 150,8 180,18 220,5" fill="none" stroke="var(--coral)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
