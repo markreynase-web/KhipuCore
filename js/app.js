@@ -8,11 +8,12 @@ import { guardarDatosLocal, cargarDatosLocal, borrarDatosLocal } from './storage
 import { renderTodo, redimensionarTodosLosGraficos } from './dashboard.js';
 import { cargarConfigEmpresa, buscarModulo } from './config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderTopbar } from '../components/topbar.js';
 import { iniciarModoBackend } from './modoBackend.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
 import { renderTabla } from '../components/tablaRegistros.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
-import { obtenerSesion, tienePermiso, haySesionActiva } from './sesion.js';
+import { tienePermiso, haySesionActiva } from './sesion.js';
 import { ESQUEMAS } from './esquemas.js';
 import { crearRegistro } from './api.js';
 
@@ -31,6 +32,17 @@ const estado = {
 // esto deja de ser null y refrescar() empieza a leer de la API en vez de
 // localStorage/CSV local. Ver activarCapturaSiCorresponde().
 let backendActivo = null;
+
+// Término de la búsqueda global del topbar (ver components/topbar.js), leído
+// UNA vez de sessionStorage al arrancar la página (ver iniciar()) y guardado
+// acá -- no en refrescarTablaBackend() -- porque activarCapturaSiCorresponde()
+// llama a refrescarTablaBackend() dos veces seguidas al iniciar (una vía
+// refrescar(), otra al final); si cada llamada leyera y borrara
+// sessionStorage por su cuenta, la primera se quedaría con el filtro y la
+// segunda (la que de verdad queda pintada) ya lo encontraría vacío. Se limpia
+// después de que el arranque termina, para que refrescos posteriores
+// (ej. tras crear un registro) no lo vuelvan a aplicar.
+let terminoBusquedaPendiente = '';
 
 function generarDatosEjemplo() {
   const productos = [
@@ -425,31 +437,9 @@ async function refrescarTablaBackend() {
       return ok;
     },
     puedeEditar: tienePermiso(`${NAMESPACE}.editar`),
-    puedeBorrar: tienePermiso(`${NAMESPACE}.eliminar`)
+    puedeBorrar: tienePermiso(`${NAMESPACE}.eliminar`),
+    terminoInicial: terminoBusquedaPendiente
   });
-}
-
-// Muestra quién está logueado (o el link para entrar) en el header.
-// Por ahora es solo informativo: no bloquea el acceso a la página si no hay
-// sesión — eso llega con el middleware de permisos (paso 4 de la Fase 4).
-function renderSesionWidget() {
-  const cont = document.getElementById('sesionWidget');
-  if (!cont) return;
-  const sesion = obtenerSesion();
-  if (!sesion || !sesion.usuario) {
-    cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`;
-    return;
-  }
-  // El botón de "Cerrar sesión" vive en el pie del sidebar (ver
-  // components/sidebar.js) para no duplicarlo acá -- este widget del topbar
-  // es solo informativo (quién está conectado) más la campana de
-  // notificaciones, que por ahora es decorativa: no hay sistema de
-  // notificaciones real todavía, así que no dispara nada al hacer clic.
-  cont.innerHTML = `
-    <span>${sesion.usuario.nombre}</span>
-    <span class="rol">${sesion.usuario.rol}</span>
-    <button type="button" class="topbar-bell" title="Notificaciones (próximamente)">🔔</button>
-  `;
 }
 
 async function iniciar() {
@@ -467,7 +457,7 @@ async function iniciar() {
 
   renderSidebar(config, NAMESPACE);
   aplicarBranding(config);
-  renderSesionWidget();
+  await renderTopbar(config);
   wireEventos();
 
   if (moduloActual?.baseDeDatos) {
@@ -477,12 +467,16 @@ async function iniciar() {
     // un instante antes de que lleguen los reales.
     borrarDatosLocal(NAMESPACE);
     mostrarEstado('Cargando datos…', 'info');
+
+    terminoBusquedaPendiente = sessionStorage.getItem('pd_busqueda_pendiente') || '';
+    if (terminoBusquedaPendiente) sessionStorage.removeItem('pd_busqueda_pendiente');
   } else {
     restaurarDatosLocalSiExisten();
     refrescar();
   }
 
   await activarCapturaSiCorresponde(config);
+  terminoBusquedaPendiente = '';
 }
 
 iniciar();

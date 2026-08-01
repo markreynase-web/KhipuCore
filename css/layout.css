@@ -9,51 +9,123 @@
 .app-shell{ display:flex; align-items:flex-start; min-height:100vh; }
 
 .sidebar{
-  width:236px; flex-shrink:0; background:#fff; border-right:1px solid var(--paper-line);
+  width:236px; flex-shrink:0; background:var(--ink);
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
 }
-.sidebar-brand{ display:flex; align-items:center; gap:12px; padding:20px 18px 16px; border-bottom:1px solid var(--paper-line); }
-.sidebar-brand .mark{ width:36px; height:36px; font-size:15px; flex-shrink:0; }
+.sidebar-brand{ display:flex; align-items:center; gap:12px; padding:20px 18px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.sidebar-brand .mark{ width:36px; height:36px; font-size:15px; flex-shrink:0; background:var(--coral); color:#fff; }
 .sidebar-brand-text{ min-width:0; }
 .sidebar-brand .biz-name{
   display:block; width:100%; border:none; background:transparent; padding:0;
-  font-family:'Fraunces', serif; font-weight:700; font-size:14px; color:var(--ink);
+  font-family:'Inter', sans-serif; font-weight:700; font-size:14px; color:#fff;
 }
 .sidebar-brand .biz-name:focus{ outline:none; }
-.sidebar-subtitle{ font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
+.sidebar-subtitle{ font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-top:3px; }
 
 .sidebar-nav{ flex:1; padding:16px 12px; overflow-y:auto; }
 .sidebar-group{ margin-bottom:20px; }
-.sidebar-group-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700; padding:0 10px; margin-bottom:6px; }
+.sidebar-group-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:rgba(255,255,255,0.35); font-weight:700; padding:0 10px; margin-bottom:6px; }
 .sidebar-item{
   display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px;
-  font-size:13px; font-weight:600; color:var(--ink); text-decoration:none; margin-bottom:2px;
+  font-size:13px; font-weight:600; color:rgba(255,255,255,0.8); text-decoration:none; margin-bottom:2px;
 }
-.sidebar-item:hover{ background:var(--paper); }
-.sidebar-item.active{ background:#E8EFFC; color:#1A4FBF; }
+.sidebar-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
+.sidebar-item.active{ background:var(--coral); color:#fff; }
 .sidebar-icon{ font-size:15px; line-height:1; width:18px; text-align:center; flex-shrink:0; }
 
-.sidebar-footer{ border-top:1px solid var(--paper-line); padding:14px 16px; display:flex; align-items:center; gap:10px; }
+.sidebar-footer{ border-top:1px solid rgba(255,255,255,0.08); padding:14px 16px; display:flex; align-items:center; gap:10px; }
 .sidebar-avatar{
-  width:32px; height:32px; border-radius:50%; background:var(--ochre); color:var(--ink);
-  display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Fraunces', serif;
+  width:32px; height:32px; border-radius:50%; background:var(--coral); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Inter', sans-serif;
   flex-shrink:0; font-size:13px;
 }
 .sidebar-footer-info{ min-width:0; flex:1; }
-.sidebar-footer-nombre{ font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sidebar-footer-rol{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
-.sidebar-logout{ font-size:15px; color:var(--coral); background:none; border:none; cursor:pointer; padding:2px; line-height:1; flex-shrink:0; }
-.sidebar-login-link{ font-size:13px; color:var(--ochre-deep); text-decoration:none; font-weight:600; }
+.sidebar-footer-nombre{ font-size:12.5px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-footer-rol{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.04em; color:rgba(255,255,255,0.45); }
+.sidebar-logout{ font-size:15px; color:rgba(255,255,255,0.6); background:none; border:none; cursor:pointer; padding:2px; line-height:1; flex-shrink:0; }
+.sidebar-logout:hover{ color:var(--coral); }
+.sidebar-login-link{ font-size:13px; color:#fff; text-decoration:none; font-weight:600; }
 
 .main-area{ flex:1; min-width:0; }
 
 .topbar{
-  background:var(--ink); color:var(--paper); padding:18px 32px;
+  background:#fff; color:var(--ink); padding:16px 32px; border-bottom:1px solid var(--paper-line);
   display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
 }
-.topbar-title h1{ font-family:'Fraunces', serif; font-size:18px; font-weight:700; margin:0; }
-.topbar-subtitle{ font-size:11px; color:rgba(250,247,240,0.6); letter-spacing:0.04em; margin-top:2px; }
-.topbar-bell{ background:none; border:none; color:var(--paper); font-size:16px; cursor:default; opacity:0.75; }
+.topbar-title h1{ font-family:'Inter', sans-serif; font-size:18px; font-weight:700; margin:0; color:var(--ink); }
+.topbar-subtitle{ font-size:11px; color:var(--muted); letter-spacing:0.04em; margin-top:2px; }
+
+/* Buscador global (components/topbar.js): input + dropdown de resultados
+   agrupados por módulo. Se pinta en #topbarSearch, entre el título y el
+   cluster de usuario. */
+.topbar-search{ position:relative; flex:1; max-width:420px; min-width:180px; }
+.topbar-search input{
+  width:100%; font-family:'Inter', sans-serif; font-size:13px; padding:9px 12px 9px 34px;
+  border:1px solid var(--paper-line); border-radius:10px; background:var(--paper); color:var(--ink);
+}
+.topbar-search input:focus{ outline:none; border-color:var(--coral); background:#fff; }
+.topbar-search .ico{ position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--muted); pointer-events:none; }
+.topbar-search-resultados{
+  display:none; position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:30;
+  background:#fff; border:1px solid var(--paper-line); border-radius:10px; box-shadow:var(--card-shadow);
+  max-height:360px; overflow-y:auto; padding:8px;
+}
+.topbar-search-resultados.abierto{ display:block; }
+.topbar-search-grupo-titulo{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:700; padding:6px 8px 4px; }
+.topbar-search-item{
+  display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; cursor:pointer; font-size:13px; color:var(--ink);
+}
+.topbar-search-item:hover{ background:var(--paper); }
+.topbar-search-item .sub{ font-size:11px; color:var(--muted); }
+.topbar-search-vacio{ padding:14px 8px; font-size:12.5px; color:var(--muted); text-align:center; }
+
+/* Cluster de usuario (components/topbar.js): campana con contador + avatar
+   con dropdown. Se pinta en #sesionWidget, reemplaza al viejo widget de
+   solo-lectura duplicado en cada página. */
+.topbar-user{ display:flex; align-items:center; gap:14px; }
+.topbar-notif{ position:relative; }
+.topbar-notif-btn{ background:none; border:none; font-size:17px; cursor:pointer; color:var(--muted); padding:4px; line-height:1; position:relative; }
+.topbar-notif-btn:hover{ color:var(--ink); }
+.topbar-notif-badge{
+  position:absolute; top:-2px; right:-4px; background:var(--coral); color:#fff; font-size:10px; font-weight:700;
+  min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+}
+.topbar-notif-panel{
+  display:none; position:absolute; right:0; top:calc(100% + 10px); z-index:30; width:320px;
+  background:#fff; border:1px solid var(--paper-line); border-radius:10px; box-shadow:var(--card-shadow); padding:8px;
+}
+.topbar-notif-panel.abierto{ display:block; }
+.topbar-notif-titulo{ font-size:12px; font-weight:700; color:var(--ink); padding:6px 8px; }
+.topbar-notif-item{ display:flex; align-items:flex-start; gap:10px; padding:8px; border-radius:7px; }
+.topbar-notif-item:hover{ background:var(--paper); }
+.topbar-notif-icono{
+  width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:13px; flex-shrink:0;
+}
+.topbar-notif-texto{ font-size:12.5px; color:var(--ink); line-height:1.4; }
+.topbar-notif-hora{ font-size:10.5px; color:var(--muted); margin-top:1px; }
+.topbar-notif-vacio{ padding:16px 8px; font-size:12.5px; color:var(--muted); text-align:center; }
+
+.topbar-usuario-menu{ position:relative; }
+.topbar-usuario-chip{ display:flex; align-items:center; gap:8px; cursor:pointer; background:none; border:none; padding:2px; }
+.topbar-usuario-avatar{
+  width:32px; height:32px; border-radius:50%; background:var(--coral); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;
+}
+.topbar-usuario-info{ text-align:left; line-height:1.25; }
+.topbar-usuario-nombre{ font-size:12.5px; font-weight:600; color:var(--ink); }
+.topbar-usuario-rol{ font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.topbar-usuario-chevron{ font-size:10px; color:var(--muted); }
+.topbar-usuario-panel{
+  display:none; position:absolute; right:0; top:calc(100% + 10px); z-index:30; min-width:180px;
+  background:#fff; border:1px solid var(--paper-line); border-radius:10px; box-shadow:var(--card-shadow); padding:6px;
+}
+.topbar-usuario-panel.abierto{ display:block; }
+.topbar-usuario-panel button{
+  display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer;
+  font-family:'Inter', sans-serif; font-size:13px; padding:9px 10px; border-radius:6px; color:var(--coral); font-weight:600;
+}
+.topbar-usuario-panel button:hover{ background:var(--paper); }
 
 .toolbar{
   background:#fff; border-bottom:1px solid var(--paper-line); padding:12px 32px;
@@ -73,10 +145,14 @@
 
 main{ max-width:1180px; margin:0 auto; padding:28px 32px; }
 
+@media (max-width: 640px){
+  .topbar-search{ display:none; }
+}
+
 @media (max-width: 900px){
   .app-shell{ flex-direction:column; }
   .sidebar{ position:relative; width:100%; height:auto; flex-direction:row; align-items:center; overflow-x:auto; }
-  .sidebar-brand{ border-bottom:none; border-right:1px solid var(--paper-line); }
+  .sidebar-brand{ border-bottom:none; border-right:1px solid rgba(255,255,255,0.08); }
   .sidebar-nav{ display:flex; padding:8px; overflow-x:auto; }
   .sidebar-group{ display:flex; align-items:center; gap:4px; margin-bottom:0; white-space:nowrap; }
   .sidebar-group-label{ display:none; }

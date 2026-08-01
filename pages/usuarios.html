@@ -22,6 +22,7 @@
         <h1 id="topbarTitle">Usuarios</h1>
         <div class="topbar-subtitle" id="topbarSubtitle">QUIÉN PUEDE ENTRAR Y QUÉ PUEDE HACER</div>
       </div>
+      <div class="topbar-search" id="topbarSearch"></div>
       <div id="sesionWidget" class="sesion-widget"></div>
     </header>
 
@@ -43,6 +44,7 @@
 <script type="module">
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderTopbar } from '../components/topbar.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { listarRegistros, crearRegistro, actualizarRegistro } from '../js/api.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
@@ -52,14 +54,6 @@ if (!haySesionActiva()) location.replace('login.html');
 
 let config;
 let roles = [];
-
-function renderSesionWidget() {
-  const cont = document.getElementById('sesionWidget');
-  const sesion = obtenerSesion();
-  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`; return; }
-  cont.innerHTML = `<span>${sesion.usuario.nombre}</span><span class="rol">${sesion.usuario.rol}</span>
-    <button type="button" class="topbar-bell" title="Notificaciones (próximamente)">🔔</button>`;
-}
 
 async function pedirRoles() {
   const sesion = obtenerSesion();
@@ -181,7 +175,7 @@ function abrirNuevoUsuario() {
 (async function iniciar() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'usuarios');
-  renderSesionWidget();
+  await renderTopbar(config);
 
   if (!tienePermiso('usuarios.ver')) {
     document.getElementById('tablaUsuarios').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';

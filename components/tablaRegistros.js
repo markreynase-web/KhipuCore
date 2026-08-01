@@ -19,7 +19,7 @@ function formatoCelda(valor) {
   return escapeHtml(valor);
 }
 
-export function renderTabla(contenedorId, filasOriginales, esquema, { onGuardarEdicion, onBorrar, puedeEditar = true, puedeBorrar = true }) {
+export function renderTabla(contenedorId, filasOriginales, esquema, { onGuardarEdicion, onBorrar, puedeEditar = true, puedeBorrar = true, terminoInicial = '' }) {
   const cont = document.getElementById(contenedorId);
   if (!cont) return;
 
@@ -34,9 +34,10 @@ export function renderTabla(contenedorId, filasOriginales, esquema, { onGuardarE
   // Estado local de la tabla (búsqueda/página). Vive solo mientras esta
   // instancia de renderTabla esté montada -- si app.js vuelve a llamar
   // renderTabla (ej. tras guardar un registro) arranca de nuevo en la
-  // página 1, sin buscador aplicado. Es una limitación aceptada a cambio
-  // de no tener que sincronizar estado con el padre.
-  let termino = '';
+  // página 1, salvo terminoInicial (llegada desde la búsqueda global del
+  // topbar, ver components/topbar.js + js/app.js). Es una limitación
+  // aceptada a cambio de no tener que sincronizar estado con el padre.
+  let termino = terminoInicial;
   let pagina = 1;
 
   function filasFiltradas() {

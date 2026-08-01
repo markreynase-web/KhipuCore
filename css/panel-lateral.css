@@ -29,10 +29,10 @@
 .panel-lateral-icono{
   display:flex; align-items:center; justify-content:center;
   width:38px; height:38px; border-radius:10px;
-  background:#FCEFD8; color:var(--ochre-deep); font-size:17px; flex-shrink:0;
+  background:var(--orange-soft); color:var(--orange); font-size:17px; flex-shrink:0;
 }
 .panel-lateral-header h3{
-  font-family:'Fraunces', serif; font-size:17px; font-weight:600; margin:0; color:var(--ink);
+  font-family:'Inter', sans-serif; font-size:16px; font-weight:700; margin:0; color:var(--ink);
 }
 .panel-lateral-cerrar{
   background:var(--paper); border:none; cursor:pointer; border-radius:50%;

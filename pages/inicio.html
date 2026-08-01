@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="../css/cards.css">
 <link rel="stylesheet" href="../css/tables.css">
 <link rel="stylesheet" href="../css/panel-lateral.css">
+<script src="../lib/chart.js"></script>
 </head>
 <body data-modulo="inicio">
 
@@ -19,8 +20,9 @@
     <header class="topbar">
       <div class="topbar-title">
         <h1 id="topbarTitle">Inicio</h1>
-        <div class="topbar-subtitle">RESUMEN GENERAL DEL NEGOCIO</div>
+        <div class="topbar-subtitle" id="topbarSubtitle">Bienvenido a tu panel de control</div>
       </div>
+      <div class="topbar-search" id="topbarSearch"></div>
       <div id="sesionWidget" class="sesion-widget"></div>
     </header>
 
@@ -28,35 +30,51 @@
       <div class="kpis" id="kpisResumen"></div>
 
       <div class="grid-2">
+        <div class="panel" id="panelChart" style="display:none;">
+          <h3>
+            Resumen de ingresos vs. egresos
+            <select id="chartPeriodo" style="font-family:'Inter',sans-serif; font-size:12px; font-weight:600; padding:5px 8px; border-radius:6px; border:1px solid var(--paper-line); background:#fff; color:var(--ink);">
+              <option value="anio">Este año</option>
+              <option value="historico">Todo el histórico</option>
+            </select>
+          </h3>
+          <div class="chart-wrap"><canvas id="chartIngresosEgresos"></canvas></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:22px;">
+          <div class="panel" id="panelTopClientesMini" style="display:none; padding:20px;">
+            <h3 style="margin-bottom:10px;">Top clientes</h3>
+            <div id="listaTopClientesMini"></div>
+          </div>
+          <div class="panel" id="panelAlertasMini" style="display:none; padding:20px;">
+            <h3 style="margin-bottom:10px;">Alertas de stock</h3>
+            <div id="listaAlertasMini"></div>
+          </div>
+          <div class="panel" id="panelActividadMini" style="display:none; padding:20px;">
+            <h3 style="margin-bottom:10px;">Actividad reciente</h3>
+            <div id="listaActividadMini"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
         <div class="panel" id="panelTopProductos" style="display:none;">
           <h3>Producto más vendido <span class="tag">Ventas</span></h3>
           <div id="listaTopProductos"></div>
         </div>
         <div class="panel" id="panelStockBajo" style="display:none;">
-          <h3>Alertas de stock <span class="tag">Inventario</span></h3>
+          <h3>Productos con stock bajo <span class="tag">Inventario</span></h3>
           <div id="listaStockBajo"></div>
         </div>
       </div>
 
       <div class="grid-2">
-        <div class="panel" id="panelTopClientes" style="display:none;">
-          <h3>Mejores clientes <span class="tag">Clientes</span></h3>
-          <div id="listaTopClientes"></div>
+        <div class="panel" id="panelVencimientos" style="display:none;">
+          <h3>Próximos vencimientos <span class="tag">Inventario</span></h3>
+          <div id="listaVencimientos"></div>
         </div>
-        <div class="panel" id="panelFinanzas" style="display:none;">
-          <h3>Ingresos vs. egresos <span class="tag">Finanzas</span></h3>
-          <div id="listaFinanzas"></div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="panel" id="panelActividad" style="display:none;">
-          <h3>Actividad reciente <span class="tag">Auditoría</span></h3>
-          <div id="listaActividad"></div>
-        </div>
-        <div class="panel" id="panelUsuarios" style="display:none;">
-          <h3>Usuarios por rol <span class="tag">Usuarios</span></h3>
-          <div id="listaUsuarios"></div>
+        <div class="panel" id="panelFinanzasResumen" style="display:none;">
+          <h3>Ingresos vs. egresos (resumen) <span class="tag">Finanzas</span></h3>
+          <div id="listaFinanzasResumen"></div>
         </div>
       </div>
 
@@ -68,27 +86,29 @@
 <script type="module">
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderTopbar } from '../components/topbar.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { listarRegistros } from '../js/api.js';
 import { fmtNum, escapeHtml } from '../js/utils.js';
+import { crearGraficoLineasComparativo } from '../js/charts.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
 let config;
-
-function renderSesionWidget() {
-  const cont = document.getElementById('sesionWidget');
-  const sesion = obtenerSesion();
-  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`; return; }
-  cont.innerHTML = `<span>${sesion.usuario.nombre}</span><span class="rol">${sesion.usuario.rol}</span>
-    <button type="button" class="topbar-bell" title="Notificaciones (próximamente)">🔔</button>`;
-}
+let chartInstance = null;
+const datos = {}; // cache de lo que se pidió una sola vez: ventas/inventario/clientes/finanzas/usuarios
 
 function esteMes(fechaStr) {
   if (!fechaStr) return false;
   const d = new Date(fechaStr);
   const hoy = new Date();
   return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth();
+}
+
+function diasHasta(fechaStr) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const f = new Date(fechaStr); f.setHours(0, 0, 0, 0);
+  return Math.round((f - hoy) / 86400000);
 }
 
 // Suma f[valorClave] agrupado por f[clave], de mayor a menor.
@@ -105,108 +125,182 @@ function filaRank(nombre, valor, i) {
   return `<div class="rank-row"><span class="rank-num">${i + 1}</span><span class="rank-name">${escapeHtml(nombre)}</span><span class="rank-val">${fmtNum(valor)}</span></div>`;
 }
 
-function kpiCard(label, valor, sub) {
-  return `<div class="kpi-card"><div class="label">${escapeHtml(label)}</div><div class="value num">${valor}</div><div class="sub">${sub || ''}</div></div>`;
+function kpiCard({ acento, icono, label, value, sub, barra = 85 }) {
+  return `<div class="kpi-card" data-acento="${acento}">
+    <div class="kpi-card-icon">${icono}</div>
+    <div class="label">${escapeHtml(label)}</div>
+    <div class="value num">${value}</div>
+    <div class="sub">${sub || ''}</div>
+    <div class="kpi-card-bar"><div class="kpi-card-bar-fill" style="width:${barra}%"></div></div>
+  </div>`;
 }
 
-async function cargarVentas(kpis) {
-  const filas = (await listarRegistros(config.apiBaseUrl, 'ventas')) || [];
-  const filasMes = filas.filter(f => esteMes(f.fecha));
-  const totalMes = filasMes.reduce((s, f) => s + (Number(f.monto) || 0), 0);
-  const totalHistorico = filas.reduce((s, f) => s + (Number(f.monto) || 0), 0);
-  kpis.push(kpiCard('Ventas este mes', fmtNum(totalMes), `${filasMes.length} venta(s) · histórico ${fmtNum(totalHistorico)}`));
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-  const top = agregarPorClave(filas, 'producto', 'monto').slice(0, 5);
+function agruparFinanzasPorMes(filas, modo) {
+  if (modo === 'historico') {
+    const ing = new Map(), egr = new Map();
+    filas.forEach(f => {
+      const d = new Date(f.fecha);
+      const clave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const mapa = f.tipo === 'ingreso' ? ing : egr;
+      mapa.set(clave, (mapa.get(clave) || 0) + (Number(f.monto) || 0));
+    });
+    const claves = [...new Set([...ing.keys(), ...egr.keys()])].sort();
+    return {
+      etiquetas: claves.map(c => { const [y, m] = c.split('-'); return `${MESES[Number(m) - 1]} ${y}`; }),
+      ingresos: claves.map(c => ing.get(c) || 0),
+      egresos: claves.map(c => egr.get(c) || 0)
+    };
+  }
+  const anioActual = new Date().getFullYear();
+  const ingresos = new Array(12).fill(0), egresos = new Array(12).fill(0);
+  filas.forEach(f => {
+    const d = new Date(f.fecha);
+    if (d.getFullYear() !== anioActual) return;
+    const arr = f.tipo === 'ingreso' ? ingresos : egresos;
+    arr[d.getMonth()] += Number(f.monto) || 0;
+  });
+  return { etiquetas: MESES, ingresos, egresos };
+}
+
+function dibujarChartFinanzas() {
+  const modo = document.getElementById('chartPeriodo').value;
+  const { etiquetas, ingresos, egresos } = agruparFinanzasPorMes(datos.finanzas, modo);
+  const wrap = document.getElementById('chartIngresosEgresos').closest('.chart-wrap');
+  wrap.innerHTML = '<canvas id="chartIngresosEgresos"></canvas>';
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  if (!ingresos.some(v => v) && !egresos.some(v => v)) {
+    wrap.innerHTML = '<div class="chart-empty">Todavía no hay movimientos de Finanzas para graficar.</div>';
+    return;
+  }
+  const ctx = document.getElementById('chartIngresosEgresos').getContext('2d');
+  chartInstance = crearGraficoLineasComparativo(ctx, {
+    etiquetas, serieA: ingresos, serieB: egresos,
+    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#1A4FBF', colorB: '#E85C4A'
+  });
+}
+
+async function seccionVentas(kpis) {
+  datos.ventas = (await listarRegistros(config.apiBaseUrl, 'ventas')) || [];
+  const filasMes = datos.ventas.filter(f => esteMes(f.fecha));
+  const totalMes = filasMes.reduce((s, f) => s + (Number(f.monto) || 0), 0);
+  const totalHistorico = datos.ventas.reduce((s, f) => s + (Number(f.monto) || 0), 0);
+  kpis.push({ orden: 1, html: kpiCard({ acento: 'red', icono: '💰', label: 'Ventas este mes', value: fmtNum(totalMes),
+    sub: `${filasMes.length} venta(s) · histórico ${fmtNum(totalHistorico)}` }) });
+
+  const top = agregarPorClave(datos.ventas, 'producto', 'monto').slice(0, 5);
   document.getElementById('panelTopProductos').style.display = '';
   document.getElementById('listaTopProductos').innerHTML = top.length
     ? top.map((r, i) => filaRank(r[0], r[1], i)).join('')
     : '<div class="rank-row">Todavía no hay ventas registradas.</div>';
 }
 
-async function cargarInventario(kpis) {
-  const filas = (await listarRegistros(config.apiBaseUrl, 'inventario')) || [];
-  const alertas = filas.filter(f => Number(f.stock) <= Number(f.stock_minimo));
-  kpis.push(kpiCard('Productos en inventario', fmtNum(filas.length),
-    alertas.length ? `<span style="color:var(--coral);">${alertas.length} con stock bajo</span>` : 'Todo el stock por encima del mínimo'));
+async function seccionInventario(kpis) {
+  datos.inventario = (await listarRegistros(config.apiBaseUrl, 'inventario')) || [];
+  const alertas = datos.inventario.filter(p => Number(p.stock) <= Number(p.stock_minimo));
+  kpis.push({ orden: 3, html: kpiCard({ acento: 'orange', icono: '📦', label: 'Productos en inventario', value: fmtNum(datos.inventario.length),
+    sub: alertas.length ? `<span style="color:var(--coral);">${alertas.length} con stock bajo</span>` : 'Todo el stock por encima del mínimo' }) });
 
   document.getElementById('panelStockBajo').style.display = '';
   document.getElementById('listaStockBajo').innerHTML = alertas.length
     ? alertas.slice(0, 8).map((p, i) => filaRank(p.nombre, Number(p.stock), i)).join('')
     : '<div class="rank-row">Ningún producto está en su stock mínimo o por debajo.</div>';
+
+  document.getElementById('panelAlertasMini').style.display = '';
+  document.getElementById('listaAlertasMini').innerHTML = alertas.length
+    ? alertas.slice(0, 4).map(p => `<div class="rank-row"><span class="rank-name">${escapeHtml(p.nombre)}</span><span class="rank-val" style="color:var(--coral);">${fmtNum(Number(p.stock))} unidad(es)</span></div>`).join('')
+    : '<div class="rank-row">Sin alertas de stock.</div>';
+
+  const vencen = datos.inventario
+    .filter(p => p.fecha_vencimiento && diasHasta(p.fecha_vencimiento) <= 30)
+    .sort((a, b) => new Date(a.fecha_vencimiento) - new Date(b.fecha_vencimiento));
+  document.getElementById('panelVencimientos').style.display = '';
+  document.getElementById('listaVencimientos').innerHTML = vencen.length
+    ? vencen.slice(0, 8).map(p => {
+        const dias = diasHasta(p.fecha_vencimiento);
+        const urgente = dias <= 7;
+        return `<div class="rank-row"><span class="rank-name">${escapeHtml(p.nombre)}</span><span class="rank-val" style="${urgente ? 'color:var(--coral);' : ''}">${escapeHtml(String(p.fecha_vencimiento).slice(0, 10))}${dias < 0 ? ' (vencido)' : ` (${dias} día${dias === 1 ? '' : 's'})`}</span></div>`;
+      }).join('')
+    : '<div class="rank-row">Ningún producto vence en los próximos 30 días.</div>';
 }
 
-async function cargarClientes(kpis) {
-  const filas = (await listarRegistros(config.apiBaseUrl, 'clientes')) || [];
-  const orden = [...filas].sort((a, b) => (Number(b.compras_totales) || 0) - (Number(a.compras_totales) || 0));
-  kpis.push(kpiCard('Clientes registrados', fmtNum(filas.length), orden[0] ? `Top: ${escapeHtml(orden[0].nombre)}` : 'Todavía no hay clientes.'));
+async function seccionClientes(kpis) {
+  datos.clientes = (await listarRegistros(config.apiBaseUrl, 'clientes')) || [];
+  const ordenClientes = [...datos.clientes].sort((a, b) => (Number(b.compras_totales) || 0) - (Number(a.compras_totales) || 0));
+  kpis.push({ orden: 2, html: kpiCard({ acento: 'blue', icono: '👥', label: 'Clientes registrados', value: fmtNum(datos.clientes.length),
+    sub: ordenClientes[0] ? `Top: ${escapeHtml(ordenClientes[0].nombre)}` : 'Todavía no hay clientes.' }) });
 
-  document.getElementById('panelTopClientes').style.display = '';
-  document.getElementById('listaTopClientes').innerHTML = orden.length
-    ? orden.slice(0, 5).map((c, i) => filaRank(c.nombre, Number(c.compras_totales) || 0, i)).join('')
+  document.getElementById('panelTopClientesMini').style.display = '';
+  document.getElementById('listaTopClientesMini').innerHTML = ordenClientes.length
+    ? ordenClientes.slice(0, 5).map((c, i) => filaRank(c.nombre, Number(c.compras_totales) || 0, i)).join('')
     : '<div class="rank-row">Todavía no hay clientes registrados.</div>';
 }
 
-async function cargarFinanzas(kpis) {
-  const filas = (await listarRegistros(config.apiBaseUrl, 'finanzas')) || [];
-  const ingresos = filas.filter(f => f.tipo === 'ingreso').reduce((s, f) => s + (Number(f.monto) || 0), 0);
-  const egresos = filas.filter(f => f.tipo === 'egreso').reduce((s, f) => s + (Number(f.monto) || 0), 0);
-  const balance = ingresos - egresos;
-  kpis.push(kpiCard('Balance (ingresos − egresos)', fmtNum(balance), `Ingresos ${fmtNum(ingresos)} · Egresos ${fmtNum(egresos)}`));
+async function seccionFinanzas(kpis) {
+  datos.finanzas = (await listarRegistros(config.apiBaseUrl, 'finanzas')) || [];
+  const ingresos = datos.finanzas.filter(f => f.tipo === 'ingreso').reduce((s, f) => s + (Number(f.monto) || 0), 0);
+  const egresos = datos.finanzas.filter(f => f.tipo === 'egreso').reduce((s, f) => s + (Number(f.monto) || 0), 0);
+  kpis.push({ orden: 5, html: kpiCard({ acento: 'green', icono: '💵', label: 'Balance (ingresos − egresos)', value: fmtNum(ingresos - egresos),
+    sub: `Ingresos ${fmtNum(ingresos)} · Egresos ${fmtNum(egresos)}` }) });
+
+  document.getElementById('panelChart').style.display = '';
+  document.getElementById('chartPeriodo').addEventListener('change', dibujarChartFinanzas);
+  dibujarChartFinanzas();
 
   const maxVal = Math.max(ingresos, egresos, 1);
-  document.getElementById('panelFinanzas').style.display = '';
-  document.getElementById('listaFinanzas').innerHTML = `
+  document.getElementById('panelFinanzasResumen').style.display = '';
+  document.getElementById('listaFinanzasResumen').innerHTML = `
     <div class="cat-row"><div class="top"><span>Ingresos</span><span>${fmtNum(ingresos)}</span></div>
-      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(ingresos / maxVal * 100).toFixed(0)}%; background:var(--teal);"></div></div></div>
+      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(ingresos / maxVal * 100).toFixed(0)}%; background:var(--blue);"></div></div></div>
     <div class="cat-row"><div class="top"><span>Egresos</span><span>${fmtNum(egresos)}</span></div>
       <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(egresos / maxVal * 100).toFixed(0)}%; background:var(--coral);"></div></div></div>`;
 }
 
-async function cargarUsuarios(kpis) {
+async function seccionUsuarios(kpis) {
   const filas = (await listarRegistros(config.apiBaseUrl, 'usuarios')) || [];
   const activos = filas.filter(u => u.activo).length;
-  kpis.push(kpiCard('Usuarios activos', fmtNum(activos), `${filas.length} en total`));
-
-  const porRol = new Map();
-  filas.forEach(u => porRol.set(u.rol, (porRol.get(u.rol) || 0) + 1));
-  const orden = [...porRol.entries()].sort((a, b) => b[1] - a[1]);
-  document.getElementById('panelUsuarios').style.display = '';
-  document.getElementById('listaUsuarios').innerHTML = orden.length
-    ? orden.map((r, i) => filaRank(r[0], r[1], i)).join('')
-    : '<div class="rank-row">Todavía no hay usuarios registrados.</div>';
+  kpis.push({ orden: 4, html: kpiCard({ acento: 'purple', icono: '👤', label: 'Usuarios activos', value: fmtNum(activos), sub: `${filas.length} en total` }) });
 }
 
-async function cargarAuditoria() {
+async function seccionActividad() {
   const sesion = obtenerSesion();
   let filas = [];
   try {
-    const res = await fetch(`${config.apiBaseUrl}/auditoria?limite=8`, { headers: { Authorization: `Bearer ${sesion.token}` } });
+    const res = await fetch(`${config.apiBaseUrl}/auditoria?limite=6`, { headers: { Authorization: `Bearer ${sesion.token}` } });
     if (res.ok) filas = await res.json();
   } catch { /* sin conexión: se deja la lista vacía */ }
 
   const ETIQUETA = { crear: '➕ Creó', editar: '✏️ Editó', eliminar: '🗑️ Eliminó' };
-  document.getElementById('panelActividad').style.display = '';
-  document.getElementById('listaActividad').innerHTML = filas.length
+  document.getElementById('panelActividadMini').style.display = '';
+  document.getElementById('listaActividadMini').innerHTML = filas.length
     ? filas.map(f => {
         const fecha = new Date(f.creado_el).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        return `<div class="rank-row"><span class="rank-name">${escapeHtml(f.usuario_nombre || '—')} ${ETIQUETA[f.accion] || f.accion} en <span class="role-badge role-categoria">${escapeHtml(f.modulo)}</span></span><span class="rank-val" style="font-weight:400; color:var(--muted);">${fecha}</span></div>`;
+        return `<div class="rank-row"><span class="rank-name">${escapeHtml(f.usuario_nombre || '—')} ${ETIQUETA[f.accion] || f.accion} en ${escapeHtml(f.modulo)}</span><span class="rank-val" style="font-weight:400; color:var(--muted);">${fecha}</span></div>`;
       }).join('')
     : '<div class="rank-row">Todavía no hay actividad registrada.</div>';
+}
+
+function aplicarSaludo() {
+  const sesion = obtenerSesion();
+  const nombre = (sesion?.usuario?.nombre || '').split(' ')[0] || '';
+  document.getElementById('topbarTitle').textContent = nombre ? `Hola, ${nombre} 👋` : 'Hola 👋';
 }
 
 (async function iniciar() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'inicio');
-  renderSesionWidget();
+  await renderTopbar(config);
+  aplicarSaludo();
 
   const kpis = [];
   const tareas = [];
-  if (tienePermiso('ventas.ver')) tareas.push(cargarVentas(kpis));
-  if (tienePermiso('inventario.ver')) tareas.push(cargarInventario(kpis));
-  if (tienePermiso('clientes.ver')) tareas.push(cargarClientes(kpis));
-  if (tienePermiso('finanzas.ver')) tareas.push(cargarFinanzas(kpis));
-  if (tienePermiso('usuarios.ver')) tareas.push(cargarUsuarios(kpis));
-  if (tienePermiso('auditoria.ver')) tareas.push(cargarAuditoria());
+  if (tienePermiso('ventas.ver')) tareas.push(seccionVentas(kpis));
+  if (tienePermiso('inventario.ver')) tareas.push(seccionInventario(kpis));
+  if (tienePermiso('clientes.ver')) tareas.push(seccionClientes(kpis));
+  if (tienePermiso('finanzas.ver')) tareas.push(seccionFinanzas(kpis));
+  if (tienePermiso('usuarios.ver')) tareas.push(seccionUsuarios(kpis));
+  if (tienePermiso('auditoria.ver')) tareas.push(seccionActividad());
 
   if (!tareas.length) {
     document.getElementById('sinPermisos').style.display = '';
@@ -214,7 +308,7 @@ async function cargarAuditoria() {
   }
 
   await Promise.all(tareas);
-  document.getElementById('kpisResumen').innerHTML = kpis.join('');
+  document.getElementById('kpisResumen').innerHTML = kpis.sort((a, b) => a.orden - b.orden).map(k => k.html).join('');
 })();
 </script>
 </body>

@@ -21,6 +21,7 @@
         <h1 id="topbarTitle">Auditoría</h1>
         <div class="topbar-subtitle">QUIÉN HIZO QUÉ, Y CUÁNDO</div>
       </div>
+      <div class="topbar-search" id="topbarSearch"></div>
       <div id="sesionWidget" class="sesion-widget"></div>
     </header>
 
@@ -47,7 +48,7 @@
 
     <main style="max-width:1116px;">
       <section class="panel" style="margin-top:24px;">
-        <h3 style="font-family:'Fraunces', serif; font-size:16px; font-weight:600; margin:0 0 4px 0;">Registro de actividad</h3>
+        <h3 style="font-family:'Inter', sans-serif; font-size:15px; font-weight:700; margin:0 0 4px 0;">Registro de actividad</h3>
         <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Últimos 200 movimientos, del más reciente al más antiguo.</div>
         <div id="tablaAuditoria">Cargando…</div>
       </section>
@@ -58,19 +59,12 @@
 <script type="module">
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderTopbar } from '../components/topbar.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
 let config;
-
-function renderSesionWidget() {
-  const cont = document.getElementById('sesionWidget');
-  const sesion = obtenerSesion();
-  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`; return; }
-  cont.innerHTML = `<span>${sesion.usuario.nombre}</span><span class="rol">${sesion.usuario.rol}</span>
-    <button type="button" class="topbar-bell" title="Notificaciones (próximamente)">🔔</button>`;
-}
 
 const ETIQUETA_ACCION = { crear: '➕ Creó', editar: '✏️ Editó', eliminar: '🗑️ Eliminó' };
 
@@ -129,7 +123,7 @@ async function cargarAuditoria() {
 (async function iniciar() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'auditoria');
-  renderSesionWidget();
+  await renderTopbar(config);
 
   if (!tienePermiso('auditoria.ver')) {
     document.getElementById('tablaAuditoria').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
