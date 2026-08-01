@@ -14,17 +14,22 @@
   .login-shell{ display:flex; min-height:100vh; }
 
   /* Columna izquierda: marketing, oculta en pantallas chicas (el login
-     sigue funcionando igual, solo se prioriza el formulario en mobile). */
+     sigue funcionando igual, solo se prioriza el formulario en mobile).
+     El max-width iba en ESTA columna antes, y en pantallas anchas dejaba una
+     franja gris vacía entre el contenido y el formulario (que además quedaba
+     "flotando" sin llegar al borde derecho). Ahora el max-width se mueve al
+     contenido de adentro (.login-marketing-inner) y esta columna sí llena
+     todo el espacio libre, empujando el formulario hasta el borde derecho. */
   .login-marketing{
-    flex:1; padding:56px 64px; display:flex; flex-direction:column; justify-content:center;
-    max-width:640px;
+    flex:1; padding:56px 64px; display:flex; flex-direction:column; justify-content:center; align-items:center;
   }
+  .login-marketing-inner{ width:100%; max-width:760px; }
   .login-marketing .sidebar-brand{ display:flex; align-items:center; gap:12px; margin-bottom:40px; }
   .login-marketing .mark{ width:40px; height:40px; font-size:16px; }
   .login-marketing .brand-name{ font-family:'Inter', sans-serif; font-weight:700; font-size:16px; color:var(--ink); }
   .login-marketing .brand-tag{ font-size:11px; color:var(--muted); }
   .login-marketing h1{ font-family:'Inter', sans-serif; font-weight:800; font-size:32px; line-height:1.2; margin:0 0 16px; color:var(--ink); }
-  .login-marketing p.lead{ font-size:15px; color:var(--muted); line-height:1.6; max-width:440px; margin:0 0 32px; }
+  .login-marketing p.lead{ font-size:15.5px; color:var(--muted); line-height:1.6; max-width:520px; margin:0 0 32px; }
 
   .login-features{ display:flex; flex-direction:column; gap:18px; margin-bottom:36px; }
   .login-feature{ display:flex; align-items:flex-start; gap:14px; }
@@ -44,8 +49,8 @@
      estática (se habría desactualizado con cada rediseño) -- es una
      miniatura hecha con las mismas variables de css/base.css, así que
      envejece con el resto del tema en vez de quedar pegada a un look viejo. */
-  .lp-mock{ display:flex; height:220px; font-family:'Inter', sans-serif; }
-  .lp-mock-sidebar{ width:148px; flex-shrink:0; background:var(--ink); padding:14px 10px; display:flex; flex-direction:column; gap:12px; }
+  .lp-mock{ display:flex; height:250px; font-family:'Inter', sans-serif; }
+  .lp-mock-sidebar{ width:160px; flex-shrink:0; background:var(--ink); padding:16px 12px; display:flex; flex-direction:column; gap:14px; }
   .lp-mock-brand{ display:flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#fff; }
   .lp-mock-mark{ width:18px; height:18px; border-radius:5px; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800; flex-shrink:0; }
   .lp-mock-nav{ display:flex; flex-direction:column; gap:3px; }
@@ -63,25 +68,27 @@
   .lp-mock-chart-label{ font-size:8.5px; font-weight:700; color:var(--ink); margin-bottom:4px; }
   .lp-mock-chart svg{ flex:1; width:100%; }
 
-  /* Columna derecha: el formulario en sí. */
+  /* Columna derecha: el formulario en sí. Más ancha que antes (460→560) y
+     con la tarjeta interna más grande, a pedido -- antes se veía chica y
+     "perdida" en medio de la pantalla en monitores anchos. */
   .login-form-col{
-    width:460px; flex-shrink:0; background:#fff; display:flex; align-items:center; justify-content:center;
+    width:560px; flex-shrink:0; background:#fff; display:flex; align-items:center; justify-content:center;
     padding:40px; border-left:1px solid var(--paper-line);
   }
-  .login-card{ width:100%; max-width:340px; }
+  .login-card{ width:100%; max-width:400px; }
   .login-lock{
-    width:56px; height:56px; border-radius:50%; background:var(--orange-soft); color:var(--orange);
-    display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 18px;
+    width:60px; height:60px; border-radius:50%; background:var(--orange-soft); color:var(--orange);
+    display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 18px;
   }
-  .login-card h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:20px; margin:0 0 4px; text-align:center; color:var(--ink); }
-  .login-card p.sub{ color:var(--muted); font-size:13px; margin:0 0 26px; text-align:center; }
+  .login-card h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:23px; margin:0 0 4px; text-align:center; color:var(--ink); }
+  .login-card p.sub{ color:var(--muted); font-size:13.5px; margin:0 0 28px; text-align:center; }
   .login-card form{ display:flex; flex-direction:column; gap:14px; }
   .login-card .campo{ display:flex; flex-direction:column; gap:5px; }
   .login-card label{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; }
   .login-input-wrap{ position:relative; }
   .login-input-wrap span.ico{ position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--muted); }
   .login-card input[type="email"], .login-card input[type="password"], .login-card input[type="text"]{
-    width:100%; font-family:'Inter', sans-serif; font-size:14px; padding:10px 12px 10px 32px;
+    width:100%; font-family:'Inter', sans-serif; font-size:14.5px; padding:12px 12px 12px 34px;
     border:1px solid var(--paper-line); border-radius:9px; background:var(--paper); color:var(--ink);
   }
   .login-card input:focus{ outline:none; border-color:var(--coral); }
@@ -92,7 +99,7 @@
   .login-forgot{ color:var(--muted); text-decoration:none; cursor:default; }
   .login-forgot:hover{ text-decoration:underline; }
 
-  .login-card button[type="submit"]{ width:100%; justify-content:center; padding:11px; font-size:14px; margin-top:4px; }
+  .login-card button[type="submit"]{ width:100%; justify-content:center; padding:13px; font-size:14.5px; margin-top:4px; }
   .login-error{ font-size:13px; color:var(--coral); min-height:18px; text-align:center; }
 
   .login-divider{ display:flex; align-items:center; gap:10px; margin:20px 0; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
@@ -118,6 +125,7 @@
 
 <div class="login-shell">
   <div class="login-marketing">
+   <div class="login-marketing-inner">
     <div class="sidebar-brand">
       <div class="mark">PD</div>
       <div>
@@ -186,6 +194,7 @@
         </div>
       </div>
     </div>
+   </div>
   </div>
 
   <div class="login-form-col">
