@@ -290,8 +290,12 @@ async function activarCapturaSiCorresponde(config) {
   // La Vista Ejecutiva se pintó antes con datos locales (en iniciar(), antes
   // de que backendActivo existiera); ahora que sí hay backend, se vuelve a
   // pintar con los datos reales -- si no, se queda mostrando lo viejo aunque
-  // la tabla de abajo ya esté leyendo de la base de datos.
-  refrescar();
+  // la tabla de abajo ya esté leyendo de la base de datos. Se llama solo a
+  // refrescarDesdeBackend() (no a refrescar(), que también dispara
+  // refrescarTablaBackend()) porque la tabla ya se refresca una vez, al
+  // final de esta función -- si acá se hiciera doble, la tabla pediría los
+  // registros dos veces seguidas en cada carga de página.
+  refrescarDesdeBackend();
 
   // Vista Ejecutiva (KPIs/gráficos, en <main>) vs Vista Operativa (la tabla
   // de registros): antes se mostraban las dos apiladas siempre; ahora son

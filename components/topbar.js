@@ -177,7 +177,7 @@ async function renderUsuarioYNotificaciones(config) {
   const cont = document.getElementById('sesionWidget');
   if (!cont) return;
   const sesion = obtenerSesion();
-  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html">Iniciar sesión</a>`; return; }
+  if (!sesion?.usuario) { cont.innerHTML = `<a href="login.html" class="topbar-login-link">Iniciar sesión</a>`; return; }
 
   const notifs = await construirNotificaciones(config);
   const inicial = (sesion.usuario.nombre || '?').trim().charAt(0).toUpperCase();

@@ -212,8 +212,12 @@ async function seccionInventario(kpis) {
     ? alertas.slice(0, 4).map(p => `<div class="rank-row"><span class="rank-name">${escapeHtml(p.nombre)}</span><span class="rank-val" style="color:var(--coral);">${fmtNum(Number(p.stock))} unidad(es)</span></div>`).join('')
     : '<div class="rank-row">Sin alertas de stock.</div>';
 
+  // Ventana de -30 a +30 días: sin el límite inferior, un producto vencido
+  // hace años se quedaría mostrándose acá para siempre (el filtro solo
+  // pedía "<=30", sin piso). Con esto se ven los que vencen pronto y los
+  // que vencieron hace poco (todavía accionable), no todo el historial.
   const vencen = datos.inventario
-    .filter(p => p.fecha_vencimiento && diasHasta(p.fecha_vencimiento) <= 30)
+    .filter(p => p.fecha_vencimiento && diasHasta(p.fecha_vencimiento) <= 30 && diasHasta(p.fecha_vencimiento) >= -30)
     .sort((a, b) => new Date(a.fecha_vencimiento) - new Date(b.fecha_vencimiento));
   document.getElementById('panelVencimientos').style.display = '';
   document.getElementById('listaVencimientos').innerHTML = vencen.length

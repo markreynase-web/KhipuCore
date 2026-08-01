@@ -132,6 +132,13 @@
 }
 .topbar-usuario-panel button:hover{ background:var(--paper); }
 
+/* Módulos sin base de datos (Compras/RRHH/Producción/Marketing) no exigen
+   sesión -- si se visitan sin estar logueado, #sesionWidget cae en este link
+   en vez del cluster de usuario (ver components/topbar.js). Sin esta regla
+   quedaba con el estilo azul/subrayado por defecto del navegador. */
+.topbar-login-link{ font-size:13px; color:var(--coral); text-decoration:none; font-weight:600; }
+.topbar-login-link:hover{ text-decoration:underline; }
+
 .toolbar{
   background:#fff; border-bottom:1px solid var(--paper-line); padding:12px 32px;
   display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
