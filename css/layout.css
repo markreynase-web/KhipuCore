@@ -11,6 +11,11 @@
 .sidebar{
   width:236px; flex-shrink:0; background:var(--ink);
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+  /* Flush contra el borde izquierdo/arriba/abajo de la ventana; solo el
+     borde que toca el contenido (derecho) se redondea, para que no quede
+     como un rectángulo recto pegado al topbar. */
+  border-radius:0 22px 22px 0;
+  overflow:hidden;
 }
 .sidebar-brand{ display:flex; align-items:center; gap:12px; padding:20px 18px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
 .sidebar-brand .mark{ width:36px; height:36px; font-size:15px; flex-shrink:0; background:var(--coral); color:#fff; }
@@ -151,7 +156,7 @@ main{ max-width:1180px; margin:0 auto; padding:28px 32px; }
 
 @media (max-width: 900px){
   .app-shell{ flex-direction:column; }
-  .sidebar{ position:relative; width:100%; height:auto; flex-direction:row; align-items:center; overflow-x:auto; }
+  .sidebar{ position:relative; width:100%; height:auto; flex-direction:row; align-items:center; overflow-x:auto; border-radius:0; }
   .sidebar-brand{ border-bottom:none; border-right:1px solid rgba(255,255,255,0.08); }
   .sidebar-nav{ display:flex; padding:8px; overflow-x:auto; }
   .sidebar-group{ display:flex; align-items:center; gap:4px; margin-bottom:0; white-space:nowrap; }

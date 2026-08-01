@@ -20,7 +20,7 @@
 .form-registro .campo-ancho-2{ grid-column:span 2; }
 .form-registro .campo-accion{ grid-column:1 / -1; flex-direction:row; align-items:center; gap:12px; margin-top:4px; }
 .form-registro label{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.form-registro input, .form-registro select{ font-family:'Inter', sans-serif; font-size:13px; padding:8px 10px; border:1px solid var(--paper-line); border-radius:6px; background:var(--paper); color:var(--ink); }
+.form-registro input, .form-registro select{ font-family:'Inter', sans-serif; font-size:13px; padding:8px 10px; border:1px solid var(--paper-line); border-radius:9px; background:var(--paper); color:var(--ink); }
 .form-registro input:focus, .form-registro select:focus{ outline:none; border-color:var(--ochre-deep); }
 .campo-accion-extra{ text-transform:none; font-size:11px; font-weight:600; color:var(--ochre-deep); background:none; border:none; cursor:pointer; padding:0; letter-spacing:normal; }
 .campo-accion-extra:hover{ text-decoration:underline; }
@@ -30,16 +30,19 @@
 
 .captura-importar{ display:flex; align-items:center; gap:12px; margin-top:18px; padding-top:16px; border-top:1px solid var(--paper-line); }
 
-.tabla-registros-wrap{ overflow-x:auto; margin-top:14px; }
+/* border-radius sobre <table> con border-collapse:collapse no se recorta
+   bien entre navegadores -- por eso el redondeo va en el wrapper, con
+   overflow:hidden para que sí recorte las esquinas de la tabla de adentro. */
+.tabla-registros-wrap{ overflow-x:auto; margin-top:14px; border:1px solid var(--paper-line); border-radius:12px; }
 .tabla-registros{ width:100%; border-collapse:collapse; font-size:13px; }
 .tabla-registros th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); font-weight:600; padding:6px 10px; border-bottom:1px solid var(--paper-line); white-space:nowrap; }
 .tabla-registros td{ padding:6px 10px; border-bottom:1px solid var(--paper-line); }
 .tabla-registros tr.editando td{ background:#FFF8EC; }
-.tabla-registros td input{ width:100%; font-size:13px; padding:4px 6px; border:1px solid var(--ochre-deep); border-radius:4px; }
+.tabla-registros td input{ width:100%; font-size:13px; padding:4px 6px; border:1px solid var(--ochre-deep); border-radius:6px; }
 .tabla-registros .col-acciones{ white-space:nowrap; text-align:right; width:110px; }
 
 .menu-acciones{ position:relative; display:inline-block; }
-.btn-menu-acciones{ background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:4px 8px; border-radius:6px; color:var(--muted); }
+.btn-menu-acciones{ background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:4px 8px; border-radius:8px; color:var(--muted); }
 .btn-menu-acciones:hover{ background:var(--paper); color:var(--ink); }
 .menu-acciones-lista{
   display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:5;
@@ -56,7 +59,7 @@
 .menu-acciones-lista button.peligro{ color:var(--coral); }
 
 .btn-guardar-fila{
-  background:var(--teal); color:#fff; border:none; border-radius:6px;
+  background:var(--teal); color:#fff; border:none; border-radius:8px;
   font-family:'Inter', sans-serif; font-size:12px; font-weight:600;
   padding:6px 10px; cursor:pointer;
 }

@@ -1,4 +1,4 @@
-.debug-panel{ background:#fff; border-radius:10px; padding:22px; box-shadow:var(--card-shadow); margin-bottom:20px; }
+.debug-panel{ background:#fff; border-radius:14px; padding:22px; box-shadow:var(--card-shadow); margin-bottom:20px; }
 .debug-panel table{ width:100%; border-collapse:collapse; font-size:13px; }
 .debug-panel th{ text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; padding:6px 8px; border-bottom:1px solid var(--paper-line); }
 .debug-panel td{ padding:7px 8px; border-bottom:1px solid var(--paper-line); }
