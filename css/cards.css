@@ -33,15 +33,6 @@
 
 .chart-wrap{ position:relative; height:280px; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .chart-wrap canvas{ max-width:100%; max-height:100%; }
-
-/* Panel del gráfico de Inicio ("Resumen de ingresos vs. egresos"): en el
-   grid-2 que comparte con la columna de la derecha (top clientes/alertas/
-   actividad, más alta porque son 3 tarjetas apiladas), .grid-2 estira los
-   dos elementos a la misma altura -- sin esto, el chart-wrap se quedaba en
-   sus 280px fijos y el resto del panel quedaba en blanco. Con flex:1 el
-   gráfico crece para ocupar el alto real del panel en vez de dejar ese hueco. */
-#panelChart{ display:flex; flex-direction:column; }
-#panelChart .chart-wrap{ flex:1; height:auto; min-height:280px; }
 .chart-empty{ color:var(--muted); font-size:13px; text-align:center; padding:0 20px; }
 
 .rank-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--paper-line); font-size:13px; }
