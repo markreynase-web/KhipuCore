@@ -1,4 +1,4 @@
-# Panel de Datos — dashboard-core
+# KhipuCore
 
 Reorganización del proyecto original (un solo `index.html` de 822 líneas) en módulos,
 más el fix de un problema de seguridad encontrado en el análisis inicial.
@@ -9,7 +9,7 @@ Necesita servidor local (usa ES modules — `import`/`export` — que los navega
 bloquean sobre `file://`):
 
 ```bash
-cd dashboard-core
+cd KhipuCore
 python -m http.server 8000
 # o: npx serve
 ```
@@ -144,7 +144,7 @@ existente) → Auditoría → Panel de administración.
 ## Estructura
 
 ```
-dashboard-core/
+KhipuCore/
   index.html            → redirige al primer módulo habilitado en config/company.json
   config/
     company.json         → nombre de empresa, logo, y qué módulos están enabled/disabled

@@ -1,7 +1,7 @@
 {
-  "name": "dashboard-core-backend",
+  "name": "khipucore-backend",
   "version": "1.0.0",
-  "description": "API del módulo de Ventas de dashboard-core: recibe datos del formulario y de importación CSV, y los persiste en PostgreSQL.",
+  "description": "API de KhipuCore: recibe datos del formulario y de importación CSV, y los persiste en PostgreSQL.",
   "main": "src/server.js",
   "type": "module",
   "scripts": {

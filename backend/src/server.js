@@ -1,5 +1,5 @@
 // src/server.js
-// Servidor de la API. Sirve solo /api/*; el frontend (dashboard-core) sigue
+// Servidor de la API. Sirve solo /api/*; el frontend (KhipuCore) sigue
 // sirviéndose aparte como archivos estáticos (ej. `python -m http.server`).
 
 import express from 'express';
@@ -59,7 +59,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Error interno del servidor.' });
 });
 
-const PORT = process.env.API_PORT || 3001;
+// PORT: la mayoría de los hosts (Render, Railway, Heroku...) asignan el
+// puerto ellos mismos por esta variable y esperan que el server escuche ahí.
+// API_PORT se mantiene como respaldo para desarrollo local con .env propio.
+const PORT = process.env.PORT || process.env.API_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`API de Ventas escuchando en http://localhost:${PORT}`);
   console.log('Si no has corrido las migraciones todavía: npm run migrate');
