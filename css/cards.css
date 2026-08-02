@@ -33,6 +33,19 @@
 
 .chart-wrap{ position:relative; height:280px; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .chart-wrap canvas{ max-width:100%; max-height:100%; }
+
+/* Paneles de Inicio (gráfico + tarjetas de resumen): dos columnas
+   independientes en vez de grid-2 fila por fila. Con grid, cada fila toma
+   la altura de su panel más alto y el más corto de esa fila queda con un
+   hueco en blanco debajo (ej. el gráfico junto a 3 tarjetas apiladas). Acá
+   cada .inicio-col apila sus propios paneles con su propia altura real --
+   pueden terminar a distinta altura entre sí, pero ninguna deja hueco. */
+.inicio-columnas{ display:flex; align-items:flex-start; gap:22px; margin-bottom:28px; }
+.inicio-col{ flex:1.6; min-width:0; display:flex; flex-direction:column; gap:22px; }
+.inicio-col-angosta{ flex:1; }
+@media (max-width:900px){
+  .inicio-columnas{ flex-direction:column; }
+}
 .chart-empty{ color:var(--muted); font-size:13px; text-align:center; padding:0 20px; }
 
 .rank-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--paper-line); font-size:13px; }

@@ -29,18 +29,40 @@
     <main>
       <div class="kpis" id="kpisResumen"></div>
 
-      <div class="grid-2" style="align-items:start;">
-        <div class="panel" id="panelChart" style="display:none;">
-          <h3>
-            Resumen de ingresos vs. egresos
-            <select id="chartPeriodo" style="font-family:'Inter',sans-serif; font-size:12px; font-weight:600; padding:5px 8px; border-radius:6px; border:1px solid var(--paper-line); background:#fff; color:var(--ink);">
-              <option value="anio">Este año</option>
-              <option value="historico">Todo el histórico</option>
-            </select>
-          </h3>
-          <div class="chart-wrap"><canvas id="chartIngresosEgresos"></canvas></div>
+      <!-- Dos columnas independientes (no grid-2 fila por fila): con grid,
+           la fila completa toma la altura del panel más alto y el más corto
+           de esa fila queda con un hueco en blanco debajo. Acá cada columna
+           apila sus propios paneles con su propia altura real -- pueden
+           terminar a distinta altura entre sí, pero ninguna deja hueco.
+           column-count (CSS) se probó primero pero Chrome no balancea
+           columnas cuando el contenedor tiene altura automática, así que
+           quedaba todo apilado en una sola columna. -->
+      <div class="inicio-columnas">
+        <div class="inicio-col">
+          <div class="panel" id="panelChart" style="display:none;">
+            <h3>
+              Resumen de ingresos vs. egresos
+              <select id="chartPeriodo" style="font-family:'Inter',sans-serif; font-size:12px; font-weight:600; padding:5px 8px; border-radius:6px; border:1px solid var(--paper-line); background:#fff; color:var(--ink);">
+                <option value="anio">Este año</option>
+                <option value="historico">Todo el histórico</option>
+              </select>
+            </h3>
+            <div class="chart-wrap"><canvas id="chartIngresosEgresos"></canvas></div>
+          </div>
+          <div class="panel" id="panelTopProductos" style="display:none;">
+            <h3>Producto más vendido <span class="tag">Ventas</span></h3>
+            <div id="listaTopProductos"></div>
+          </div>
+          <div class="panel" id="panelStockBajo" style="display:none;">
+            <h3>Productos con stock bajo <span class="tag">Inventario</span></h3>
+            <div id="listaStockBajo"></div>
+          </div>
+          <div class="panel" id="panelVencimientos" style="display:none;">
+            <h3>Próximos vencimientos <span class="tag">Inventario</span></h3>
+            <div id="listaVencimientos"></div>
+          </div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:22px;">
+        <div class="inicio-col inicio-col-angosta">
           <div class="panel" id="panelTopClientesMini" style="display:none; padding:20px;">
             <h3 style="margin-bottom:10px;">Top clientes</h3>
             <div id="listaTopClientesMini"></div>
@@ -53,28 +75,10 @@
             <h3 style="margin-bottom:10px;">Actividad reciente</h3>
             <div id="listaActividadMini"></div>
           </div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="panel" id="panelTopProductos" style="display:none;">
-          <h3>Producto más vendido <span class="tag">Ventas</span></h3>
-          <div id="listaTopProductos"></div>
-        </div>
-        <div class="panel" id="panelStockBajo" style="display:none;">
-          <h3>Productos con stock bajo <span class="tag">Inventario</span></h3>
-          <div id="listaStockBajo"></div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="panel" id="panelVencimientos" style="display:none;">
-          <h3>Próximos vencimientos <span class="tag">Inventario</span></h3>
-          <div id="listaVencimientos"></div>
-        </div>
-        <div class="panel" id="panelFinanzasResumen" style="display:none;">
-          <h3>Ingresos vs. egresos (resumen) <span class="tag">Finanzas</span></h3>
-          <div id="listaFinanzasResumen"></div>
+          <div class="panel" id="panelFinanzasResumen" style="display:none;">
+            <h3>Ingresos vs. egresos (resumen) <span class="tag">Finanzas</span></h3>
+            <div id="listaFinanzasResumen"></div>
+          </div>
         </div>
       </div>
 
