@@ -1,10 +1,10 @@
 /* Panel de "Captura de datos": solo aparece en los módulos con baseDeDatos:true
    en config/company.json, y solo una vez que se confirma conexión con el backend. */
-.vista-tabs{ display:flex; gap:6px; max-width:1116px; margin:24px auto 0; padding:0 0 0 2px; }
+.vista-tabs{ display:flex; gap:6px; }
 .vista-tab{
   font-family:'Inter', sans-serif; font-size:13px; font-weight:600; color:var(--muted);
   background:transparent; border:none; border-bottom:2px solid transparent;
-  padding:10px 14px; cursor:pointer;
+  padding:7px 14px; cursor:pointer;
 }
 .vista-tab:hover{ color:var(--ink); }
 .vista-tab.activo{ color:var(--ink); border-bottom-color:var(--ochre-deep); }
