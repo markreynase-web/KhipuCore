@@ -9,11 +9,12 @@
 import { fmtNum, escapeHtml } from './utils.js';
 import { rangoFechasDisponible, filtrarPeriodo, sincronizarSelectorDeRango } from './filters.js';
 import {
-  crearGraficoLineaFecha, crearGraficoBarras,
+  crearGraficoLineaFecha, crearGraficoBarras, crearGraficoDona,
   crearGraficoLineaSecundario, crearGraficoBarrasSecundario
 } from './charts.js';
 
 let mainChartInstance = null;
+let catChartInstance = null;
 let secundariosChartInstances = [];
 
 function renderSecundarios(mapa, actual, tieneFecha, tieneCat1) {
@@ -53,7 +54,7 @@ function renderSecundarios(mapa, actual, tieneFecha, tieneCat1) {
       }
       secundariosChartInstances.push(crearGraficoLineaSecundario(ctx, {
         fechas, valores: fechas.map(f => agrupado[f]), label: col,
-        color: '#1F6F63', colorFondo: 'rgba(31,111,99,0.15)'
+        color: '#0F6E56', colorFondo: 'rgba(15,110,86,0.15)'
       }));
     } else {
       const top = Object.entries(agrupado).sort((a, b) => b[1] - a[1]).slice(0, 8);
@@ -146,10 +147,27 @@ export function renderTodo(fuente) {
   ).join('') || '<div class="rank-row">No se detectó una columna de categoría</div>';
 
   document.getElementById('catTitle').textContent = tieneCat1 ? `Distribución por ${mapa.colCat1}` : 'Distribución';
-  const maxCat = Math.max(1, ...Object.values(porCat1));
-  document.getElementById('catList').innerHTML = Object.entries(porCat1).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([cat, val]) =>
-    `<div class="cat-row"><div class="top"><span>${escapeHtml(cat)}</span><span>${fmtNum(val)}</span></div><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(val / maxCat * 100).toFixed(0)}%"></div></div></div>`
-  ).join('') || '<div>Sin columna de categoría detectada</div>';
+  const catEntries = Object.entries(porCat1).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  // Dona en vez de las barras de progreso de antes: "distribución" es
+  // justamente lo que un gráfico circular comunica mejor (proporción del
+  // total), y el catChartWrap tiene su propio id fijo -- no se busca a
+  // través del <canvas>, que puede no existir si la vez anterior no había
+  // categoría (mismo motivo que el arreglo de mainChartWrap más abajo).
+  const catWrap = document.getElementById('catChartWrap');
+  catWrap.innerHTML = '<canvas id="catChart"></canvas>';
+  if (catChartInstance) { catChartInstance.destroy(); catChartInstance = null; }
+  if (!catEntries.length) {
+    catWrap.innerHTML = '<div class="chart-empty">Sin columna de categoría detectada</div>';
+  } else {
+    const ctxCat = document.getElementById('catChart').getContext('2d');
+    // Chart.js dibuja las etiquetas como texto en el canvas (leyenda/tooltip),
+    // no vía innerHTML -- no hace falta (ni conviene) escapeHtml() acá, igual
+    // que en las etiquetas del gráfico de barras más abajo.
+    catChartInstance = crearGraficoDona(ctxCat, {
+      etiquetas: catEntries.map(e => e[0]),
+      valores: catEntries.map(e => e[1])
+    });
+  }
 
   document.getElementById('secTitle').textContent = tieneCat2 ? `Por ${mapa.colCat2}` : 'Otra dimensión';
   if (tieneCat2) {
@@ -162,7 +180,11 @@ export function renderTodo(fuente) {
     document.getElementById('secList').innerHTML = '<div class="rank-row">No se detectó una segunda columna de categoría</div>';
   }
 
-  const chartWrap = document.getElementById('mainChart').closest('.chart-wrap');
+  // Se busca por el id fijo del wrapper, no por .closest() desde el canvas:
+  // si el renderTodo() anterior no tenía fecha ni categoría para graficar,
+  // #mainChart ya no existe (se reemplazó por el div "sin datos") y
+  // document.getElementById('mainChart') hubiera devuelto null.
+  const chartWrap = document.getElementById('mainChartWrap');
   chartWrap.innerHTML = '<canvas id="mainChart"></canvas>';
   const ctx = document.getElementById('mainChart').getContext('2d');
   if (mainChartInstance) { mainChartInstance.destroy(); mainChartInstance = null; }
@@ -178,14 +200,14 @@ export function renderTodo(fuente) {
     } else {
       mainChartInstance = crearGraficoLineaFecha(ctx, {
         fechas, valores: fechas.map(f => porDia[f]), label: tieneNum ? mapa.colNum : 'conteo',
-        color: '#B8871F', colorFondo: 'rgba(227,178,60,0.18)'
+        color: '#E85C4A', colorFondo: 'rgba(232,92,74,0.15)'
       });
     }
   } else if (tieneCat1) {
     document.getElementById('chartTitle').innerHTML = `Por ${escapeHtml(mapa.colCat1)} <span class="tag" id="chartTag">${escapeHtml(tieneNum ? mapa.colNum : 'conteo')}</span>`;
     const top10 = rankingCat1.slice(0, 10);
     mainChartInstance = crearGraficoBarras(ctx, {
-      etiquetas: top10.map(r => r[0]), valores: top10.map(r => r[1]), label: tieneNum ? mapa.colNum : 'conteo', color: '#1F6F63'
+      etiquetas: top10.map(r => r[0]), valores: top10.map(r => r[1]), label: tieneNum ? mapa.colNum : 'conteo', color: '#1A4FBF'
     });
   } else {
     document.getElementById('chartTitle').innerHTML = `Vista principal <span class="tag" id="chartTag">—</span>`;
@@ -212,5 +234,6 @@ export function renderTodo(fuente) {
 
 export function redimensionarTodosLosGraficos() {
   if (mainChartInstance) mainChartInstance.resize();
+  if (catChartInstance) catChartInstance.resize();
   secundariosChartInstances.forEach(c => c.resize());
 }
