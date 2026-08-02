@@ -69,17 +69,18 @@ export const ESQUEMAS = {
       { id: 'categoria', label: 'Categoría', type: 'text', placeholder: 'Opcional' },
       { id: 'stock', label: 'Stock', type: 'number', required: true, defecto: 0, min: 0, step: '0.01' },
       { id: 'stock_minimo', label: 'Stock mínimo', type: 'number', defecto: 0, min: 0, step: '0.01' },
-      { id: 'precio_unitario', label: 'Precio unitario', type: 'number', min: 0, step: '0.01' },
+      { id: 'costo_unitario', label: 'Costo de compra (unitario)', type: 'number', min: 0, step: '0.01', placeholder: 'Lo que pagaste por unidad' },
+      { id: 'precio_unitario', label: 'Precio de venta (unitario)', type: 'number', min: 0, step: '0.01' },
       { id: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date', placeholder: 'Opcional' },
       { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
     ],
     columnasTabla: [
       { key: 'fecha_registro', label: 'Fecha' }, { key: 'nombre', label: 'Producto' },
       { key: 'categoria', label: 'Categoría' }, { key: 'stock', label: 'Stock' },
-      { key: 'stock_minimo', label: 'Stock mín.' }, { key: 'precio_unitario', label: 'P. unit.' },
-      { key: 'fecha_vencimiento', label: 'Vence' }
+      { key: 'stock_minimo', label: 'Stock mín.' }, { key: 'costo_unitario', label: 'Costo compra' },
+      { key: 'precio_unitario', label: 'P. venta' }, { key: 'fecha_vencimiento', label: 'Vence' }
     ],
-    mapa: { colFecha: 'fecha_registro', colNum: 'stock', otrosNum: ['precio_unitario', 'stock_minimo'], colCat1: 'nombre', colCat2: 'categoria', otrasCat: [] }
+    mapa: { colFecha: 'fecha_registro', colNum: 'stock', otrosNum: ['precio_unitario', 'costo_unitario', 'stock_minimo'], colCat1: 'nombre', colCat2: 'categoria', otrasCat: [] }
   },
 
   clientes: {

@@ -36,30 +36,29 @@ async function registrarAuditoria(cliente, { usuario, accion, registroId, detall
 // por ese stock inicial. Va todo en una transacción: o se crea el producto
 // y su egreso juntos, o no se crea nada.
 router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
-  const { fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, fecha_vencimiento, notas } = req.body;
+  const { fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, costo_unitario, fecha_vencimiento, notas } = req.body;
   if (!fecha_registro || !nombre) return res.status(400).json({ error: 'fecha_registro y nombre son requeridos' });
 
   const stockNum = numeroOCero(stock);
   const stockMinNum = numeroOCero(stock_minimo);
   const precioNum = numeroOCero(precio_unitario);
+  const costoNum = numeroOCero(costo_unitario);
 
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
     const { rows } = await cliente.query(
-      `INSERT INTO inventario (fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, fecha_vencimiento, notas)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [fecha_registro, String(nombre).trim(), categoria || null, stockNum, stockMinNum, precioNum, fecha_vencimiento || null, notas || null]
+      `INSERT INTO inventario (fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, costo_unitario, fecha_vencimiento, notas)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [fecha_registro, String(nombre).trim(), categoria || null, stockNum, stockMinNum, precioNum, costoNum, fecha_vencimiento || null, notas || null]
     );
     const producto = rows[0];
 
-    // Todavía no existe un campo de "costo" separado del precio de venta
-    // (ver LEEME_FASE5.md, pendiente) -- por ahora el egreso usa
-    // precio_unitario * stock como aproximación. Si en el futuro se agrega
-    // un campo de costo real, este cálculo debería usar ese en vez de
-    // precio_unitario. Con stock 0 (producto sin existencias todavía) no
-    // se genera ningún movimiento -- no hay gasto que registrar.
-    const montoEgreso = +(stockNum * precioNum).toFixed(2);
+    // El egreso es lo que costó COMPRAR el stock, no lo que va a costar
+    // venderlo -- por eso usa costo_unitario (precio de compra) y no
+    // precio_unitario (precio de venta). Si no se indica costo (0 o vacío),
+    // no se genera egreso -- no hay forma de saber cuánto gastó sin ese dato.
+    const montoEgreso = +(stockNum * costoNum).toFixed(2);
     if (montoEgreso > 0) {
       await cliente.query(
         `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id)
@@ -114,9 +113,9 @@ router.delete('/:id', verificarPermiso('inventario.eliminar'), async (req, res) 
 router.use(crearRouterCRUD({
   tabla: 'inventario',
   modulo: 'inventario',
-  columnas: ['fecha_registro', 'nombre', 'categoria', 'stock', 'stock_minimo', 'precio_unitario', 'fecha_vencimiento', 'notas'],
+  columnas: ['fecha_registro', 'nombre', 'categoria', 'stock', 'stock_minimo', 'precio_unitario', 'costo_unitario', 'fecha_vencimiento', 'notas'],
   camposRequeridos: ['fecha_registro', 'nombre'],
-  camposNumericos: ['stock', 'stock_minimo', 'precio_unitario'],
+  camposNumericos: ['stock', 'stock_minimo', 'precio_unitario', 'costo_unitario'],
   columnaFecha: 'fecha_registro',
   valoresPorDefecto: { stock: 0, stock_minimo: 0 }
 }));
