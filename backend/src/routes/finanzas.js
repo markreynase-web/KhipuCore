@@ -63,7 +63,7 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
       [fecha, tipo, categoria || null, concepto, numeroOCero(monto), notas || null]
     );
     res.status(201).json(rows[0]);
-    registrarAuditoria({ usuario: req.usuario, accion: 'crear', registroId: rows[0].id });
+    registrarAuditoria({ usuario: req.usuario, accion: 'crear', registroId: rows[0].id, detalle: rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo guardar el movimiento.' });
@@ -71,21 +71,42 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
 });
 
 router.put('/:id', verificarPermiso('finanzas.editar'), async (req, res) => {
-  const { rows: actuales } = await pool.query(`SELECT origen_modulo FROM finanzas WHERE id = $1`, [req.params.id]);
+  const { rows: actuales } = await pool.query(`SELECT * FROM finanzas WHERE id = $1`, [req.params.id]);
   if (!actuales.length) return res.status(404).json({ error: 'Movimiento no encontrado.' });
   if (actuales[0].origen_modulo) {
     return res.status(409).json({ error: 'Este movimiento viene de una venta. Anúlala en Ventas para revertirlo; no se edita directo aquí.' });
   }
+  const antes = actuales[0];
 
   const { fecha, tipo, categoria, concepto, monto, notas } = req.body;
   try {
+    const montoNuevo = numeroOCero(monto);
     const { rows } = await pool.query(
       `UPDATE finanzas SET fecha=COALESCE($1,fecha), tipo=COALESCE($2,tipo), categoria=$3, concepto=COALESCE($4,concepto),
        monto=$5, notas=$6, actualizado_el=now() WHERE id=$7 RETURNING *`,
-      [fecha || null, tipo || null, categoria || null, concepto || null, numeroOCero(monto), notas || null, req.params.id]
+      [fecha || null, tipo || null, categoria || null, concepto || null, montoNuevo, notas || null, req.params.id]
     );
     res.json(rows[0]);
-    registrarAuditoria({ usuario: req.usuario, accion: 'editar', registroId: req.params.id });
+
+    // Diff simple antes/después -- suficiente para este módulo (no tiene
+    // tantos campos como ventas.js), no hace falta el helper sonIguales()
+    // de crudFactory.js.
+    const cambios = {};
+    ['fecha', 'tipo', 'categoria', 'concepto', 'monto', 'notas'].forEach(campo => {
+      let antesVal = antes[campo];
+      let despuesVal = rows[0][campo];
+      if (campo === 'monto') { antesVal = Number(antesVal); despuesVal = Number(despuesVal); }
+      else {
+        if (antesVal instanceof Date) antesVal = antesVal.toISOString().slice(0, 10);
+        if (despuesVal instanceof Date) despuesVal = despuesVal.toISOString().slice(0, 10);
+      }
+      const iguales = campo === 'monto' ? antesVal === despuesVal : String(antesVal ?? '') === String(despuesVal ?? '');
+      if (!iguales) cambios[campo] = { antes: antesVal, despues: despuesVal };
+    });
+    registrarAuditoria({
+      usuario: req.usuario, accion: 'editar', registroId: req.params.id,
+      detalle: Object.keys(cambios).length ? cambios : 'Sin cambios en los valores (se guardó igual).'
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo actualizar el movimiento.' });
@@ -93,7 +114,7 @@ router.put('/:id', verificarPermiso('finanzas.editar'), async (req, res) => {
 });
 
 router.delete('/:id', verificarPermiso('finanzas.eliminar'), async (req, res) => {
-  const { rows: actuales } = await pool.query(`SELECT origen_modulo FROM finanzas WHERE id = $1`, [req.params.id]);
+  const { rows: actuales } = await pool.query(`SELECT * FROM finanzas WHERE id = $1`, [req.params.id]);
   if (!actuales.length) return res.status(404).json({ error: 'Movimiento no encontrado.' });
   if (actuales[0].origen_modulo) {
     return res.status(409).json({ error: 'Este movimiento viene de una venta. Anúlala en Ventas para revertirlo; no se borra directo aquí.' });
@@ -102,7 +123,7 @@ router.delete('/:id', verificarPermiso('finanzas.eliminar'), async (req, res) =>
   try {
     await pool.query(`DELETE FROM finanzas WHERE id = $1`, [req.params.id]);
     res.status(204).end();
-    registrarAuditoria({ usuario: req.usuario, accion: 'eliminar', registroId: req.params.id });
+    registrarAuditoria({ usuario: req.usuario, accion: 'eliminar', registroId: req.params.id, detalle: { eliminado: actuales[0] } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo borrar el movimiento.' });

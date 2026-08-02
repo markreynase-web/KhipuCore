@@ -61,16 +61,64 @@ import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
 import { renderTopbar } from '../components/topbar.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
+import { escapeHtml } from '../js/utils.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
 let config;
 
-const ETIQUETA_ACCION = { crear: '➕ Creó', editar: '✏️ Editó', eliminar: '🗑️ Eliminó' };
+const ETIQUETA_MODULO = {
+  ventas: 'una venta', inventario: 'un producto', clientes: 'un cliente',
+  finanzas: 'un movimiento', usuarios: 'un usuario'
+};
 
 function formatoFechaHora(iso) {
   const d = new Date(iso);
   return d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// Nombre o texto identificador de un objeto de detalle (venta, producto,
+// cliente, movimiento...) -- cada módulo usa un campo distinto para "el
+// nombre de la cosa", se prueban en orden hasta encontrar uno.
+function nombrePrincipal(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  return obj.nombre || obj.producto || obj.cliente || obj.concepto || obj.email || null;
+}
+
+// Arma una oración en español a partir de fila+detalle, en vez de mostrar
+// el JSON crudo -- eso queda atrás del botón "Más información". Cubre las
+// 4 formas de "detalle" que arma el backend (crear/editar/eliminar/importar,
+// ver crudFactory.js y las rutas de ventas/finanzas/inventario) más un
+// respaldo genérico para lo que no encaje (ej. datos de prueba con acciones
+// como "iniciar_sesion" que no vienen de este código).
+function generarDescripcion(f) {
+  const modulo = ETIQUETA_MODULO[f.modulo] || `un registro de ${f.modulo}`;
+  const detalle = f.detalle;
+
+  if (f.accion === 'crear') {
+    const nombre = nombrePrincipal(detalle);
+    return `Creó ${modulo}${nombre ? `: "${nombre}"` : ` #${f.registro_id ?? '—'}`}.`;
+  }
+  if (f.accion === 'eliminar') {
+    const nombre = nombrePrincipal(detalle?.eliminado || detalle);
+    return `Eliminó ${modulo}${nombre ? `: "${nombre}"` : ` #${f.registro_id ?? '—'}`}.`;
+  }
+  if (f.accion === 'editar') {
+    if (typeof detalle === 'string') return detalle;
+    if (detalle && typeof detalle === 'object') {
+      const cambios = Object.entries(detalle)
+        .filter(([, v]) => v && typeof v === 'object' && 'antes' in v && 'despues' in v)
+        .map(([campo, v]) => `${campo} de "${v.antes ?? '—'}" a "${v.despues ?? '—'}"`);
+      if (cambios.length) return `Editó ${modulo}: cambió ${cambios.join(', ')}.`;
+    }
+    return `Editó ${modulo} #${f.registro_id ?? '—'}.`;
+  }
+  if (f.accion === 'importar') {
+    const ins = detalle?.insertadas ?? '—';
+    const err = detalle?.errores || 0;
+    return `Importó ${ins} fila(s) a ${modulo}${err ? `, ${err} con error` : ''}.`;
+  }
+  return detalle ? `${f.accion} en ${f.modulo}.` : `${f.accion} en ${f.modulo} (sin más detalle disponible).`;
 }
 
 async function cargarAuditoria() {
@@ -101,23 +149,39 @@ async function cargarAuditoria() {
   cont.innerHTML = `
     <div class="tabla-registros-wrap" style="margin-top:14px;">
       <table class="tabla-registros">
-        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Registro</th><th>Detalle</th></tr></thead>
+        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Módulo</th><th>Qué pasó</th><th></th></tr></thead>
         <tbody>
-          ${filas.map(f => `
-            <tr>
+          ${filas.map((f, i) => `
+            <tr data-fila="${i}">
               <td>${formatoFechaHora(f.creado_el)}</td>
-              <td>${f.usuario_nombre || '—'}</td>
-              <td>${ETIQUETA_ACCION[f.accion] || f.accion}</td>
-              <td><span class="role-badge role-categoria">${f.modulo}</span></td>
-              <td>#${f.registro_id ?? '—'}</td>
-              <td style="max-width:260px; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${f.detalle ? String(JSON.stringify(f.detalle)).replace(/"/g, '&quot;') : ''}">
-                ${f.detalle ? JSON.stringify(f.detalle) : '—'}
+              <td>${escapeHtml(f.usuario_nombre || '—')}</td>
+              <td><span class="role-badge role-categoria">${escapeHtml(f.modulo)}</span></td>
+              <td>${escapeHtml(generarDescripcion(f))}</td>
+              <td class="col-acciones">${f.detalle ? `<button type="button" class="icon-btn" data-accion="ver" data-fila="${i}" title="Más información">👁️ Más información</button>` : ''}</td>
+            </tr>
+            <tr class="fila-detalle" data-detalle-de="${i}" hidden>
+              <td colspan="5">
+                <div class="fila-detalle-grid">
+                  <div><span class="fila-detalle-label">Acción</span><span class="fila-detalle-valor">${escapeHtml(f.accion)}</span></div>
+                  <div><span class="fila-detalle-label">Registro</span><span class="fila-detalle-valor">#${escapeHtml(f.registro_id ?? '—')}</span></div>
+                </div>
+                <pre style="margin-top:8px; font-size:11px; white-space:pre-wrap; word-break:break-word; background:var(--paper); border:1px solid var(--paper-line); border-radius:8px; padding:10px;">${f.detalle ? escapeHtml(JSON.stringify(f.detalle, null, 2)) : '—'}</pre>
               </td>
             </tr>`).join('')}
         </tbody>
       </table>
     </div>
   `;
+
+  cont.querySelectorAll('[data-accion="ver"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = btn.dataset.fila;
+      const filaDetalle = cont.querySelector(`tr[data-detalle-de="${i}"]`);
+      const abierto = !filaDetalle.hidden;
+      cont.querySelectorAll('.fila-detalle').forEach(fd => fd.hidden = true);
+      filaDetalle.hidden = abierto;
+    });
+  });
 }
 
 (async function iniciar() {

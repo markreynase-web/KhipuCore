@@ -95,7 +95,7 @@ function renderOtrasCategorias(mapa, actual, tieneNum) {
   });
 }
 
-export function renderTodo(fuente) {
+export function renderTodo(fuente, opciones = {}) {
   const { filas, mapa, stats, cols } = fuente;
   const dom = {
     dateRangeWrap: document.getElementById('dateRangeWrap'),
@@ -189,7 +189,18 @@ export function renderTodo(fuente) {
   const ctx = document.getElementById('mainChart').getContext('2d');
   if (mainChartInstance) { mainChartInstance.destroy(); mainChartInstance = null; }
 
-  if (tieneFecha) {
+  if (opciones.dibujarGraficoPrincipal) {
+    // El caller (js/app.js) decide cómo se ve el gráfico principal para su
+    // módulo (ej. Finanzas: comparativo ingresos/egresos) en vez de la
+    // detección automática de fecha/categoría genérica de acá abajo.
+    // dashboard.js sigue siendo el único dueño de mainChartInstance (crea y
+    // destruye el canvas), solo delega qué dibujar adentro.
+    document.getElementById('chartTitle').innerHTML = opciones.tituloGraficoPrincipal || 'Vista principal';
+    mainChartInstance = opciones.dibujarGraficoPrincipal(ctx, actual, fuente);
+    if (!mainChartInstance) {
+      chartWrap.innerHTML = '<div class="chart-empty">Todavía no hay datos para graficar.</div>';
+    }
+  } else if (tieneFecha) {
     document.getElementById('chartTitle').innerHTML = `Evolución por fecha <span class="tag" id="chartTag">${escapeHtml(tieneNum ? mapa.colNum : 'conteo')}</span>`;
     const porDia = {};
     actual.forEach(r => { if (r._fecha) porDia[r._fecha] = (porDia[r._fecha] || 0) + (tieneNum ? (isNaN(r._numero) ? 0 : r._numero) : 1); });

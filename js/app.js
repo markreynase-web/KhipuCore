@@ -16,6 +16,7 @@ import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLatera
 import { tienePermiso, haySesionActiva } from './sesion.js';
 import { ESQUEMAS } from './esquemas.js';
 import { crearRegistro } from './api.js';
+import { crearGraficoLineasComparativo } from './charts.js';
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,
 // inventario.html, clientes.html, ...) declara el suyo en <body data-modulo="...">,
@@ -81,13 +82,43 @@ function refrescar() {
   renderTodo(obtenerFuenteActual());
 }
 
+// Ingresos vs. egresos por fecha, en vez del gráfico de una sola línea que
+// arma dashboard.js automáticamente (que sumaría ingresos y egresos como si
+// fueran lo mismo). El esquema de finanzas mapea colCat1:'tipo', así que
+// r._cat1 ya viene siendo 'ingreso'/'egreso' -- no hace falta pedir filas
+// crudas aparte, alcanza con "actual" (mismo dato ya filtrado por rango de
+// fechas que usa el resto del dashboard).
+function dibujarGraficoFinanzas(ctx, actual) {
+  const porDiaIngreso = {}, porDiaEgreso = {};
+  actual.forEach(r => {
+    if (!r._fecha) return;
+    const mapa = r._cat1 === 'ingreso' ? porDiaIngreso : porDiaEgreso;
+    mapa[r._fecha] = (mapa[r._fecha] || 0) + (isNaN(r._numero) ? 0 : r._numero);
+  });
+  const fechas = [...new Set([...Object.keys(porDiaIngreso), ...Object.keys(porDiaEgreso)])].sort();
+  if (!fechas.length) return null;
+  return crearGraficoLineasComparativo(ctx, {
+    etiquetas: fechas,
+    serieA: fechas.map(f => porDiaIngreso[f] || 0), serieB: fechas.map(f => porDiaEgreso[f] || 0),
+    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#1A4FBF', colorB: '#E85C4A'
+  });
+}
+
+function opcionesGraficoPrincipal() {
+  if (NAMESPACE !== 'finanzas') return {};
+  return {
+    tituloGraficoPrincipal: 'Ingresos vs. egresos <span class="tag" id="chartTag">por fecha</span>',
+    dibujarGraficoPrincipal: dibujarGraficoFinanzas
+  };
+}
+
 async function refrescarDesdeBackend() {
   if (!backendActivo) return;
   const fuente = await backendActivo.obtenerFuente({
     desde: document.getElementById('fechaDesde').value || undefined,
     hasta: document.getElementById('fechaHasta').value || undefined
   });
-  if (fuente) renderTodo(fuente);
+  if (fuente) renderTodo(fuente, opcionesGraficoPrincipal());
 }
 
 function mostrarEstado(msg, tipo) {
