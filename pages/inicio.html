@@ -167,7 +167,13 @@ function agruparFinanzasPorMes(filas, modo) {
 function dibujarChartFinanzas() {
   const modo = document.getElementById('chartPeriodo').value;
   const { etiquetas, ingresos, egresos } = agruparFinanzasPorMes(datos.finanzas, modo);
-  const wrap = document.getElementById('chartIngresosEgresos').closest('.chart-wrap');
+  // El wrapper se busca por su propio id (fijo en el HTML), no a través del
+  // <canvas> -- si la llamada anterior no tenía datos, esta misma función ya
+  // reemplazó el canvas por el mensaje "sin datos", así que
+  // getElementById('chartIngresosEgresos') hubiera devuelto null y
+  // .closest(...) reventaba en la segunda vez que se abría el selector de
+  // período (ej. "Este año" sin datos -> "Todo el histórico").
+  const wrap = document.getElementById('panelChart').querySelector('.chart-wrap');
   wrap.innerHTML = '<canvas id="chartIngresosEgresos"></canvas>';
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
   if (!ingresos.some(v => v) && !egresos.some(v => v)) {
