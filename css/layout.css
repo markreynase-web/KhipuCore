@@ -159,6 +159,19 @@ main{ max-width:1180px; margin:0 auto; padding:28px 32px; }
 
 @media (max-width: 640px){
   .topbar-search{ display:none; }
+
+  /* Los dropdowns de notificaciones/usuario están anclados (right:0) al
+     botón que los abre. En el sidebar horizontal de móvil el topbar puede
+     envolver a una segunda línea y ese botón queda cerca del borde
+     izquierdo -- con el ancho fijo del panel (320px) se salía de la
+     pantalla por la izquierda. En vez de perseguir la posición del botón,
+     en pantallas chicas se anclan directo a la parte de abajo de la
+     ventana (patrón "hoja inferior"), que siempre entra sin importar
+     dónde haya quedado el botón. */
+  .topbar-notif-panel, .topbar-usuario-panel{
+    position:fixed; left:12px; right:12px; top:auto; bottom:12px;
+    width:auto; max-width:none; max-height:70vh; overflow-y:auto;
+  }
 }
 
 @media (max-width: 900px){
