@@ -6,7 +6,7 @@
 // para que los gráficos combinen con las tarjetas KPI y el resto del rediseño,
 // en vez de los ochre/teal de la versión "papel" original.
 
-import { fmtCorto } from './utils.js';
+import { fmtCorto, fmtNum } from './utils.js';
 
 const GRID = '#E6E8F0';
 
@@ -18,8 +18,20 @@ export const PALETA_CATEGORICA = ['#E85C4A', '#1A4FBF', '#0F6E56', '#B8871F', '#
 export function crearGraficoLineaFecha(ctx, { fechas, valores, label, color, colorFondo }) {
   return new Chart(ctx, {
     type: 'line',
-    data: { labels: fechas, datasets: [{ label, data: valores, borderColor: color, backgroundColor: colorFondo, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid: { color: GRID } } } }
+    data: { labels: fechas, datasets: [{ label, data: valores, borderColor: color, backgroundColor: colorFondo, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 20, pointHoverBackgroundColor: color, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2, borderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      // mode:'index' + intersect:false: el tooltip aparece con solo pasar el
+      // mouse por la posición X que sea, sin tener que acertarle al punto
+      // exacto (que además es invisible -- pointRadius:0 -- mientras no se
+      // pasa el mouse encima).
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctxItem => ` ${label}: ${fmtNum(ctxItem.parsed.y)}` } }
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid: { color: GRID } } }
+    }
   });
 }
 
@@ -27,7 +39,14 @@ export function crearGraficoBarras(ctx, { etiquetas, valores, label, color }) {
   return new Chart(ctx, {
     type: 'bar',
     data: { labels: etiquetas, datasets: [{ label, data: valores, backgroundColor: color, borderRadius: 6, borderSkipped: false, maxBarThickness: 46 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45 } }, y: { grid: { color: GRID } } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctxItem => ` ${label}: ${fmtNum(ctxItem.parsed.y)}` } }
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxRotation: 45 } }, y: { grid: { color: GRID } } }
+    }
   });
 }
 
@@ -47,7 +66,10 @@ export function crearGraficoLineasComparativo(ctx, { etiquetas, serieA, serieB, 
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } } },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctxItem => ` ${ctxItem.dataset.label}: ${fmtNum(ctxItem.parsed.y)}` } }
+      },
       scales: { x: { grid: { display: false } }, y: { grid: { color: GRID }, ticks: { callback: v => fmtCorto(v) } } }
     }
   });
@@ -74,8 +96,16 @@ export function crearGraficoDona(ctx, { etiquetas, valores, colores = PALETA_CAT
 export function crearGraficoLineaSecundario(ctx, { fechas, valores, label, color, colorFondo }) {
   return new Chart(ctx, {
     type: 'line',
-    data: { labels: fechas, datasets: [{ label, data: valores, borderColor: color, backgroundColor: colorFondo, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, font: { size: 10 } } }, y: { grid: { color: GRID }, ticks: { maxTicksLimit: 5, font: { size: 10 }, callback: v => fmtCorto(v) } } } }
+    data: { labels: fechas, datasets: [{ label, data: valores, borderColor: color, backgroundColor: colorFondo, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, pointHitRadius: 20, pointHoverBackgroundColor: color, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2, borderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctxItem => ` ${label}: ${fmtNum(ctxItem.parsed.y)}` } }
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, font: { size: 10 } } }, y: { grid: { color: GRID }, ticks: { maxTicksLimit: 5, font: { size: 10 }, callback: v => fmtCorto(v) } } }
+    }
   });
 }
 
@@ -83,6 +113,13 @@ export function crearGraficoBarrasSecundario(ctx, { etiquetas, valores, label, c
   return new Chart(ctx, {
     type: 'bar',
     data: { labels: etiquetas, datasets: [{ label, data: valores, backgroundColor: color, borderRadius: 5, borderSkipped: false }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { grid: { color: GRID }, ticks: { maxTicksLimit: 5, font: { size: 10 }, callback: v => fmtCorto(v) } } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctxItem => ` ${label}: ${fmtNum(ctxItem.parsed.y)}` } }
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { grid: { color: GRID }, ticks: { maxTicksLimit: 5, font: { size: 10 }, callback: v => fmtCorto(v) } } }
+    }
   });
 }
