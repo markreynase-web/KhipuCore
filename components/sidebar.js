@@ -70,6 +70,44 @@ export function renderSidebar(config, paginaActualId) {
   `;
 
   renderSidebarFooter();
+  asegurarControlesMovil();
+}
+
+// Botón hamburguesa (topbar) + overlay oscuro (body), para el menú tipo
+// drawer en celular (ver @media max-width:640px en css/layout.css). Se
+// generan una sola vez desde acá -- así no hay que agregar este mismo
+// bloque de HTML a mano en las 11 páginas que usan el sidebar.
+function asegurarControlesMovil() {
+  if (!document.getElementById('btnMenuMovil')) {
+    const topbar = document.querySelector('.topbar');
+    if (topbar) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'btnMenuMovil';
+      btn.className = 'sidebar-toggle-movil';
+      btn.setAttribute('aria-label', 'Abrir menú');
+      btn.textContent = '☰';
+      topbar.prepend(btn);
+      btn.addEventListener('click', () => toggleSidebarMovil(true));
+    }
+  }
+
+  if (!document.getElementById('sidebarOverlayMovil')) {
+    const overlay = document.createElement('div');
+    overlay.id = 'sidebarOverlayMovil';
+    overlay.className = 'sidebar-overlay-movil';
+    overlay.addEventListener('click', () => toggleSidebarMovil(false));
+    document.body.appendChild(overlay);
+  }
+}
+
+function toggleSidebarMovil(abrir) {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlayMovil');
+  if (!sidebar || !overlay) return;
+  sidebar.classList.toggle('abierto', abrir);
+  overlay.classList.toggle('activo', abrir);
+  document.body.classList.toggle('sidebar-movil-abierto', abrir);
 }
 
 function renderSidebarFooter() {
