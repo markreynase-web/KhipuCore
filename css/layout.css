@@ -148,8 +148,8 @@
 
 /* Los botones/inputs "ghost" y "period" nacieron para el header oscuro de
    antes; dentro del toolbar (fondo blanco) necesitan su propio contraste. */
-.toolbar .btn-ghost{ color:var(--muted); border-color:var(--paper-line); }
-.toolbar .btn-ghost:hover{ color:var(--ink); border-color:var(--ink); }
+.toolbar .btn-ghost{ background:var(--paper); color:var(--ink); border-color:var(--paper-line); font-weight:600; }
+.toolbar .btn-ghost:hover{ background:var(--teal-deep); color:#fff; border-color:var(--teal-deep); }
 .toolbar select.period, .toolbar input.period{
   color:var(--ink); border-color:var(--paper-line); color-scheme:light;
 }
