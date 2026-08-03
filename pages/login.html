@@ -11,8 +11,16 @@
 <link rel="stylesheet" href="../css/cards.css">
 <link rel="stylesheet" href="../css/forms.css">
 <style>
-  body{ background:var(--paper); }
-  .login-shell{ display:flex; min-height:100vh; }
+  /* height (no min-height) + overflow:hidden en .login-shell: la tarjeta
+     nunca es más alta que la ventana visible, así en laptops no hace falta
+     scrollear para ver el botón de ingresar. Lo que se ajusta para que
+     quepa es el contenido de adentro (ilustración con max-height en vh,
+     paddings/márgenes más chicos), no la tarjeta. */
+  body{ background:var(--paper); display:flex; align-items:center; justify-content:center; height:100vh; padding:20px; overflow:hidden; }
+  .login-shell{
+    display:flex; width:100%; max-width:1360px; height:100%;
+    border-radius:26px; overflow:hidden; box-shadow:0 30px 80px -24px rgba(2,23,57,0.4);
+  }
 
   /* Columna izquierda: marketing, oculta en pantallas chicas (el login
      sigue funcionando igual, solo se prioriza el formulario en mobile).
@@ -22,67 +30,44 @@
      contenido de adentro (.login-marketing-inner) y esta columna sí llena
      todo el espacio libre, empujando el formulario hasta el borde derecho. */
   .login-marketing{
-    flex:1; padding:56px 64px; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    flex:1; padding:32px 64px; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    background:#021739; color:#fff; min-height:0; overflow:hidden;
   }
-  .login-marketing-inner{ width:100%; max-width:760px; }
-  .login-marketing .sidebar-brand{ display:flex; align-items:center; gap:12px; margin-bottom:40px; }
-  .login-marketing .mark{ width:40px; height:40px; font-size:16px; }
-  .login-marketing .brand-name{ font-family:'Inter', sans-serif; font-weight:700; font-size:16px; color:var(--ink); }
-  .login-marketing .brand-tag{ font-size:11px; color:var(--muted); }
-  .login-marketing h1{ font-family:'Inter', sans-serif; font-weight:800; font-size:32px; line-height:1.2; margin:0 0 16px; color:var(--ink); }
-  .login-marketing p.lead{ font-size:15.5px; color:var(--muted); line-height:1.6; max-width:520px; margin:0 0 32px; }
+  .login-marketing-inner{ width:100%; max-width:760px; display:flex; flex-direction:column; align-items:center; min-height:0; }
+  .login-marketing .sidebar-brand{ display:flex; align-items:center; gap:14px; margin-bottom:12px; flex-shrink:0; }
+  .login-marketing .mark{ width:58px; height:58px; }
+  .login-brand-word{ font-family:'Inter', sans-serif; font-weight:800; font-size:34px; color:#fff; letter-spacing:0.01em; }
+  .login-brand-word .acc{ color:var(--teal); }
+  .login-brand-tagline{ font-size:12.5px; letter-spacing:0.1em; color:var(--teal); font-weight:600; margin-top:4px; flex-shrink:0; }
 
-  .login-features{ display:flex; flex-direction:column; gap:18px; margin-bottom:36px; }
-  .login-feature{ display:flex; align-items:flex-start; gap:14px; }
-  .login-feature-icon{
-    width:38px; height:38px; border-radius:10px;
-    display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
-  }
-  .login-feature-title{ font-size:13.5px; font-weight:700; color:var(--ink); }
-  .login-feature-desc{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  /* assets/login-hero.png: recorte de la ilustración que compartió el
+     dueño del proyecto (mismo mockup de donde salió la paleta de colores).
+     max-height en vh (no solo max-width) para que se achique en pantallas
+     bajas en vez de desbordar la tarjeta. */
+  .login-hero{ margin:28px 0; box-shadow:0 20px 50px -20px rgba(0,0,0,0.5); max-height:42vh; width:auto; max-width:100%; object-fit:contain; flex-shrink:1; min-height:0; }
 
-  .login-preview{
-    border-radius:12px; box-shadow:var(--card-shadow); overflow:hidden; border:1px solid var(--paper-line);
-    background:#fff;
-  }
+  .login-marketing h1{ font-family:'Inter', sans-serif; font-weight:800; font-size:28px; line-height:1.3; margin:0 0 10px; color:#fff; flex-shrink:0; }
+  .login-marketing h1 .acc{ color:var(--teal); }
+  .login-marketing p.lead{ font-size:15px; color:rgba(255,255,255,0.65); line-height:1.55; max-width:440px; margin:0; flex-shrink:0; }
 
-  /* Vista previa del panel dentro del login: no es una captura de pantalla
-     estática (se habría desactualizado con cada rediseño) -- es una
-     miniatura hecha con las mismas variables de css/base.css, así que
-     envejece con el resto del tema en vez de quedar pegada a un look viejo. */
-  .lp-mock{ display:flex; height:250px; font-family:'Inter', sans-serif; }
-  .lp-mock-sidebar{ width:160px; flex-shrink:0; background:var(--ink); padding:16px 12px; display:flex; flex-direction:column; gap:14px; }
-  .lp-mock-brand{ display:flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#fff; }
-  .lp-mock-mark{ width:18px; height:18px; border-radius:5px; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800; flex-shrink:0; }
-  .lp-mock-nav{ display:flex; flex-direction:column; gap:3px; }
-  .lp-mock-item{ font-size:9.5px; font-weight:600; color:rgba(255,255,255,0.75); padding:5px 7px; border-radius:6px; white-space:nowrap; }
-  .lp-mock-item.activo{ background:var(--coral); color:#fff; }
-  .lp-mock-main{ flex:1; min-width:0; display:flex; flex-direction:column; }
-  .lp-mock-topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--paper-line); font-size:10px; font-weight:700; color:var(--ink); }
-  .lp-mock-avatar{ width:16px; height:16px; border-radius:50%; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; }
-  .lp-mock-kpis{ display:flex; gap:8px; padding:10px 14px 0; }
-  .lp-mock-kpi{ flex:1; display:flex; align-items:center; gap:6px; background:var(--paper); border-radius:8px; padding:8px; min-width:0; }
-  .lp-mock-kpi-icon{ width:20px; height:20px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:9px; flex-shrink:0; }
-  .lp-mock-kpi-label{ font-size:7px; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .lp-mock-kpi-value{ font-size:12px; font-weight:800; color:var(--ink); }
-  .lp-mock-chart{ flex:1; padding:10px 14px 14px; display:flex; flex-direction:column; min-height:0; }
-  .lp-mock-chart-label{ font-size:8.5px; font-weight:700; color:var(--ink); margin-bottom:4px; }
-  .lp-mock-chart svg{ flex:1; width:100%; }
+  .login-dots{ display:flex; gap:7px; margin-top:28px; flex-shrink:0; }
+  .login-dots span{ width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.25); }
+  .login-dots span:first-child{ background:var(--teal); }
 
   /* Columna derecha: el formulario en sí. Más ancha que antes (460→560) y
      con la tarjeta interna más grande, a pedido -- antes se veía chica y
-     "perdida" en medio de la pantalla en monitores anchos. */
+     "perdida" en medio de la pantalla en monitores anchos. overflow-y:auto
+     como respaldo: si algún día el formulario crece (ej. mensaje de error
+     largo) y no entra en pantallas muy bajas, scrollea adentro de la
+     columna en vez de romper el layout. */
   .login-form-col{
     width:560px; flex-shrink:0; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:40px; border-left:1px solid var(--paper-line);
+    padding:40px; border-left:1px solid var(--paper-line); overflow-y:auto;
   }
   .login-card{ width:100%; max-width:400px; }
-  .login-lock{
-    width:60px; height:60px; border-radius:50%; background:var(--orange-soft); color:var(--orange);
-    display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 18px;
-  }
-  .login-card h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:23px; margin:0 0 4px; text-align:center; color:var(--ink); }
-  .login-card p.sub{ color:var(--muted); font-size:13.5px; margin:0 0 28px; text-align:center; }
+  .login-card h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:26px; margin:0 0 6px; color:var(--ink); }
+  .login-card p.sub{ color:var(--muted); font-size:14px; margin:0 0 28px; }
+  .login-card p.sub b{ color:var(--teal-deep); }
   .login-card form{ display:flex; flex-direction:column; gap:14px; }
   .login-card .campo{ display:flex; flex-direction:column; gap:5px; }
   .login-card label{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; }
@@ -92,15 +77,21 @@
     width:100%; font-family:'Inter', sans-serif; font-size:14.5px; padding:12px 12px 12px 34px;
     border:1px solid var(--paper-line); border-radius:9px; background:var(--paper); color:var(--ink);
   }
-  .login-card input:focus{ outline:none; border-color:var(--coral); }
+  .login-card input:focus{ outline:none; border-color:var(--teal-deep); }
   .login-toggle-pass{ position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--muted); font-size:13px; }
 
-  .login-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
+  .login-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; font-size:12.5px; }
   .login-row label{ display:flex; align-items:center; gap:6px; text-transform:none; letter-spacing:normal; font-weight:500; color:var(--ink); }
-  .login-forgot{ color:var(--muted); text-decoration:none; cursor:default; }
+  .login-forgot{ color:var(--blue); text-decoration:none; cursor:default; font-weight:600; }
   .login-forgot:hover{ text-decoration:underline; }
 
-  .login-card button[type="submit"]{ width:100%; justify-content:center; padding:13px; font-size:14.5px; margin-top:4px; }
+  .btn-login-submit{
+    width:100%; justify-content:center; padding:13px; font-size:14.5px; margin-top:4px;
+    background:var(--teal-deep); color:#fff; border:none; border-radius:9px; font-weight:700;
+    display:flex; align-items:center; gap:8px; cursor:pointer; font-family:'Inter', sans-serif;
+  }
+  .btn-login-submit:hover{ background:#009AB2; }
+  .btn-login-submit:disabled{ opacity:0.7; cursor:default; }
   .login-error{ font-size:13px; color:var(--coral); min-height:18px; text-align:center; }
 
   .login-divider{ display:flex; align-items:center; gap:10px; margin:20px 0; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
@@ -108,17 +99,32 @@
 
   .btn-google{
     width:100%; justify-content:center; background:#fff; border:1px solid var(--paper-line); color:var(--ink);
-    padding:10px; opacity:0.9; cursor:not-allowed; position:relative;
+    padding:11px; cursor:not-allowed; position:relative; border-radius:9px; font-weight:600;
+    display:flex; align-items:center; gap:10px; font-family:'Inter', sans-serif; font-size:14px;
   }
-  .btn-google .g{ font-weight:700; }
 
   .login-signup{ text-align:center; font-size:12.5px; color:var(--muted); margin-top:22px; }
-  .login-signup a{ color:var(--ochre-deep); font-weight:600; text-decoration:none; cursor:default; }
+  .login-signup a{ color:var(--blue); font-weight:600; text-decoration:none; cursor:default; }
   .login-signup a:hover{ text-decoration:underline; }
 
-  @media (max-width: 860px){
+  /* Con .login-form-col en ancho fijo (560px), el panel de marketing se
+     queda con muy poco espacio útil justo antes de este quiebre (el
+     tagline se corta en dos líneas, la ilustración queda chica) -- por
+     eso el corte está más arriba que el resto de la app (860px), no en
+     el breakpoint típico de tablet. */
+  @media (max-width: 1180px){
+    /* Sin el panel de marketing, ya no hay dos columnas que tienen que
+       calzar juntas en la altura de la ventana -- se puede volver al
+       tamaño natural (y dejar que la página scrollee si hiciera falta,
+       ej. teclado en pantalla achicando el viewport en el celular). */
+    body{ height:auto; min-height:100vh; overflow:visible; }
+    .login-shell{ height:auto; }
     .login-marketing{ display:none; }
     .login-form-col{ width:100%; border-left:none; }
+  }
+  @media (max-width: 480px){
+    body{ padding:12px; }
+    .login-form-col{ padding:32px 22px; }
   }
 </style>
 </head>
@@ -130,79 +136,23 @@
     <div class="sidebar-brand">
       <img class="mark" src="../assets/logo-icon.png" alt="KhipuCore">
       <div>
-        <div class="brand-name">KhipuCore</div>
-        <div class="brand-tag">Gestor Empresarial</div>
+        <div class="login-brand-word"><span class="acc">K</span>hipu<span class="acc">C</span>ore</div>
       </div>
     </div>
+    <div class="login-brand-tagline">ORGANIZA - CONTROLA - CONECTA - CRECE</div>
 
-    <h1>Gestiona tu empresa,<br>toma mejores decisiones</h1>
-    <p class="lead">La plataforma todo en uno para controlar tus ventas, finanzas, clientes e inventario desde un solo lugar.</p>
+    <img class="login-hero" src="../assets/login-hero.png" alt="Panel de control de KhipuCore" style="width:100%; max-width:640px; border-radius:10px;">
 
-    <div class="login-features">
-      <div class="login-feature">
-        <div class="login-feature-icon" style="background:var(--blue-soft); color:var(--blue);">📊</div>
-        <div>
-          <div class="login-feature-title">Información en tiempo real</div>
-          <div class="login-feature-desc">Visualiza lo más importante de tu empresa al instante.</div>
-        </div>
-      </div>
-      <div class="login-feature">
-        <div class="login-feature-icon" style="background:var(--purple-soft); color:var(--purple);">🛡️</div>
-        <div>
-          <div class="login-feature-title">Seguridad y confianza</div>
-          <div class="login-feature-desc">Tus datos siempre protegidos, con permisos por rol.</div>
-        </div>
-      </div>
-      <div class="login-feature">
-        <div class="login-feature-icon" style="background:var(--orange-soft); color:var(--orange);">🤝</div>
-        <div>
-          <div class="login-feature-title">Todo en un solo lugar</div>
-          <div class="login-feature-desc">Clientes, ventas, inventario, finanzas y más.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="login-preview">
-      <div class="lp-mock">
-        <div class="lp-mock-sidebar">
-          <div class="lp-mock-brand"><span class="lp-mock-mark">PD</span><span>Mi proyecto de datos</span></div>
-          <div class="lp-mock-nav">
-            <div class="lp-mock-item activo">🏠 Inicio</div>
-            <div class="lp-mock-item">💰 Ventas</div>
-            <div class="lp-mock-item">📦 Inventario</div>
-            <div class="lp-mock-item">👥 Clientes</div>
-            <div class="lp-mock-item">📊 Finanzas</div>
-          </div>
-        </div>
-        <div class="lp-mock-main">
-          <div class="lp-mock-topbar"><span>Panel de Ventas</span><span class="lp-mock-avatar">A</span></div>
-          <div class="lp-mock-kpis">
-            <div class="lp-mock-kpi">
-              <span class="lp-mock-kpi-icon" style="background:var(--blue-soft); color:var(--blue);">💰</span>
-              <div><div class="lp-mock-kpi-label">Total de monto</div><div class="lp-mock-kpi-value">323</div></div>
-            </div>
-            <div class="lp-mock-kpi">
-              <span class="lp-mock-kpi-icon" style="background:var(--orange-soft); color:var(--orange);">📦</span>
-              <div><div class="lp-mock-kpi-label">Registros</div><div class="lp-mock-kpi-value">1</div></div>
-            </div>
-          </div>
-          <div class="lp-mock-chart">
-            <div class="lp-mock-chart-label">Evolución por fecha</div>
-            <svg viewBox="0 0 220 50" preserveAspectRatio="none">
-              <polyline points="0,42 30,30 60,35 90,15 120,22 150,8 180,18 220,5" fill="none" stroke="var(--coral)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
+    <h1>Tu <span class="acc">negocio</span>, en un solo lugar</h1>
+    <p class="lead">Administra clientes, productos, ventas y más desde una plataforma inteligente y segura.</p>
+    <div class="login-dots"><span></span><span></span><span></span><span></span></div>
    </div>
   </div>
 
   <div class="login-form-col">
     <div class="login-card">
-      <div class="login-lock">🔒</div>
-      <h2>Iniciar sesión</h2>
-      <p class="sub">Ingresa tus credenciales para continuar</p>
+      <h2>¡Bienvenido de nuevo!</h2>
+      <p class="sub">Inicia sesión para continuar en <b>KhipuCore</b></p>
 
       <form id="formLogin">
         <div class="campo">
@@ -229,19 +179,23 @@
         </div>
 
         <div class="login-error" id="loginError"></div>
-        <button type="submit" class="btn btn-ochre" id="btnLogin">Ingresar</button>
+        <button type="submit" class="btn-login-submit" id="btnLogin">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Iniciar sesión
+        </button>
       </form>
 
       <div class="login-divider">o continúa con</div>
 
       <!-- Google OAuth: decidido dejarlo solo visual por ahora (ver charla
            de esta fase) -- botón deshabilitado, sin flujo real detrás. -->
-      <button type="button" class="btn btn-google" id="btnGoogle" disabled title="Próximamente: inicio de sesión con Google">
-        <span class="g">G</span>&nbsp; Continuar con Google
+      <button type="button" class="btn-google" id="btnGoogle" disabled title="Próximamente: inicio de sesión con Google">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3c-7.4 0-13.8 4.2-17 10.4z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-1.8 14-5.2l-6.5-5.4c-2 1.4-4.6 2.3-7.5 2.3-5.3 0-9.7-3.3-11.3-8l-6.5 5c3.2 6.3 9.6 10.6 17.1 10.6z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C41.4 36 45 30.5 45 24c0-1.4-.1-2.7-.4-3.5z"/></svg>
+          Continuar con Google
       </button>
 
       <div class="login-signup">
-        ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Solicita acceso</a>
+        ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Contácta a tu administrador</a>
       </div>
     </div>
 

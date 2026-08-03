@@ -35,12 +35,12 @@
   font-size:13px; font-weight:600; color:rgba(255,255,255,0.8); text-decoration:none; margin-bottom:2px;
 }
 .sidebar-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
-.sidebar-item.active{ background:var(--teal); color:#fff; }
+.sidebar-item.active{ background:var(--teal); color:var(--ink); }
 .sidebar-icon{ font-size:15px; line-height:1; width:18px; text-align:center; flex-shrink:0; }
 
 .sidebar-footer{ border-top:1px solid rgba(255,255,255,0.08); padding:14px 16px; display:flex; align-items:center; gap:10px; }
 .sidebar-avatar{
-  width:32px; height:32px; border-radius:50%; background:var(--coral); color:#fff;
+  width:32px; height:32px; border-radius:50%; background:var(--teal); color:var(--ink);
   display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Inter', sans-serif;
   flex-shrink:0; font-size:13px;
 }
@@ -114,7 +114,7 @@
 .topbar-usuario-menu{ position:relative; }
 .topbar-usuario-chip{ display:flex; align-items:center; gap:8px; cursor:pointer; background:none; border:none; padding:2px; }
 .topbar-usuario-avatar{
-  width:32px; height:32px; border-radius:50%; background:var(--coral); color:#fff;
+  width:32px; height:32px; border-radius:50%; background:var(--ink); color:#fff;
   display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;
 }
 .topbar-usuario-info{ text-align:left; line-height:1.25; }

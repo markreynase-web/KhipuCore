@@ -190,7 +190,7 @@ function dibujarChartFinanzas() {
   const ctx = document.getElementById('chartIngresosEgresos').getContext('2d');
   chartInstance = crearGraficoLineasComparativo(ctx, {
     etiquetas, serieA: ingresos, serieB: egresos,
-    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#12CCC0', colorB: '#1A4FBF'
+    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#00B3CD', colorB: '#006CA1'
   });
 }
 
@@ -269,7 +269,7 @@ async function seccionFinanzas(kpis) {
   document.getElementById('panelFinanzasResumen').style.display = '';
   document.getElementById('listaFinanzasResumen').innerHTML = `
     <div class="cat-row"><div class="top"><span>Ingresos</span><span>${fmtNum(ingresos)}</span></div>
-      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(ingresos / maxVal * 100).toFixed(0)}%; background:var(--teal);"></div></div></div>
+      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(ingresos / maxVal * 100).toFixed(0)}%; background:var(--teal-deep);"></div></div></div>
     <div class="cat-row"><div class="top"><span>Egresos</span><span>${fmtNum(egresos)}</span></div>
       <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(egresos / maxVal * 100).toFixed(0)}%; background:var(--blue);"></div></div></div>`;
 }

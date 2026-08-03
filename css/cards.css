@@ -18,7 +18,7 @@
 .kpi-card[data-acento="orange"] .kpi-card-icon{ background:var(--orange-soft); color:var(--orange); }
 .kpi-card[data-acento="purple"] .kpi-card-icon{ background:var(--purple-soft); color:var(--purple); }
 .kpi-card[data-acento="green"] .kpi-card-icon{ background:var(--green-soft); color:var(--green); }
-.kpi-card[data-acento="teal"] .kpi-card-icon{ background:var(--teal-soft); color:var(--teal); }
+.kpi-card[data-acento="teal"] .kpi-card-icon{ background:var(--teal-soft); color:var(--teal-deep); }
 .kpi-card-bar{ height:5px; border-radius:20px; background:var(--paper-line); margin-top:14px; overflow:hidden; }
 .kpi-card-bar-fill{ height:100%; border-radius:20px; }
 .kpi-card[data-acento="red"] .kpi-card-bar-fill{ background:var(--coral); }
@@ -26,7 +26,7 @@
 .kpi-card[data-acento="orange"] .kpi-card-bar-fill{ background:var(--orange); }
 .kpi-card[data-acento="purple"] .kpi-card-bar-fill{ background:var(--purple); }
 .kpi-card[data-acento="green"] .kpi-card-bar-fill{ background:var(--green); }
-.kpi-card[data-acento="teal"] .kpi-card-bar-fill{ background:var(--teal); }
+.kpi-card[data-acento="teal"] .kpi-card-bar-fill{ background:var(--teal-deep); }
 
 .grid-2{ display:grid; grid-template-columns:1.6fr 1fr; gap:22px; margin-bottom:28px; }
 .panel{ background:#fff; border-radius:14px; padding:24px; box-shadow:var(--card-shadow); }
@@ -53,7 +53,7 @@
 .rank-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--paper-line); font-size:13px; }
 .rank-row:last-child{ border-bottom:none; }
 .rank-num{
-  font-family:'Inter', sans-serif; font-weight:700; font-size:11px; color:var(--teal); background:var(--teal-soft);
+  font-family:'Inter', sans-serif; font-weight:700; font-size:11px; color:var(--teal-deep); background:var(--teal-soft);
   width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 .rank-name{ flex:1; font-weight:500; }

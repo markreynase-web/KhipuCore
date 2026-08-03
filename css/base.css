@@ -8,17 +8,18 @@
    sueltos en el código (role-badge, login-feature-icon, sidebar-item.active
    viejo) ahora reunidos en variables con nombre. */
 :root{
-  --ink:#14213D;
+  --ink:#152667;
   --paper:#F3F4F9;
   --paper-line:#E6E8F0;
   --ochre:#E3B23C;
   --ochre-deep:#B8871F;
-  --teal:#12CCC0;
-  --teal-soft:#DFFAF7;
+  --teal:#3DE1DC;
+  --teal-deep:#00B3CD;
+  --teal-soft:#DDF8F6;
   --coral:#E85C4A;
   --coral-deep:#C8493A;
-  --blue:#1A4FBF;
-  --blue-soft:#E8EFFC;
+  --blue:#006CA1;
+  --blue-soft:#DAEFF4;
   --green:#0F6E56;
   --green-soft:#E1F5EE;
   --orange:#B8871F;
