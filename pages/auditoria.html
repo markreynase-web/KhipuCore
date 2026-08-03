@@ -149,39 +149,19 @@ async function cargarAuditoria() {
   cont.innerHTML = `
     <div class="tabla-registros-wrap" style="margin-top:14px;">
       <table class="tabla-registros">
-        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Módulo</th><th>Qué pasó</th><th></th></tr></thead>
+        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Módulo</th><th>Qué pasó</th></tr></thead>
         <tbody>
-          ${filas.map((f, i) => `
-            <tr data-fila="${i}">
+          ${filas.map(f => `
+            <tr>
               <td>${formatoFechaHora(f.creado_el)}</td>
               <td>${escapeHtml(f.usuario_nombre || '—')}</td>
               <td><span class="role-badge role-categoria">${escapeHtml(f.modulo)}</span></td>
               <td>${escapeHtml(generarDescripcion(f))}</td>
-              <td class="col-acciones">${f.detalle ? `<button type="button" class="icon-btn" data-accion="ver" data-fila="${i}" title="Más información">👁️ Más información</button>` : ''}</td>
-            </tr>
-            <tr class="fila-detalle" data-detalle-de="${i}" hidden>
-              <td colspan="5">
-                <div class="fila-detalle-grid">
-                  <div><span class="fila-detalle-label">Acción</span><span class="fila-detalle-valor">${escapeHtml(f.accion)}</span></div>
-                  <div><span class="fila-detalle-label">Registro</span><span class="fila-detalle-valor">#${escapeHtml(f.registro_id ?? '—')}</span></div>
-                </div>
-                <pre style="margin-top:8px; font-size:11px; white-space:pre-wrap; word-break:break-word; background:var(--paper); border:1px solid var(--paper-line); border-radius:8px; padding:10px;">${f.detalle ? escapeHtml(JSON.stringify(f.detalle, null, 2)) : '—'}</pre>
-              </td>
             </tr>`).join('')}
         </tbody>
       </table>
     </div>
   `;
-
-  cont.querySelectorAll('[data-accion="ver"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const i = btn.dataset.fila;
-      const filaDetalle = cont.querySelector(`tr[data-detalle-de="${i}"]`);
-      const abierto = !filaDetalle.hidden;
-      cont.querySelectorAll('.fila-detalle').forEach(fd => fd.hidden = true);
-      filaDetalle.hidden = abierto;
-    });
-  });
 }
 
 (async function iniciar() {
