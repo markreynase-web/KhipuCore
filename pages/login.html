@@ -243,12 +243,17 @@
         ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Solicita acceso</a>
       </div>
     </div>
+
+    <footer style="padding:20px 20px 0;"></footer>
   </div>
 </div>
 
 <script type="module">
   import { cargarConfigEmpresa } from '../js/config.js';
   import { guardarSesion, haySesionActiva } from '../js/sesion.js';
+  import { renderFooter } from '../components/footer.js';
+
+  renderFooter();
 
   if (haySesionActiva()) location.replace('../index.html');
 

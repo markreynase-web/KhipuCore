@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de privacidad — KhipuCore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/cards.css">
+<style>
+  body{ background:var(--paper); }
+  .doc-shell{ max-width:760px; margin:0 auto; padding:48px 24px 20px; }
+  .doc-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+  .doc-brand{ display:flex; align-items:center; gap:10px; }
+  .doc-brand .mark{ width:34px; height:34px; border-radius:9px; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; }
+  .doc-brand span{ font-family:'Inter', sans-serif; font-weight:700; font-size:15px; color:var(--ink); }
+  .doc-volver{ font-size:13px; color:var(--muted); text-decoration:none; font-weight:600; }
+  .doc-volver:hover{ text-decoration:underline; }
+
+  .doc-card{ background:#fff; border-radius:14px; padding:40px 44px; box-shadow:var(--card-shadow); }
+  .doc-card h1{ font-family:'Inter', sans-serif; font-weight:800; font-size:26px; margin:0 0 6px; color:var(--ink); }
+  .doc-fecha{ font-size:13px; color:var(--muted); margin-bottom:32px; }
+  .doc-card h2{ font-family:'Inter', sans-serif; font-weight:700; font-size:16px; margin:30px 0 10px; color:var(--ink); }
+  .doc-card h2:first-of-type{ margin-top:0; }
+  .doc-card p, .doc-card li{ font-size:14px; line-height:1.7; color:var(--ink); }
+  .doc-card ul{ margin:8px 0; padding-left:22px; }
+  .doc-card li{ margin-bottom:6px; }
+  .doc-card a{ color:var(--ochre-deep); font-weight:600; }
+  .doc-placeholder{ background:var(--orange-soft); color:#7A5410; padding:1px 5px; border-radius:4px; font-weight:600; }
+  .doc-tabla{ width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0; }
+  .doc-tabla th{ text-align:left; background:var(--paper); font-weight:700; padding:8px 10px; border:1px solid var(--paper-line); }
+  .doc-tabla td{ padding:8px 10px; border:1px solid var(--paper-line); vertical-align:top; }
+
+  @media (max-width:600px){
+    .doc-card{ padding:26px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-shell">
+  <div class="doc-header">
+    <div class="doc-brand"><div class="mark">K</div><span>KhipuCore</span></div>
+    <a href="#" class="doc-volver" id="linkVolver">← Volver</a>
+  </div>
+
+  <div class="doc-card">
+    <h1>Política de privacidad y tratamiento de datos personales</h1>
+    <div class="doc-fecha">Última actualización: <span id="fechaActualizacion"></span></div>
+
+    <h2>1. Responsable del tratamiento</h2>
+    <p>
+      Esta plataforma (KhipuCore) es operada por
+      <span class="doc-placeholder">[RAZÓN SOCIAL DE TU EMPRESA]</span>,
+      con RUC <span class="doc-placeholder">[RUC]</span> y domicilio en
+      <span class="doc-placeholder">[DIRECCIÓN]</span>
+      ("nosotros", "la empresa"). Para cualquier consulta sobre esta política o sobre
+      tus datos personales, puedes escribir a
+      <span class="doc-placeholder">[CORREO DE CONTACTO]</span>.
+    </p>
+    <p>
+      Este documento se rige por la Ley N° 29733, Ley de Protección de Datos
+      Personales del Perú, y su reglamento (Decreto Supremo N° 003-2013-JUS),
+      bajo supervisión de la Autoridad Nacional de Protección de Datos
+      Personales (ANPD).
+    </p>
+
+    <h2>2. Qué datos recopilamos</h2>
+    <p>KhipuCore es un sistema de gestión interno: los datos que maneja los ingresan directamente las personas autorizadas de la empresa, no público general. Los datos personales que trata son:</p>
+    <table class="doc-tabla">
+      <tr><th>Tipo de dato</th><th>De quién</th><th>Para qué</th></tr>
+      <tr><td>Nombre, correo electrónico, contraseña (cifrada) y rol</td><td>Usuarios del sistema (colaboradores con acceso)</td><td>Autenticación y control de permisos</td></tr>
+      <tr><td>Nombre, correo, teléfono y dirección</td><td>Clientes registrados por la empresa en el módulo Clientes</td><td>Gestión comercial y de ventas</td></tr>
+      <tr><td>Usuario, acción realizada, módulo y fecha/hora</td><td>Usuarios del sistema</td><td>Registro de auditoría interna (trazabilidad de cambios)</td></tr>
+    </table>
+    <p>Los datos de ventas, inventario y finanzas del negocio no son datos personales salvo que incluyan información de una persona identificable (por ejemplo, el nombre de un cliente asociado a una venta).</p>
+
+    <h2>3. Cómo usamos tus datos</h2>
+    <ul>
+      <li>Permitir el inicio de sesión y aplicar los permisos según el rol de cada usuario.</li>
+      <li>Operar los módulos de Ventas, Inventario, Clientes y Finanzas para la gestión del negocio.</li>
+      <li>Mantener un registro de auditoría de quién hizo qué cambio y cuándo, con fines de seguridad y control interno.</li>
+      <li>No usamos los datos para publicidad, no los vendemos ni los compartimos con terceros para fines comerciales.</li>
+    </ul>
+
+    <h2>4. Dónde se almacenan los datos</h2>
+    <p>La información se guarda en una base de datos PostgreSQL alojada en Supabase (servidores en Sudamérica). El backend corre en Render y el sitio web en Vercel — ambos actúan como encargados del tratamiento, procesando los datos únicamente para operar la plataforma, bajo sus propias políticas de seguridad.</p>
+
+    <h2>5. Seguridad</h2>
+    <ul>
+      <li>Las contraseñas se guardan cifradas (nunca en texto plano).</li>
+      <li>El acceso a cada módulo está controlado por permisos según el rol de cada usuario.</li>
+      <li>Cada sesión usa un token temporal (JWT); al cerrar sesión, el token se elimina del navegador.</li>
+      <li>Toda acción de creación, edición o borrado queda registrada en el módulo de Auditoría.</li>
+    </ul>
+
+    <h2>6. Cookies y almacenamiento local</h2>
+    <p>KhipuCore no usa cookies de rastreo ni de publicidad. Para mantener la sesión iniciada, guarda un token en el almacenamiento local del navegador (localStorage), que se borra al cerrar sesión.</p>
+
+    <h2>7. Conservación de los datos</h2>
+    <p>Los datos se conservan mientras la cuenta o el registro estén activos en el sistema, o mientras sea necesario para cumplir obligaciones legales o contables de la empresa. Un usuario o cliente puede solicitar la eliminación de sus datos según el punto 8.</p>
+
+    <h2>8. Tus derechos (ARCO)</h2>
+    <p>Como titular de tus datos personales, tienes derecho a:</p>
+    <ul>
+      <li><b>Acceso:</b> saber qué datos tuyos tenemos registrados.</li>
+      <li><b>Rectificación:</b> corregir datos inexactos o incompletos.</li>
+      <li><b>Cancelación:</b> pedir que eliminemos tus datos cuando ya no sean necesarios.</li>
+      <li><b>Oposición:</b> oponerte a un uso específico de tus datos.</li>
+    </ul>
+    <p>Para ejercer estos derechos, escríbenos a <span class="doc-placeholder">[CORREO DE CONTACTO]</span>.</p>
+
+    <h2>9. Menores de edad</h2>
+    <p>KhipuCore es una herramienta de gestión empresarial y no está dirigida a menores de edad. No solicitamos deliberadamente datos de menores.</p>
+
+    <h2>10. Cambios a esta política</h2>
+    <p>Podemos actualizar esta política cuando cambien las funciones del sistema o la normativa aplicable. La fecha de la última actualización aparece al inicio de este documento.</p>
+  </div>
+
+  <footer></footer>
+</div>
+
+<script type="module">
+  import { renderFooter } from '../components/footer.js';
+  renderFooter();
+
+  document.getElementById('fechaActualizacion').textContent = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  document.getElementById('linkVolver').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (document.referrer) history.back();
+    else location.href = 'login.html';
+  });
+</script>
+</body>
+</html>

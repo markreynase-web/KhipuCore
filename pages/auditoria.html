@@ -53,6 +53,8 @@
         <div id="tablaAuditoria">Cargando…</div>
       </section>
     </main>
+
+    <footer></footer>
   </div>
 </div>
 
@@ -60,6 +62,7 @@
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
 import { renderTopbar } from '../components/topbar.js';
+import { renderFooter } from '../components/footer.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { escapeHtml } from '../js/utils.js';
 
@@ -168,6 +171,7 @@ async function cargarAuditoria() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'auditoria');
   await renderTopbar(config);
+  renderFooter();
 
   if (!tienePermiso('auditoria.ver')) {
     document.getElementById('tablaAuditoria').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';

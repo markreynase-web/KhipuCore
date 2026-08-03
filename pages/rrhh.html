@@ -129,6 +129,8 @@
         <div style="font-size:12px; color:var(--muted); margin-top:12px;">Vista previa — próximamente con datos reales, conectados a Ventas, Finanzas y Auditoría igual que el resto de KhipuCore.</div>
       </div>
     </main>
+
+    <footer></footer>
   </div>
 </div>
 
@@ -136,6 +138,7 @@
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
 import { renderTopbar } from '../components/topbar.js';
+import { renderFooter } from '../components/footer.js';
 import { haySesionActiva } from '../js/sesion.js';
 import { crearGraficoBarras, crearGraficoDona } from '../js/charts.js';
 
@@ -190,6 +193,7 @@ function dibujarCharts() {
   const config = await cargarConfigEmpresa();
   renderSidebar(config, 'rrhh');
   await renderTopbar(config);
+  renderFooter();
   pintarEmpleadosPreview();
   dibujarCharts();
 })();

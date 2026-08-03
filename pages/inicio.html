@@ -84,6 +84,8 @@
 
       <p class="tabla-vacia" id="sinPermisos" style="display:none;">Tu rol no tiene permisos para ver ningún resumen todavía.</p>
     </main>
+
+    <footer></footer>
   </div>
 </div>
 
@@ -91,6 +93,7 @@
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
 import { renderTopbar } from '../components/topbar.js';
+import { renderFooter } from '../components/footer.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { listarRegistros } from '../js/api.js';
 import { fmtNum, escapeHtml } from '../js/utils.js';
@@ -305,6 +308,7 @@ function aplicarSaludo() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'inicio');
   await renderTopbar(config);
+  renderFooter();
   aplicarSaludo();
 
   const kpis = [];

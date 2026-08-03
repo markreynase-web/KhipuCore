@@ -9,6 +9,7 @@ import { renderTodo, redimensionarTodosLosGraficos } from './dashboard.js';
 import { cargarConfigEmpresa, buscarModulo } from './config.js';
 import { renderSidebar } from '../components/sidebar.js';
 import { renderTopbar } from '../components/topbar.js';
+import { renderFooter } from '../components/footer.js';
 import { iniciarModoBackend } from './modoBackend.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
 import { renderTabla } from '../components/tablaRegistros.js';
@@ -493,6 +494,7 @@ async function iniciar() {
   renderSidebar(config, NAMESPACE);
   aplicarBranding(config);
   await renderTopbar(config);
+  renderFooter();
   wireEventos();
 
   if (moduloActual?.baseDeDatos) {
