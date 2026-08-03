@@ -42,9 +42,11 @@ export function renderSidebar(config, paginaActualId) {
     seccionConfig.push({ id: 'auditoria', label: 'Auditoría', icon: '🛡️', href: 'auditoria.html' });
   }
 
+  asegurarFavicon();
+
   cont.innerHTML = `
     <div class="sidebar-brand">
-      <div class="mark">${config.logo || 'GDE'}</div>
+      <img class="mark" src="../assets/logo-icon.png" alt="KhipuCore">
       <div class="sidebar-brand-text">
         <input class="biz-name" id="bizName" value="${config.bizName || 'Gestor de Datos Empresariales'}" />
         <div class="sidebar-subtitle" id="sidebarSubtitle"></div>
@@ -71,6 +73,18 @@ export function renderSidebar(config, paginaActualId) {
 
   renderSidebarFooter();
   asegurarControlesMovil();
+}
+
+// Ícono de pestaña del navegador -- se agrega una sola vez por página, acá
+// en vez de tener que repetir <link rel="icon"> en las 11 páginas que usan
+// el sidebar (login.html y privacidad.html, que no usan el sidebar, lo
+// declaran directo en su <head>).
+function asegurarFavicon() {
+  if (document.querySelector('link[rel="icon"]')) return;
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  link.href = '../assets/logo-icon.png';
+  document.head.appendChild(link);
 }
 
 // Botón hamburguesa (topbar) + overlay oscuro (body), para el menú tipo

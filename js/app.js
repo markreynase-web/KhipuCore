@@ -101,7 +101,7 @@ function dibujarGraficoFinanzas(ctx, actual) {
   return crearGraficoLineasComparativo(ctx, {
     etiquetas: fechas,
     serieA: fechas.map(f => porDiaIngreso[f] || 0), serieB: fechas.map(f => porDiaEgreso[f] || 0),
-    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#1A4FBF', colorB: '#E85C4A'
+    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#12CCC0', colorB: '#1A4FBF'
   });
 }
 

@@ -18,7 +18,7 @@
   overflow:hidden;
 }
 .sidebar-brand{ display:flex; align-items:center; gap:12px; padding:20px 18px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
-.sidebar-brand .mark{ width:36px; height:36px; font-size:15px; flex-shrink:0; background:var(--coral); color:#fff; }
+.sidebar-brand .mark{ width:36px; height:36px; }
 .sidebar-brand-text{ min-width:0; }
 .sidebar-brand .biz-name{
   display:block; width:100%; border:none; background:transparent; padding:0;
@@ -35,7 +35,7 @@
   font-size:13px; font-weight:600; color:rgba(255,255,255,0.8); text-decoration:none; margin-bottom:2px;
 }
 .sidebar-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
-.sidebar-item.active{ background:var(--coral); color:#fff; }
+.sidebar-item.active{ background:var(--teal); color:#fff; }
 .sidebar-icon{ font-size:15px; line-height:1; width:18px; text-align:center; flex-shrink:0; }
 
 .sidebar-footer{ border-top:1px solid rgba(255,255,255,0.08); padding:14px 16px; display:flex; align-items:center; gap:10px; }

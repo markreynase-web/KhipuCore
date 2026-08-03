@@ -190,7 +190,7 @@ function dibujarChartFinanzas() {
   const ctx = document.getElementById('chartIngresosEgresos').getContext('2d');
   chartInstance = crearGraficoLineasComparativo(ctx, {
     etiquetas, serieA: ingresos, serieB: egresos,
-    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#1A4FBF', colorB: '#E85C4A'
+    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#12CCC0', colorB: '#1A4FBF'
   });
 }
 
@@ -199,7 +199,7 @@ async function seccionVentas(kpis) {
   const filasMes = datos.ventas.filter(f => esteMes(f.fecha));
   const totalMes = filasMes.reduce((s, f) => s + (Number(f.monto) || 0), 0);
   const totalHistorico = datos.ventas.reduce((s, f) => s + (Number(f.monto) || 0), 0);
-  kpis.push({ orden: 1, html: kpiCard({ acento: 'red', icono: '💰', label: 'Ventas este mes', value: fmtNum(totalMes),
+  kpis.push({ orden: 1, html: kpiCard({ acento: 'teal', icono: '💰', label: 'Ventas este mes', value: fmtNum(totalMes),
     sub: `${filasMes.length} venta(s) · histórico ${fmtNum(totalHistorico)}` }) });
 
   const top = agregarPorClave(datos.ventas, 'producto', 'monto').slice(0, 5);
@@ -269,9 +269,9 @@ async function seccionFinanzas(kpis) {
   document.getElementById('panelFinanzasResumen').style.display = '';
   document.getElementById('listaFinanzasResumen').innerHTML = `
     <div class="cat-row"><div class="top"><span>Ingresos</span><span>${fmtNum(ingresos)}</span></div>
-      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(ingresos / maxVal * 100).toFixed(0)}%; background:var(--blue);"></div></div></div>
+      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(ingresos / maxVal * 100).toFixed(0)}%; background:var(--teal);"></div></div></div>
     <div class="cat-row"><div class="top"><span>Egresos</span><span>${fmtNum(egresos)}</span></div>
-      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(egresos / maxVal * 100).toFixed(0)}%; background:var(--coral);"></div></div></div>`;
+      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${(egresos / maxVal * 100).toFixed(0)}%; background:var(--blue);"></div></div></div>`;
 }
 
 async function seccionUsuarios(kpis) {
