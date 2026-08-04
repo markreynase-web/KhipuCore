@@ -2,14 +2,510 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>KhipuCore</title>
-<script>
-  // pages/inicio.html es el resumen general (KPIs de todos los módulos) y
-  // ya se encarga de mandar a login.html si no hay sesión activa.
-  location.replace('pages/inicio.html');
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Plataforma SaaS modular de gestión empresarial</title>
+<meta name="description" content="KhipuCore es una plataforma SaaS modular de gestión empresarial e inteligencia operativa: un núcleo compartido (ventas, inventario, clientes, finanzas) más módulos especializados por industria.">
+<link rel="icon" href="assets/logo-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/cards.css">
+<style>
+  html{ scroll-behavior:smooth; }
+  body{ background:#fff; }
+  a{ color:inherit; }
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 24px; }
+  .eyebrow{ font-size:12px; letter-spacing:0.12em; text-transform:uppercase; font-weight:700; }
+  .pill{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; letter-spacing:0.03em; padding:5px 11px; border-radius:100px; }
+
+  /* ---------- Nav ---------- */
+  .lp-nav{ position:sticky; top:0; z-index:20; background:rgba(255,255,255,0.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--paper-line); }
+  .lp-nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:14px 24px; max-width:1180px; margin:0 auto; }
+  .lp-brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
+  .lp-brand img{ width:32px; height:32px; }
+  .lp-brand span{ font-family:'Inter', sans-serif; font-weight:800; font-size:18px; color:var(--ink); }
+  .lp-brand .acc{ color:var(--teal-deep); }
+  .lp-links{ display:flex; align-items:center; gap:28px; }
+  .lp-links a{ font-size:13.5px; font-weight:600; color:var(--muted); text-decoration:none; }
+  .lp-links a:hover{ color:var(--ink); }
+  .lp-nav-cta{ display:flex; align-items:center; gap:10px; }
+  .btn-nav-login{ background:var(--teal-deep); color:#fff; padding:9px 18px; border-radius:9px; font-weight:700; font-size:13.5px; text-decoration:none; }
+  .btn-nav-login:hover{ background:#009AB2; }
+  .lp-nav-toggle{ display:none; background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink); }
+
+  .lp-links-mobile{ display:none; flex-direction:column; gap:2px; padding:10px 24px 16px; border-top:1px solid var(--paper-line); background:#fff; }
+  .lp-links-mobile a{ font-size:14.5px; font-weight:600; color:var(--ink); text-decoration:none; padding:10px 0; border-bottom:1px solid var(--paper-line); }
+  .lp-links-mobile a:last-child{ border-bottom:none; }
+
+  @media (max-width:860px){
+    .lp-links{ display:none; }
+    .lp-nav-toggle{ display:block; }
+    .lp-links-mobile.abierto{ display:flex; }
+  }
+
+  /* ---------- Hero ---------- */
+  .lp-hero{ background:#021739; color:#fff; padding:64px 0 80px; overflow:hidden; }
+  .lp-hero-inner{ display:flex; align-items:center; gap:56px; }
+  .lp-hero-text{ flex:1; min-width:0; }
+  .lp-hero .eyebrow{ color:var(--teal); }
+  .lp-hero h1{ font-family:'Inter', sans-serif; font-weight:800; font-size:44px; line-height:1.18; margin:16px 0 18px; }
+  .lp-hero h1 .acc{ color:var(--teal); }
+  .lp-hero p.lead{ font-size:16.5px; line-height:1.65; color:rgba(255,255,255,0.7); max-width:540px; margin:0 0 30px; }
+  .lp-hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; }
+  .btn-hero-primary{ background:var(--teal-deep); color:#fff; padding:14px 24px; border-radius:10px; font-weight:700; font-size:14.5px; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+  .btn-hero-primary:hover{ background:#009AB2; }
+  .btn-hero-ghost{ border:1px solid rgba(255,255,255,0.3); color:#fff; padding:14px 24px; border-radius:10px; font-weight:700; font-size:14.5px; text-decoration:none; }
+  .btn-hero-ghost:hover{ border-color:#fff; }
+  .lp-hero-figure{ flex:0 0 auto; width:420px; max-width:44vw; }
+  .lp-hero-figure img{ width:100%; border-radius:14px; box-shadow:0 30px 70px -20px rgba(0,0,0,0.6); }
+  @media (max-width:900px){
+    .lp-hero-inner{ flex-direction:column; }
+    .lp-hero-figure{ width:100%; max-width:420px; }
+    .lp-hero h1{ font-size:32px; }
+  }
+
+  /* ---------- Secciones generales ---------- */
+  section{ padding:76px 0; }
+  .lp-head{ max-width:640px; margin:0 auto 44px; text-align:center; }
+  .lp-head .eyebrow{ color:var(--teal-deep); }
+  .lp-head h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:30px; color:var(--ink); margin:12px 0 10px; }
+  .lp-head p{ font-size:15px; color:var(--muted); line-height:1.6; margin:0; }
+
+  /* ---------- Qué es ---------- */
+  .lp-origen{ background:var(--paper); }
+  .lp-origen-grid{ display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; }
+  .lp-origen-grid h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:28px; color:var(--ink); margin:0 0 14px; }
+  .lp-origen-grid p{ font-size:15px; color:var(--muted); line-height:1.7; margin:0 0 14px; }
+  .lp-origen-cards{ display:flex; flex-direction:column; gap:14px; }
+  .lp-origen-card{ background:#fff; border-radius:14px; padding:18px 20px; box-shadow:var(--card-shadow); display:flex; gap:14px; align-items:flex-start; }
+  .lp-origen-card .ico{ font-size:22px; flex-shrink:0; }
+  .lp-origen-card b{ display:block; color:var(--ink); font-size:14.5px; margin-bottom:2px; }
+  .lp-origen-card span{ font-size:13px; color:var(--muted); line-height:1.5; }
+  @media (max-width:860px){ .lp-origen-grid{ grid-template-columns:1fr; } }
+
+  /* ---------- Beneficios ---------- */
+  .lp-beneficios-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; }
+  .lp-beneficio{ background:#fff; border:1px solid var(--paper-line); border-radius:14px; padding:24px; }
+  .lp-beneficio .ico{ width:42px; height:42px; border-radius:10px; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:14px; }
+  .lp-beneficio b{ display:block; font-size:15px; color:var(--ink); margin-bottom:6px; }
+  .lp-beneficio p{ font-size:13.5px; color:var(--muted); line-height:1.6; margin:0; }
+  @media (max-width:860px){ .lp-beneficios-grid{ grid-template-columns:1fr; } }
+
+  /* ---------- Núcleo ---------- */
+  .lp-nucleo{ background:var(--ink); color:#fff; }
+  .lp-nucleo .lp-head .eyebrow{ color:var(--teal); }
+  .lp-nucleo .lp-head h2{ color:#fff; }
+  .lp-nucleo .lp-head p{ color:rgba(255,255,255,0.65); }
+  .lp-nucleo-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+  .lp-nucleo-item{ background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:12px; }
+  .lp-nucleo-item .ico{ font-size:18px; }
+  .lp-nucleo-item span{ font-size:14px; font-weight:600; }
+  @media (max-width:760px){ .lp-nucleo-grid{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:480px){ .lp-nucleo-grid{ grid-template-columns:1fr; } }
+
+  /* ---------- Industrias ---------- */
+  .lp-industrias-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:18px; }
+  .lp-industria{ background:#fff; border:1px solid var(--paper-line); border-radius:14px; padding:22px; position:relative; }
+  .lp-industria .ico{ font-size:26px; margin-bottom:10px; display:block; }
+  .lp-industria b{ display:block; font-size:15.5px; color:var(--ink); margin-bottom:8px; }
+  .lp-industria ul{ margin:0; padding-left:18px; }
+  .lp-industria li{ font-size:12.5px; color:var(--muted); line-height:1.7; }
+  .badge-dev{ position:absolute; top:18px; right:18px; background:var(--coral); color:#fff; }
+
+  /* ---------- IA ---------- */
+  .lp-ia{ background:linear-gradient(135deg, #021739 0%, #063a63 100%); color:#fff; }
+  .lp-ia .lp-head .eyebrow{ color:var(--teal); }
+  .lp-ia .lp-head h2{ color:#fff; }
+  .lp-ia .lp-head p{ color:rgba(255,255,255,0.65); }
+  .lp-ia-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .lp-ia-card{ background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:16px; padding:26px; }
+  .lp-ia-card .pill{ background:rgba(61,225,220,0.18); color:var(--teal); margin-bottom:14px; }
+  .lp-ia-card h3{ font-family:'Inter', sans-serif; font-size:18px; margin:0 0 10px; }
+  .lp-ia-card ul{ margin:0; padding-left:18px; }
+  .lp-ia-card li{ font-size:13.5px; color:rgba(255,255,255,0.75); line-height:1.8; }
+  @media (max-width:760px){ .lp-ia-grid{ grid-template-columns:1fr; } }
+
+  /* ---------- Planes ---------- */
+  .lp-planes{ background:var(--paper); }
+  .lp-planes-nota{ text-align:center; font-size:12.5px; color:var(--muted); margin:-24px 0 40px; }
+  .lp-planes-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; align-items:stretch; }
+  .lp-plan{ background:#fff; border-radius:16px; padding:30px 26px; box-shadow:var(--card-shadow); display:flex; flex-direction:column; border:2px solid transparent; }
+  .lp-plan.destacado{ border-color:var(--teal-deep); position:relative; }
+  .lp-plan-badge{ position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--teal-deep); color:#fff; font-size:11px; font-weight:700; padding:5px 14px; border-radius:100px; letter-spacing:0.03em; }
+  .lp-plan h3{ font-family:'Inter', sans-serif; font-size:18px; color:var(--ink); margin:0 0 4px; }
+  .lp-plan .desc{ font-size:13px; color:var(--muted); margin-bottom:18px; min-height:34px; }
+  .lp-plan .precio{ font-family:'Inter', sans-serif; font-weight:800; font-size:30px; color:var(--ink); margin-bottom:2px; }
+  .lp-plan .precio small{ font-size:13px; font-weight:600; color:var(--muted); }
+  .lp-plan .precio-nota{ font-size:11.5px; color:var(--muted); margin-bottom:20px; }
+  .lp-plan ul{ margin:0 0 24px; padding-left:0; list-style:none; flex:1; }
+  .lp-plan li{ font-size:13.5px; color:var(--ink); padding:7px 0; border-top:1px solid var(--paper-line); display:flex; gap:8px; }
+  .lp-plan li:first-child{ border-top:none; }
+  .lp-plan li b{ color:var(--teal-deep); }
+  .lp-plan .btn-plan{ text-align:center; padding:12px; border-radius:9px; font-weight:700; font-size:13.5px; text-decoration:none; }
+  .lp-plan .btn-plan.primario{ background:var(--teal-deep); color:#fff; }
+  .lp-plan .btn-plan.primario:hover{ background:#009AB2; }
+  .lp-plan .btn-plan.secundario{ background:var(--paper); color:var(--ink); border:1px solid var(--paper-line); }
+  @media (max-width:900px){ .lp-planes-grid{ grid-template-columns:1fr; } .lp-plan.destacado{ order:-1; } }
+
+  /* ---------- Contacto ---------- */
+  .lp-contacto-card{ background:#021739; color:#fff; border-radius:22px; padding:52px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap; }
+  .lp-contacto-card h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:26px; margin:0 0 10px; }
+  .lp-contacto-card p{ font-size:14.5px; color:rgba(255,255,255,0.7); margin:0; max-width:420px; }
+  .lp-contacto-acciones{ display:flex; gap:12px; flex-wrap:wrap; }
+  .btn-contacto{ display:flex; align-items:center; gap:9px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:13px 20px; border-radius:10px; font-weight:600; font-size:13.5px; text-decoration:none; }
+  .btn-contacto:hover{ background:rgba(255,255,255,0.16); }
+  .btn-contacto.teal{ background:var(--teal-deep); border-color:var(--teal-deep); }
+  .btn-contacto.teal:hover{ background:#009AB2; }
+
+  /* ---------- Footer ---------- */
+  .lp-footer{ padding:36px 24px 46px; text-align:center; font-size:12px; color:var(--muted); }
+  .lp-footer a{ color:var(--ink); font-weight:600; text-decoration:none; }
+  .lp-footer a:hover{ text-decoration:underline; }
+</style>
 </head>
 <body>
-  <p>Redirigiendo… Si no ocurre automáticamente, <a href="pages/ventas.html">haz clic aquí</a>.</p>
+
+<nav class="lp-nav">
+  <div class="lp-nav-inner">
+    <a class="lp-brand" href="#top">
+      <img src="assets/logo-icon.png" alt="KhipuCore">
+      <span><span class="acc">K</span>hipu<span class="acc">C</span>ore</span>
+    </a>
+    <div class="lp-links">
+      <a href="#producto">Producto</a>
+      <a href="#modulos">Módulos</a>
+      <a href="#industrias">Industrias</a>
+      <a href="#ia">IA</a>
+      <a href="#planes">Planes</a>
+      <a href="#contacto">Contacto</a>
+    </div>
+    <div class="lp-nav-cta">
+      <a class="btn-nav-login" href="pages/login.html">Iniciar sesión</a>
+      <button type="button" class="lp-nav-toggle" id="btnNavMovil" aria-label="Abrir menú">☰</button>
+    </div>
+  </div>
+  <div class="lp-links-mobile" id="navMovil">
+    <a href="#producto">Producto</a>
+    <a href="#modulos">Módulos</a>
+    <a href="#industrias">Industrias</a>
+    <a href="#ia">IA</a>
+    <a href="#planes">Planes</a>
+    <a href="#contacto">Contacto</a>
+  </div>
+</nav>
+
+<header class="lp-hero" id="top">
+  <div class="wrap lp-hero-inner">
+    <div class="lp-hero-text">
+      <div class="eyebrow">ORGANIZA · CONTROLA · CONECTA · CRECE</div>
+      <h1>Un <span class="acc">núcleo</span>. Los módulos que tu negocio necesite.</h1>
+      <p class="lead">
+        KhipuCore es una plataforma SaaS modular de gestión empresarial e
+        inteligencia operativa, inspirada en la organización del conocimiento
+        mediante el quipu, diseñada para adaptarse a cualquier industria con
+        módulos especializados, automatización y datos en tiempo real.
+      </p>
+      <div class="lp-hero-ctas">
+        <a class="btn-hero-primary" href="#planes">
+          Ver planes
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a class="btn-hero-ghost" href="pages/login.html">Iniciar sesión</a>
+      </div>
+    </div>
+    <div class="lp-hero-figure">
+      <img src="assets/login-hero.png" alt="Panel de control de KhipuCore">
+    </div>
+  </div>
+</header>
+
+<section class="lp-origen" id="producto">
+  <div class="wrap lp-origen-grid">
+    <div>
+      <div class="eyebrow" style="color:var(--teal-deep);">QUÉ ES Y POR QUÉ NACIÓ</div>
+      <h2>Khipu es orden. Core es el núcleo.</h2>
+      <p>
+        Un khipu es el sistema con el que los incas registraban y organizaban
+        información compleja usando nudos y cuerdas. KhipuCore retoma esa
+        idea: un núcleo sólido que ordena la información de tu empresa, sobre
+        el que se construyen las soluciones específicas que tu industria
+        necesita.
+      </p>
+      <p>
+        En vez de un sistema distinto para cada tipo de negocio, todas las
+        empresas comparten el mismo núcleo tecnológico — y agregan solo los
+        módulos que usan.
+      </p>
+    </div>
+    <div class="lp-origen-cards">
+      <div class="lp-origen-card">
+        <span class="ico">🏢</span>
+        <div><b>Multiempresa real</b><span>Cada empresa ve solo sus propios datos, aunque todas compartan la misma plataforma.</span></div>
+      </div>
+      <div class="lp-origen-card">
+        <span class="ico">🔐</span>
+        <div><b>Roles y permisos por empresa</b><span>Una misma persona puede tener un rol distinto en cada empresa a la que pertenece.</span></div>
+      </div>
+      <div class="lp-origen-card">
+        <span class="ico">🧭</span>
+        <div><b>Auditoría completa</b><span>Cada creación, edición o borrado queda registrado: quién, qué y cuándo.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="lp-head">
+      <div class="eyebrow">BENEFICIOS</div>
+      <h2>Construido para crecer contigo</h2>
+      <p>No son promesas de marketing — son decisiones de arquitectura que ya están funcionando.</p>
+    </div>
+    <div class="lp-beneficios-grid">
+      <div class="lp-beneficio">
+        <div class="ico">🧩</div>
+        <b>Núcleo + módulos</b>
+        <p>Un solo motor para todas las empresas; cada una activa únicamente los módulos que contrató.</p>
+      </div>
+      <div class="lp-beneficio">
+        <div class="ico">🔑</div>
+        <b>Login inteligente</b>
+        <p>Un correo y una contraseña. Si administras más de una empresa, eliges cuál abrir — nada más que recordar.</p>
+      </div>
+      <div class="lp-beneficio">
+        <div class="ico">📊</div>
+        <b>Datos en tiempo real</b>
+        <p>Ventas, inventario, clientes y finanzas conectados entre sí: una venta descuenta stock y genera el movimiento financiero solo.</p>
+      </div>
+      <div class="lp-beneficio">
+        <div class="ico">🛡️</div>
+        <b>Seguridad por diseño</b>
+        <p>Contraseñas cifradas, sesiones con token temporal, y aislamiento de datos entre empresas a nivel de base de datos.</p>
+      </div>
+      <div class="lp-beneficio">
+        <div class="ico">📈</div>
+        <b>Crece sin fricción</b>
+        <p>Onboarding de una empresa nueva sin desplegar infraestructura nueva — es una fila más en la misma plataforma.</p>
+      </div>
+      <div class="lp-beneficio">
+        <div class="ico">🎯</div>
+        <b>Construido con clientes reales</b>
+        <p>Cada módulo nuevo parte de una conversación con un negocio real, no de una lista de funciones genéricas.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="lp-nucleo" id="modulos">
+  <div class="wrap">
+    <div class="lp-head">
+      <div class="eyebrow">EL NÚCLEO — KHIPUCORE BASE</div>
+      <h2>Lo que trae toda empresa desde el primer día</h2>
+      <p>Disponible hoy para cualquier empresa en la plataforma.</p>
+    </div>
+    <div class="lp-nucleo-grid">
+      <div class="lp-nucleo-item"><span class="ico">📊</span><span>Dashboard</span></div>
+      <div class="lp-nucleo-item"><span class="ico">👤</span><span>Usuarios y roles</span></div>
+      <div class="lp-nucleo-item"><span class="ico">🤝</span><span>Clientes</span></div>
+      <div class="lp-nucleo-item"><span class="ico">💰</span><span>Ventas</span></div>
+      <div class="lp-nucleo-item"><span class="ico">📦</span><span>Inventario</span></div>
+      <div class="lp-nucleo-item"><span class="ico">💵</span><span>Finanzas</span></div>
+      <div class="lp-nucleo-item"><span class="ico">🛡️</span><span>Auditoría</span></div>
+      <div class="lp-nucleo-item"><span class="ico">📑</span><span>Reportes</span></div>
+      <div class="lp-nucleo-item"><span class="ico">✨</span><span>Inteligencia Artificial</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="industrias">
+  <div class="wrap">
+    <div class="lp-head">
+      <div class="eyebrow">MÓDULOS POR INDUSTRIA</div>
+      <h2>El mismo núcleo, adaptado a tu rubro</h2>
+      <p>Sobre KhipuCore Base, cada industria incorpora sus propios módulos especializados.</p>
+    </div>
+    <div class="lp-industrias-grid">
+      <div class="lp-industria">
+        <span class="pill badge-dev">EN DESARROLLO</span>
+        <span class="ico">🚗</span>
+        <b>Automotriz</b>
+        <ul>
+          <li>Vehículos y VIN</li>
+          <li>Taller y postventa</li>
+          <li>Repuestos (OEM, compatibilidad)</li>
+          <li>Garantías y fidelización</li>
+        </ul>
+      </div>
+      <div class="lp-industria">
+        <span class="ico">🏥</span>
+        <b>Salud</b>
+        <ul>
+          <li>Pacientes</li>
+          <li>Historia clínica</li>
+          <li>Agenda</li>
+          <li>Tratamientos</li>
+        </ul>
+      </div>
+      <div class="lp-industria">
+        <span class="ico">🍽️</span>
+        <b>Restaurantes</b>
+        <ul>
+          <li>Mesas</li>
+          <li>Cocina</li>
+          <li>Delivery</li>
+          <li>Caja</li>
+        </ul>
+      </div>
+      <div class="lp-industria">
+        <span class="ico">🛍️</span>
+        <b>Retail</b>
+        <ul>
+          <li>Punto de venta</li>
+          <li>Tiendas</li>
+          <li>Inventario</li>
+          <li>Compras</li>
+        </ul>
+      </div>
+      <div class="lp-industria">
+        <span class="ico">🎓</span>
+        <b>Educación</b>
+        <ul>
+          <li>Alumnos</li>
+          <li>Matrículas</li>
+          <li>Pagos</li>
+          <li>Cursos</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="lp-ia" id="ia">
+  <div class="wrap">
+    <div class="lp-head">
+      <div class="eyebrow">INTELIGENCIA ARTIFICIAL — HACIA DÓNDE VAMOS</div>
+      <h2>De reportar el pasado a anticipar lo que viene</h2>
+      <p>La IA deja de ser un asistente para convertirse en una herramienta de decisión.</p>
+    </div>
+    <div class="lp-ia-grid">
+      <div class="lp-ia-card">
+        <span class="pill">OPERACIÓN INTERNA</span>
+        <h3>IA para operar mejor</h3>
+        <ul>
+          <li>Predicción de ventas</li>
+          <li>Recomendación de compras</li>
+          <li>Alertas de stock y productos de baja rotación</li>
+          <li>Detección de anomalías</li>
+          <li>Reportes generados automáticamente</li>
+        </ul>
+      </div>
+      <div class="lp-ia-card">
+        <span class="pill">CONTEXTO DE MERCADO</span>
+        <h3>IA para leer el mercado</h3>
+        <ul>
+          <li>Tendencias del sector</li>
+          <li>Comportamiento de precios y estacionalidad</li>
+          <li>Cambios regulatorios relevantes</li>
+          <li>Opiniones y comportamiento de clientes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="lp-planes" id="planes">
+  <div class="wrap">
+    <div class="lp-head">
+      <div class="eyebrow">PLANES</div>
+      <h2>Un plan para cada etapa de tu negocio</h2>
+      <p>Precios de referencia — se ajustan según el tamaño de tu equipo y los módulos que necesites.</p>
+    </div>
+    <div class="lp-planes-grid">
+      <div class="lp-plan">
+        <h3>Básico</h3>
+        <div class="desc">Para un solo negocio que recién ordena su operación.</div>
+        <div class="precio">S/ 149<small>/mes</small></div>
+        <div class="precio-nota">Hasta 3 usuarios · 1 empresa</div>
+        <ul>
+          <li><b>✓</b> Núcleo completo: Ventas, Inventario, Clientes, Finanzas</li>
+          <li><b>✓</b> Roles y permisos</li>
+          <li><b>✓</b> Auditoría</li>
+          <li><b>✓</b> Soporte por correo</li>
+        </ul>
+        <a class="btn-plan secundario" href="#contacto">Contáctanos</a>
+      </div>
+      <div class="lp-plan destacado">
+        <span class="lp-plan-badge">MÁS ELEGIDO</span>
+        <h3>Profesional</h3>
+        <div class="desc">Para negocios con varias sucursales o más de una empresa.</div>
+        <div class="precio">S/ 349<small>/mes</small></div>
+        <div class="precio-nota">Hasta 15 usuarios · varias empresas</div>
+        <ul>
+          <li><b>✓</b> Todo lo del plan Básico</li>
+          <li><b>✓</b> Multiempresa (login inteligente incluido)</li>
+          <li><b>✓</b> Usuarios y roles ilimitados por empresa</li>
+          <li><b>✓</b> Soporte prioritario</li>
+        </ul>
+        <a class="btn-plan primario" href="#contacto">Contáctanos</a>
+      </div>
+      <div class="lp-plan">
+        <h3>Empresarial</h3>
+        <div class="desc">Para operaciones grandes o con necesidades a medida.</div>
+        <div class="precio" style="font-size:22px;">Cotización a medida</div>
+        <div class="precio-nota">Usuarios ilimitados · soporte dedicado</div>
+        <ul>
+          <li><b>✓</b> Todo lo del plan Profesional</li>
+          <li><b>✓</b> Módulo especializado de tu industria (ej. Automotriz)</li>
+          <li><b>✓</b> Inteligencia artificial (según disponibilidad del roadmap)</li>
+          <li><b>✓</b> Integraciones a medida</li>
+        </ul>
+        <a class="btn-plan secundario" href="#contacto">Hablemos</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contacto">
+  <div class="wrap">
+    <div class="lp-contacto-card">
+      <div>
+        <h2>¿Conversamos sobre tu negocio?</h2>
+        <p>Cuéntanos qué procesos quieres ordenar y armamos el plan que le queda a tu empresa.</p>
+      </div>
+      <div class="lp-contacto-acciones">
+        <a class="btn-contacto teal" href="https://wa.me/51934568353" target="_blank" rel="noopener">
+          <span>💬</span> WhatsApp
+        </a>
+        <a class="btn-contacto" href="mailto:markreynase@gmail.com">
+          <span>✉️</span> markreynase@gmail.com
+        </a>
+        <a class="btn-contacto" href="pages/login.html">
+          <span>→</span> Ya soy cliente
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="lp-footer">
+  © <span id="anioFooter"></span> <b>KhipuCore</b> · <a href="pages/privacidad.html">Política de privacidad y tratamiento de datos</a>
+</footer>
+
+<script type="module">
+  import { haySesionActiva } from './js/sesion.js';
+  // Quien ya inició sesión no necesita ver la landing -- va directo a su
+  // dashboard, igual que antes redirigía sin condiciones.
+  if (haySesionActiva()) {
+    location.replace('pages/inicio.html');
+  }
+  document.getElementById('anioFooter').textContent = new Date().getFullYear();
+
+  const navMovil = document.getElementById('navMovil');
+  document.getElementById('btnNavMovil').addEventListener('click', () => {
+    navMovil.classList.toggle('abierto');
+  });
+  navMovil.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navMovil.classList.remove('abierto')));
+</script>
+
 </body>
 </html>
