@@ -1,0 +1,51 @@
+/* css/khipu-ai-widget.css
+   Fase D: botón flotante + chat de Khipu AI. El drawer en sí (overlay,
+   ancho, animación) ya lo da css/panel-lateral.css -- este archivo solo
+   cubre el botón flotante y el contenido de adentro del panel. */
+
+.khipu-ai-boton{
+  position:fixed; right:22px; bottom:22px; z-index:30;
+  width:54px; height:54px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--ochre-deep); color:#fff; font-size:22px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 20px -6px rgba(20,33,61,0.45);
+  transition:transform 0.15s ease;
+}
+.khipu-ai-boton:hover{ transform:scale(1.06); }
+.khipu-ai-boton:active{ transform:scale(0.96); }
+
+.khipu-ai-chat{ display:flex; flex-direction:column; min-height:50vh; }
+
+.khipu-ai-mensajes{ display:flex; flex-direction:column; gap:10px; }
+
+.khipu-ai-msg{
+  font-family:'Inter', sans-serif; font-size:13px; line-height:1.5;
+  padding:10px 13px; border-radius:12px; max-width:92%;
+  white-space:pre-wrap;
+}
+.khipu-ai-msg-user{
+  align-self:flex-end; background:var(--ochre); color:var(--ink);
+  border-bottom-right-radius:4px;
+}
+.khipu-ai-msg-asistente{
+  align-self:flex-start; background:var(--paper); color:var(--ink);
+  border-bottom-left-radius:4px;
+}
+.khipu-ai-fuentes{
+  margin-top:6px; font-size:10px; text-transform:uppercase; letter-spacing:0.04em;
+  color:var(--muted); font-weight:600;
+}
+
+.khipu-ai-estado{ font-size:12px; color:var(--muted); padding:6px 2px; min-height:18px; }
+
+.khipu-ai-form{ display:flex; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-line); }
+.khipu-ai-form input{
+  flex:1; font-family:'Inter', sans-serif; font-size:13px; padding:10px 12px;
+  border:1px solid var(--paper-line); border-radius:9px; background:#fff; color:var(--ink);
+}
+.khipu-ai-form input:focus{ outline:none; border-color:var(--ochre-deep); }
+.khipu-ai-form input:disabled{ opacity:0.6; }
+
+@media (max-width: 640px){
+  .khipu-ai-boton{ right:16px; bottom:16px; width:48px; height:48px; font-size:19px; }
+}

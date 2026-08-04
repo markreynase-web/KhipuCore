@@ -8,6 +8,7 @@ import { guardarDatosLocal, cargarDatosLocal, borrarDatosLocal } from './storage
 import { renderTodo, redimensionarTodosLosGraficos } from './dashboard.js';
 import { cargarConfigEmpresa, buscarModulo } from './config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
 import { renderTopbar } from '../components/topbar.js';
 import { renderFooter } from '../components/footer.js';
 import { iniciarModoBackend } from './modoBackend.js';
@@ -508,6 +509,7 @@ async function iniciar() {
   }
 
   renderSidebar(config, NAMESPACE);
+  renderKhipuAiWidget(config);
   aplicarBranding(config);
   await renderTopbar(config);
   renderFooter();

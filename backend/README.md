@@ -250,6 +250,36 @@ imposible de ignorar. Arreglado: un PUT (`limpiarYValidar(body, {esEdicion:
 true})`) ahora excluye del `UPDATE` cualquier columna que no venga en el
 body, en vez de resetearla.
 
+## Khipu AI (Fase D)
+
+Asistente de IA (Claude, vía la API de Anthropic) con acceso de solo lectura
+a los datos de la empresa activa, opt-in por empresa igual que el resto de
+módulos (ver `backend/migrations/016_khipu_ai.sql` -- agrega `khipu_ai` al
+catálogo de `modulos`, sin habilitarlo para ninguna empresa existente). Se
+accede desde el frontend como un widget flotante en toda la app, no una
+página de módulo (ver `components/khipuAiWidget.js`).
+
+Un solo endpoint sirve tanto preguntas sueltas del usuario como resúmenes
+automáticos -- son la misma llamada con distinto mensaje de entrada:
+
+- `POST /api/khipu-ai/preguntar` (`{ pregunta, historial? }`, requiere
+  `khipu_ai.ver`) corre un loop agentic manual: Claude recibe un set de
+  "herramientas de datos" (`backend/src/khipuAiTools.js` -- consultas SQL
+  parametrizadas y scoped a `empresa_id`, nunca SQL libre), decide cuáles
+  necesita, el backend las ejecuta y le devuelve el resultado, y Claude
+  arma la respuesta final en español. El set de herramientas se arma según
+  qué módulos tiene habilitados la empresa (ej. sin `repuestos` habilitado,
+  Claude ni ve esas herramientas).
+- **Generación en vivo, sin caché**: cada pregunta es una llamada real y
+  facturada a la API de Claude (modelo `claude-opus-5`) -- decisión
+  informada, se prioriza frescura sobre costo. Requiere la env var
+  `ANTHROPIC_API_KEY`; sin ella, el endpoint responde 500 con un mensaje
+  claro en vez de tumbar el resto del backend.
+- Límite de abuso/costo: 40 preguntas por usuario por día (contador en
+  memoria del proceso, se resetea a medianoche o si el servidor reinicia).
+- El historial de la conversación vive en el navegador (nada se persiste en
+  el servidor) -- coherente con "generación en vivo".
+
 ## Endpoints
 
 Los mismos 5 endpoints existen para cada módulo: `ventas`, `inventario`,

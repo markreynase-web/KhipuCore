@@ -233,8 +233,28 @@ módulos, y agregar su primer administrador — mismo flujo que antes hacía
 admin sigue creándose por terminal (`npm run seed:superadmin`, huevo-y-gallina:
 para crear uno desde la API hace falta ya serlo).
 
-Siguiente (fase acordada, no implementada todavía): Fase D (IA — primero
-analítica interna, después inteligencia de mercado externa).
+**Khipu AI (Fase D)**
+
+Última fase del roadmap post-reunión con la concesionaria: IA real, no solo
+anunciada en el landing. Un solo agente de Claude con tool use resuelve a la
+vez la capa estadística (predicción de ventas, alertas de stock, productos
+de baja rotación, detección de anomalías, recomendación de compras) y la
+capa de lenguaje natural — no son dos sistemas separados: el backend expone
+un set de "herramientas de datos" (consultas SQL parametrizadas, scoped a
+`empresa_id`, ver `backend/src/khipuAiTools.js`), Claude decide cuáles
+necesita para responder, y arma la respuesta final en español. El set de
+herramientas se ajusta según qué módulos tiene habilitados cada empresa.
+
+Se accede vía un **widget flotante** (🤖, esquina inferior derecha)
+disponible en toda la app una vez habilitada, no una página de módulo
+aparte — decisión explícita para que esté a mano desde cualquier pantalla.
+Modelo **Claude Opus 5** y **generación en vivo** (cada pregunta es una
+llamada real, sin cachear la respuesta): ambas, decisiones informadas del
+usuario, priorizando calidad y frescura sobre costo — con un límite de 40
+preguntas/día por usuario como techo barato de abuso. Opt-in por empresa,
+igual que Vehículos/Repuestos/Postventa (`backend/migrations/016_khipu_ai.sql`),
+habilitable desde el panel de super administrador sin código nuevo (es una
+fila más del catálogo `modulos` que ese panel ya gestiona).
 
 ## Qué falta (fases siguientes, aún no implementadas)
 
