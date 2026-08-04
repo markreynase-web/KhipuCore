@@ -111,6 +111,37 @@ de `crudFactory.js` y de las rutas manuales (`ventas.js`, `inventario.js`,
 `backend/migrations/012_empresas.sql` para el esquema completo
 (`empresas`, `modulos`, `empresa_modulos`, `usuario_empresa`).
 
+## Panel de super administrador
+
+`usuarios.es_super_admin` es una bandera global, separada del sistema de
+roles por empresa a propósito -- gestiona empresas enteras, no datos dentro
+de una. El primer super admin se crea por terminal (huevo-y-gallina: para
+crear uno desde la API hace falta ya serlo):
+
+```bash
+npm run seed:superadmin -- "Tu Nombre" tu@email.com tuContraseña
+```
+
+Si esa cuenta hace login, **nunca** pasa por la resolución de empresas de
+`POST /api/auth/login` -- el token sale directo, sin `empresa_id` ni
+`permisos`, solo `es_super_admin: true` (v1: exclusivo, no hay selector de
+"entro como super admin" vs "entro como empresa X" aunque la cuenta también
+tenga membresías normales). Frontend en `pages/superadmin.html`.
+
+Rutas en `routes/superadmin.js`, protegidas con `auth() + requireSuperAdmin()`
+(no `requireEmpresa()` -- cruzan empresas a propósito):
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/api/superadmin/empresas` | Todas las empresas + conteo de usuarios y módulos habilitados |
+| POST | `/api/superadmin/empresas` | `{ nombre, logo? }` |
+| PUT | `/api/superadmin/empresas/:id` | `{ nombre?, logo?, activo? }` |
+| GET | `/api/superadmin/modulos` | Catálogo completo de `modulos` |
+| GET | `/api/superadmin/empresas/:id/modulos` | Catálogo + flag `habilitado` para esa empresa |
+| POST | `/api/superadmin/empresas/:id/modulos` | `{ modulo_id }` → habilita |
+| DELETE | `/api/superadmin/empresas/:id/modulos/:moduloId` | Deshabilita |
+| POST | `/api/superadmin/empresas/:id/admin` | `{ nombre, email, password? }` → crea (o reusa si el email ya existe globalmente) un usuario y lo vincula como `administrador` de esa empresa. A diferencia de `POST /api/usuarios` (que rechaza un email ya existente para no vincular sin consentimiento), acá SÍ se reusa a propósito: es el super admin pidiendo explícitamente esa acción, no un efecto secundario de un formulario común. |
+
 ## Usando Supabase como base de datos
 
 Si tu `DATABASE_URL` apunta a Supabase, hay dos cosas propias de Supabase que

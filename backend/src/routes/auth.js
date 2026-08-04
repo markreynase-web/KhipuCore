@@ -72,6 +72,16 @@ router.post('/login', async (req, res) => {
     const coincide = await bcrypt.compare(password, usuario.password_hash);
     if (!coincide) return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
 
+    // Super admin: sesión exclusiva, nunca pasa por la resolución de
+    // empresas de abajo -- ni siquiera si esta cuenta también tuviera
+    // membresías en usuario_empresa (v1: no hay selector de modo "entro
+    // como super admin" vs "entro como empresa X").
+    if (usuario.es_super_admin) {
+      const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, es_super_admin: true };
+      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: DURACION_TOKEN });
+      return res.json({ token, usuario: payload });
+    }
+
     // "Login inteligente": la identidad (usuarios) es global, la empresa
     // activa sale de a qué empresas pertenece ese usuario (usuario_empresa).
     const { rows: membresias } = await pool.query(

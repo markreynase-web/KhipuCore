@@ -43,6 +43,14 @@ export function tieneAlgunPermiso(prefijoModulo) {
   return permisos.some(p => p.startsWith(`${prefijoModulo}.`));
 }
 
+// Panel de super administrador: sesión exclusiva, sin empresa_id ni
+// permisos (ver backend/src/routes/auth.js) -- por eso es una consulta
+// aparte, no una revisión más de `permisos`.
+export function esSuperAdmin() {
+  const s = obtenerSesion();
+  return !!s?.usuario?.es_super_admin;
+}
+
 // Fase A (multi-tenant): cuando un usuario pertenece a más de una empresa,
 // el login no entrega sesión de una vez -- entrega un preAuthToken de 5
 // minutos + la lista de empresas para que el usuario elija. Eso NO es una

@@ -492,11 +492,13 @@
 </footer>
 
 <script type="module">
-  import { haySesionActiva } from './js/sesion.js';
+  import { haySesionActiva, esSuperAdmin } from './js/sesion.js';
   // Quien ya inició sesión no necesita ver la landing -- va directo a su
-  // dashboard, igual que antes redirigía sin condiciones.
+  // dashboard, igual que antes redirigía sin condiciones. Un super admin no
+  // pertenece a ninguna empresa (ver js/sesion.js), así que su "dashboard"
+  // es el panel de super administrador, no pages/inicio.html.
   if (haySesionActiva()) {
-    location.replace('pages/inicio.html');
+    location.replace(esSuperAdmin() ? 'pages/superadmin.html' : 'pages/inicio.html');
   }
   document.getElementById('anioFooter').textContent = new Date().getFullYear();
 

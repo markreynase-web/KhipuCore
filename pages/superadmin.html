@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Super administrador</title>
+<link rel="icon" href="../assets/logo-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+<style>
+  body{ background:var(--paper); }
+  .sa-shell{ max-width:1040px; margin:0 auto; padding:28px 24px 20px; }
+  .sa-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+  .sa-brand{ display:flex; align-items:center; gap:10px; }
+  .sa-brand img{ width:34px; height:34px; }
+  .sa-brand-text{ display:flex; align-items:center; gap:8px; font-family:'Inter', sans-serif; font-weight:800; font-size:16px; color:var(--ink); }
+  .sa-brand-tag{ font-size:11px; font-weight:700; color:var(--teal-deep); background:var(--teal-soft); padding:3px 9px; border-radius:20px; }
+  .sa-panel{ background:#fff; border-radius:14px; padding:24px; box-shadow:var(--card-shadow); margin-bottom:20px; }
+  .sa-panel-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .sa-panel-header h2{ font-family:'Inter', sans-serif; font-size:16px; font-weight:700; margin:0; color:var(--ink); }
+  .sa-modulos-lista{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin:14px 0 0; }
+  .sa-modulo-item{ display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--paper-line); border-radius:9px; font-size:13.5px; text-transform:none; letter-spacing:normal; color:var(--ink); font-weight:500; }
+  .sa-modulo-item input{ width:auto; }
+  .sa-estado-badge{ font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; white-space:nowrap; }
+  .sa-estado-badge.activo{ background:#E1F5EE; color:#0F6E56; }
+  .sa-estado-badge.inactivo{ background:#FBEAF0; color:#993556; }
+  .sa-acceso-denegado{ text-align:center; padding:80px 20px; color:var(--muted); }
+  .sa-acceso-denegado h2{ font-family:'Inter', sans-serif; color:var(--ink); }
+  .sa-subtitulo{ font-family:'Inter', sans-serif; font-size:13px; margin:20px 0 8px; color:var(--ink); font-weight:700; }
+</style>
+</head>
+<body>
+
+<div class="sa-shell">
+  <div class="sa-header">
+    <div class="sa-brand">
+      <img src="../assets/logo-icon.png" alt="KhipuCore">
+      <div class="sa-brand-text">KhipuCore <span class="sa-brand-tag">Super Admin</span></div>
+    </div>
+    <button type="button" class="btn btn-ghost" id="btnCerrarSesion" style="color:var(--ink); border:1px solid var(--paper-line);">Cerrar sesión</button>
+  </div>
+
+  <div id="contenido">Cargando…</div>
+
+  <footer></footer>
+</div>
+
+<script type="module">
+  import { haySesionActiva, obtenerSesion, cerrarSesion, esSuperAdmin } from '../js/sesion.js';
+  import { API_BASE_URL } from '../js/apiConfig.js';
+  import { abrirPanelLateral } from '../components/panelLateral.js';
+  import { renderFooter } from '../components/footer.js';
+
+  renderFooter();
+
+  if (!haySesionActiva()) location.replace('login.html');
+
+  const contenido = document.getElementById('contenido');
+  document.getElementById('btnCerrarSesion').addEventListener('click', () => {
+    cerrarSesion();
+    location.replace('login.html');
+  });
+
+  if (!esSuperAdmin()) {
+    contenido.innerHTML = `
+      <div class="sa-acceso-denegado">
+        <h2>Acceso restringido</h2>
+        <p>Tu cuenta no tiene permisos de super administrador.</p>
+      </div>`;
+  } else {
+    iniciar();
+  }
+
+  function headerAuth() {
+    const token = obtenerSesion()?.token;
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  // alert() a propósito: este panel no es de cara al cliente final, lo usa
+  // un super admin -- no vale la pena construir un sistema de notificaciones
+  // aparte para un puñado de acciones de back-office.
+  async function api(path, opciones) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${path}`, { headers: headerAuth(), ...opciones });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => ({}));
+        throw new Error(cuerpo.error || `HTTP ${res.status}`);
+      }
+      if (res.status === 204) return true;
+      return await res.json();
+    } catch (err) {
+      alert(err.message);
+      return null;
+    }
+  }
+
+  async function iniciar() {
+    contenido.innerHTML = `
+      <div class="sa-panel">
+        <div class="sa-panel-header">
+          <h2>Empresas</h2>
+          <button type="button" class="btn btn-ochre" id="btnNuevaEmpresa">+ Nueva empresa</button>
+        </div>
+        <div id="formNuevaEmpresaWrap"></div>
+        <div id="tablaEmpresas">Cargando…</div>
+      </div>
+    `;
+    document.getElementById('btnNuevaEmpresa').addEventListener('click', toggleFormNuevaEmpresa);
+    await cargarEmpresas();
+  }
+
+  function toggleFormNuevaEmpresa() {
+    const wrap = document.getElementById('formNuevaEmpresaWrap');
+    if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `
+      <form class="form-registro" id="formNuevaEmpresa" style="margin:16px 0 20px; padding-bottom:20px; border-bottom:1px solid var(--paper-line);">
+        <div class="campo"><label>Nombre</label><input type="text" id="nuevaEmpresaNombre" required></div>
+        <div class="campo"><label>Logo (iniciales)</label><input type="text" id="nuevaEmpresaLogo" maxlength="4" placeholder="Opcional"></div>
+        <div class="campo campo-accion">
+          <button type="submit" class="btn btn-ochre">Crear empresa</button>
+          <span class="form-status" id="nuevaEmpresaStatus"></span>
+        </div>
+      </form>
+    `;
+    document.getElementById('formNuevaEmpresa').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById('nuevaEmpresaNombre').value.trim();
+      const logo = document.getElementById('nuevaEmpresaLogo').value.trim();
+      const res = await api('/superadmin/empresas', { method: 'POST', body: JSON.stringify({ nombre, logo: logo || undefined }) });
+      if (res) { wrap.innerHTML = ''; await cargarEmpresas(); }
+    });
+  }
+
+  async function cargarEmpresas() {
+    const cont = document.getElementById('tablaEmpresas');
+    const empresas = await api('/superadmin/empresas');
+    if (!empresas) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+    if (!empresas.length) { cont.innerHTML = '<p class="tabla-vacia">Todavía no hay empresas. Usa "+ Nueva empresa" para crear la primera.</p>'; return; }
+
+    cont.innerHTML = `
+      <div class="tabla-registros-wrap">
+        <table class="tabla-registros">
+          <thead><tr><th>Nombre</th><th>Usuarios</th><th>Módulos</th><th>Estado</th><th class="col-acciones"></th></tr></thead>
+          <tbody>
+            ${empresas.map(e => `
+              <tr data-id="${e.id}">
+                <td>${e.nombre}</td>
+                <td>${e.usuarios_count}</td>
+                <td>${e.modulos_count}</td>
+                <td><span class="sa-estado-badge ${e.activo ? 'activo' : 'inactivo'}">${e.activo ? 'Activa' : 'Inactiva'}</span></td>
+                <td class="col-acciones"><button type="button" class="icon-btn" data-accion="gestionar" title="Gestionar">⚙️</button></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    cont.querySelectorAll('[data-accion="gestionar"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('tr').dataset.id;
+        const empresa = empresas.find(e => String(e.id) === id);
+        gestionarEmpresa(empresa);
+      });
+    });
+  }
+
+  function gestionarEmpresa(empresa) {
+    abrirPanelLateral({
+      titulo: `Gestionar: ${empresa.nombre}`,
+      icono: '🏢',
+      montar: async (body) => {
+        body.innerHTML = 'Cargando módulos…';
+        const modulos = await api(`/superadmin/empresas/${empresa.id}/modulos`);
+        if (!modulos) { body.innerHTML = 'No se pudieron cargar los módulos.'; return; }
+
+        body.innerHTML = `
+          <div class="sa-subtitulo">Módulos habilitados</div>
+          <div class="sa-modulos-lista" id="listaModulos">
+            ${modulos.map(m => `
+              <label class="sa-modulo-item">
+                <input type="checkbox" data-modulo="${m.id}" ${m.habilitado ? 'checked' : ''}>
+                ${m.icon || ''} ${m.label}
+              </label>`).join('')}
+          </div>
+
+          <div class="sa-subtitulo" style="margin-top:26px;">Agregar administrador</div>
+          <form class="form-registro" id="formAdmin" style="grid-template-columns:1fr;">
+            <div class="campo"><label>Nombre</label><input type="text" id="adminNombre" required></div>
+            <div class="campo"><label>Correo</label><input type="email" id="adminEmail" required></div>
+            <div class="campo"><label>Contraseña (solo si es cuenta nueva)</label><input type="password" id="adminPassword" placeholder="Mínimo 6 caracteres"></div>
+            <div class="campo campo-accion">
+              <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">Agregar administrador</button>
+              <span class="form-status" id="adminStatus"></span>
+            </div>
+          </form>
+        `;
+
+        document.getElementById('listaModulos').querySelectorAll('input[type="checkbox"]').forEach(chk => {
+          chk.addEventListener('change', async () => {
+            const moduloId = chk.dataset.modulo;
+            const habilitar = chk.checked;
+            chk.disabled = true;
+            const res = habilitar
+              ? await api(`/superadmin/empresas/${empresa.id}/modulos`, { method: 'POST', body: JSON.stringify({ modulo_id: moduloId }) })
+              : await api(`/superadmin/empresas/${empresa.id}/modulos/${moduloId}`, { method: 'DELETE' });
+            chk.disabled = false;
+            if (res === null) chk.checked = !habilitar; // revertir si falló
+            await cargarEmpresas(); // refresca el conteo de módulos en la tabla de fondo
+          });
+        });
+
+        document.getElementById('formAdmin').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const nombre = document.getElementById('adminNombre').value.trim();
+          const email = document.getElementById('adminEmail').value.trim();
+          const password = document.getElementById('adminPassword').value;
+          const statusEl = document.getElementById('adminStatus');
+          const res = await api(`/superadmin/empresas/${empresa.id}/admin`, {
+            method: 'POST', body: JSON.stringify({ nombre, email, password: password || undefined })
+          });
+          if (res) {
+            statusEl.textContent = 'Administrador agregado.';
+            statusEl.style.color = 'var(--teal)';
+            document.getElementById('formAdmin').reset();
+            await cargarEmpresas();
+          }
+        });
+      }
+    });
+  }
+</script>
+</body>
+</html>

@@ -32,3 +32,14 @@ export function requireEmpresa(req, res, next) {
   }
   next();
 }
+
+// Panel de super administrador: rutas que cruzan empresas a propósito (dar
+// de alta una empresa, habilitar sus módulos, crear su primer admin) --
+// nunca se usa junto con requireEmpresa(), son sesiones mutuamente
+// excluyentes (ver routes/auth.js).
+export function requireSuperAdmin(req, res, next) {
+  if (!req.usuario?.es_super_admin) {
+    return res.status(403).json({ error: 'Esta acción requiere una cuenta de super administrador.' });
+  }
+  next();
+}

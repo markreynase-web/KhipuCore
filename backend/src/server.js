@@ -16,6 +16,7 @@ import empresaRouter from './routes/empresa.js';
 import vehiculosRouter from './routes/vehiculos.js';
 import repuestosRouter from './routes/repuestos.js';
 import postventaRouter from './routes/postventa.js';
+import superadminRouter from './routes/superadmin.js';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/empresa', empresaRouter);
 app.use('/api/vehiculos', vehiculosRouter);
 app.use('/api/repuestos', repuestosRouter);
 app.use('/api/postventa', postventaRouter);
+app.use('/api/superadmin', superadminRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 

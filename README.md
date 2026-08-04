@@ -215,6 +215,24 @@ meter de pasada).
   `vehiculos.cliente_id`, `postventa.cliente_id/vehiculo_id/repuesto_id`,
   etc. funcionan todos con el mismo mecanismo, sin código nuevo por módulo.
 
+**Panel de super administrador**
+
+Hueco encontrado durante Fase C: no había ningún rol por encima de
+"administrador de una empresa" — dar de alta una empresa nueva, habilitarle
+módulos, o crear su primer usuario administrador era 100% SQL manual. Se
+agregó un **super admin**: `usuarios.es_super_admin`, una bandera global
+separada del sistema de roles por empresa (`usuario_empresa`) a propósito
+(ese sistema está armado alrededor de "una empresa a la vez"; un super
+admin necesita lo contrario). Su login es exclusivo: si la cuenta es super
+admin, el token nunca lleva `empresa_id`/`permisos` y nunca pasa por el
+selector de empresas, aunque también tenga membresías normales (v1, sin
+selector de modo). Panel en `pages/superadmin.html` (standalone, no usa
+`app.js`/sidebar de módulos): crear empresas, habilitar/deshabilitar sus
+módulos, y agregar su primer administrador — mismo flujo que antes hacía
+`seedAdmin.js` por terminal, ahora desde una pantalla real. El primer super
+admin sigue creándose por terminal (`npm run seed:superadmin`, huevo-y-gallina:
+para crear uno desde la API hace falta ya serlo).
+
 Siguiente (fase acordada, no implementada todavía): Fase D (IA — primero
 analítica interna, después inteligencia de mercado externa).
 
