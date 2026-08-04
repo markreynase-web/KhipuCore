@@ -69,10 +69,20 @@ export function crearRouterCRUD(config) {
   const router = Router();
   const permiso = (accion) => `${modulo}.${accion}`;
 
-  function limpiarYValidar(bodyCrudo) {
+  // esEdicion:true (PUT) -- una columna AUSENTE del body (no enviada) no se
+  // toca: se excluye de `datos` entera para que el UPDATE dinámico de abajo
+  // ni siquiera la mencione. Antes, cualquier columna que no viniera en el
+  // body (ej. porque tablaRegistros.js solo manda las columnas visibles en
+  // columnasTabla) se trataba igual que "vacía" y se pisaba con null/0 --
+  // cada edición inline borraba en silencio cualquier campo que no
+  // estuviera en la tabla. En POST/import (esEdicion:false) el
+  // comportamiento no cambia: todo columna ausente sigue tomando su valor
+  // por defecto, porque ahí sí es una fila nueva completa.
+  function limpiarYValidar(bodyCrudo, { esEdicion = false } = {}) {
     const datos = {};
     columnas.forEach(c => {
       let v = bodyCrudo[c];
+      if (esEdicion && v === undefined) return; // no se tocó: se conserva el valor actual en la base
       const vacio = v === undefined || v === null || v === '';
       if (vacio) {
         v = valoresPorDefecto[c] !== undefined ? valoresPorDefecto[c] : (camposNumericos.includes(c) ? 0 : null);
@@ -88,6 +98,9 @@ export function crearRouterCRUD(config) {
 
     const errores = [];
     camposRequeridos.forEach(c => {
+      // En edición, un campo requerido que ni siquiera vino en el body no
+      // es un error -- significa que no se tocó, no que se vació a propósito.
+      if (esEdicion && !Object.prototype.hasOwnProperty.call(datos, c)) return;
       if (datos[c] === null || datos[c] === undefined || datos[c] === '') errores.push(`${c} es requerido`);
     });
     camposNumericos.forEach(c => {
@@ -146,8 +159,9 @@ export function crearRouterCRUD(config) {
 
   // PUT /:id
   router.put('/:id', verificarPermiso(permiso('editar')), async (req, res) => {
-    const { errores, datos } = limpiarYValidar(req.body);
+    const { errores, datos } = limpiarYValidar(req.body, { esEdicion: true });
     if (errores.length) return res.status(400).json({ error: errores.join(', ') });
+    if (!Object.keys(datos).length) return res.status(400).json({ error: 'No se envió ningún campo para actualizar.' });
     const cols = Object.keys(datos);
     try {
       // Se lee el registro ANTES de pisarlo -- es la única forma de saber,

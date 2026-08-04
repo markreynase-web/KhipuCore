@@ -13,6 +13,9 @@ import authRouter from './routes/auth.js';
 import usuariosRouter from './routes/usuarios.js';
 import auditoriaRouter from './routes/auditoria.js';
 import empresaRouter from './routes/empresa.js';
+import vehiculosRouter from './routes/vehiculos.js';
+import repuestosRouter from './routes/repuestos.js';
+import postventaRouter from './routes/postventa.js';
 
 dotenv.config();
 
@@ -52,6 +55,9 @@ app.use('/api/finanzas', finanzasRouter);
 app.use('/api/usuarios', usuariosRouter);
 app.use('/api/auditoria', auditoriaRouter);
 app.use('/api/empresa', empresaRouter);
+app.use('/api/vehiculos', vehiculosRouter);
+app.use('/api/repuestos', repuestosRouter);
+app.use('/api/postventa', postventaRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 

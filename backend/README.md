@@ -188,6 +188,37 @@ sin que cada ruta tenga que acordarse de escribirla:
 |---|---|---|---|
 | GET | `/api/auditoria?modulo=&desde=&hasta=&limite=` | `auditoria.ver` | Lista el historial (quién, qué acción, qué módulo, cuándo) |
 
+## Vertical automotriz (Fase C)
+
+Primer vertical de industria, opt-in por empresa (ver
+`backend/migrations/014_vertical_automotriz.sql` -- agrega `vehiculos`,
+`repuestos`, `postventa` al catálogo de `modulos`, pero no los habilita
+para ninguna empresa existente).
+
+| Módulo | POST | GET/PUT/DELETE/import |
+|---|---|---|
+| `vehiculos` | Manual (resuelve `cliente_nombre`, ver `routes/vehiculos.js`) | GET/DELETE/import genéricos (`crudFactory`); PUT manual por el mismo motivo que POST |
+| `repuestos` | Manual (genera un egreso en Finanzas si hay stock inicial, igual que `inventario.js`) | GET/PUT/import genéricos; DELETE manual (limpia el egreso) |
+| `postventa` | Manual (transacción: descuenta stock del repuesto principal si se eligió uno, calcula `total`) | Todo manual (no usa `crudFactory` en absoluto, mismo patrón que `ventas.js`) -- no tiene `POST /import` |
+
+`postventa.repuesto_id` es opcional y, si se usa, **inmutable después de
+creada la orden** (igual que `ventas.js` no deja cambiar `producto_id` en un
+PUT) -- corregir una elección equivocada es borrar y recrear la orden.
+`costo_repuestos` siempre queda editable a mano (no hay líneas múltiples de
+repuestos por orden), `mano_obra` siempre manual, `total` siempre calculado
+en el servidor.
+
+**De paso, un bug real en `crudFactory.js` que esta fase encontró y
+arregló:** el PUT genérico trataba cualquier columna ausente del body como
+"vacía" y la reseteaba a `null`/`0` -- cualquier edición inline que no
+tocara TODAS las columnas de un módulo borraba en silencio las que se
+quedaban afuera. Ya afectaba a `clientes.direccion`/`notas`, pero
+`repuestos` tiene 5 columnas así (`compatibilidad`, `ubicacion`,
+`tiempo_reposicion_dias`, `equivalencias`, `notas`), lo que lo hizo
+imposible de ignorar. Arreglado: un PUT (`limpiarYValidar(body, {esEdicion:
+true})`) ahora excluye del `UPDATE` cualquier columna que no venga en el
+body, en vez de resetearla.
+
 ## Endpoints
 
 Los mismos 5 endpoints existen para cada módulo: `ventas`, `inventario`,
@@ -208,6 +239,8 @@ Columnas esperadas en el CSV de cada módulo (insensible a mayúsculas):
 - **ventas**: `fecha, producto, categoria, cantidad, precio_unitario, cliente, notas` (`monto` opcional, se calcula si no viene)
 - **inventario**: `fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, notas`
 - **clientes**: `fecha_registro, nombre, email, telefono, direccion, compras_totales, notas`
+- **repuestos**: `fecha_registro, nombre, codigo_oem, compatibilidad, ubicacion, proveedor, tiempo_reposicion_dias, equivalencias, stock, stock_minimo, costo_unitario, precio_unitario, notas`
+- **vehiculos**: igual que sus campos del formulario, pero además necesita `cliente_nombre` en el CSV -- el import genérico no puede resolverlo a partir de `cliente_id` como sí hace el formulario de la UI (ver tabla de arriba). `postventa` no tiene import de CSV (es 100% manual, como `ventas`).
 
 ## Cómo migrar un módulo nuevo (ej. Compras) a este mismo patrón
 

@@ -100,7 +100,11 @@ export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear 
     if (!c.ayudaStock || c.type !== 'select') return;
     const select = document.getElementById(idInput(c));
     const ayudaEl = cont.querySelector(`[data-rol="ayuda-${c.id}"]`);
-    const campoCantidad = esquema.campos.find(cm => cm.id === 'cantidad');
+    // El nombre del campo de cantidad a clampear es 'cantidad' por defecto
+    // (Ventas), pero un módulo puede declarar otro nombre (ej. Postventa
+    // usa 'cantidad_repuesto') con ayudaStockCampoCantidad en su esquema.
+    const idCampoCantidad = c.ayudaStockCampoCantidad || 'cantidad';
+    const campoCantidad = esquema.campos.find(cm => cm.id === idCampoCantidad);
     const inputCantidad = campoCantidad ? document.getElementById(idInput(campoCantidad)) : null;
 
     select.addEventListener('change', () => {
@@ -118,6 +122,11 @@ export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear 
         if (!inputSugerido) return;
         if (idCampoSugerido === 'categoria' && extra.categoria) inputSugerido.value = extra.categoria;
         if (idCampoSugerido === 'precio_unitario' && extra.precioSugerido) inputSugerido.value = extra.precioSugerido;
+        // Postventa: al elegir un repuesto principal, sugiere su precio
+        // unitario como costo_repuestos (copia el valor tal cual, sin
+        // multiplicar por cantidad_repuesto -- si la cantidad cambia
+        // después, este campo NO se recalcula solo, queda editable a mano).
+        if (idCampoSugerido === 'costo_repuestos' && extra.precioSugerido) inputSugerido.value = extra.precioSugerido;
       });
     });
   });

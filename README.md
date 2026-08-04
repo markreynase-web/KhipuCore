@@ -166,9 +166,57 @@ despliegue. Motivación completa en el historial del proyecto; resumen técnico:
   congelaba los permisos — alguien removido de una empresa a media sesión
   sigue teniendo acceso hasta por 8h o hasta volver a loguearse.
 
-Siguiente (fases ya acordadas, no implementadas todavía): Fase B (landing
-page + este login inteligente como fachada pública) → Fase C (vertical
-automotriz: Vehículos/VIN, Repuestos, Postventa) → Fase D (IA).
+**Fase B — Landing page pública**
+
+`index.html` deja de ser un redirect ciego a `pages/inicio.html` y pasa a
+ser una landing real (qué es KhipuCore, el núcleo, módulos por industria,
+IA como roadmap, planes, contacto) — el login inteligente de Fase A ya era
+la pieza que le faltaba para tener sentido como fachada pública. Quien ya
+tiene sesión sigue yendo directo a su dashboard, sin ver la landing.
+
+**Fase C — Vertical automotriz (Vehículos, Repuestos, Postventa)**
+
+Primer vertical de industria sobre el núcleo multi-tenant, a partir de la
+conversación con el gerente de la concesionaria. Alcance de esta pasada:
+Vehículos, Repuestos y Postventa (órdenes de servicio) con mano de obra
+separada del costo de repuestos — facturación electrónica/SUNAT queda para
+una fase aparte (es su propio proyecto de cumplimiento legal, no algo para
+meter de pasada).
+
+- ✅ **`vehiculos`**: autos de un CLIENTE (para dar seguimiento en
+  postventa) — no es el inventario de venta propio de la concesionaria, eso
+  seguiría usando el módulo genérico Inventario si algún día hace falta.
+- ✅ **`repuestos`**: catálogo especializado (código OEM, compatibilidad,
+  ubicación, proveedor, tiempo de reposición) — tabla propia, hermana de
+  Inventario, no la misma tabla, para no ensuciar el módulo genérico con
+  columnas específicas de autopartes.
+- ✅ **`postventa`** (órdenes de servicio): un repuesto "principal" opcional
+  (mismo patrón que `ventas.producto_id`: descuenta stock con `FOR UPDATE`),
+  `costo_repuestos` siempre editable a mano para cubrir órdenes con más de
+  un repuesto (no hay carrito de líneas múltiples — construirlo sería una
+  inversión de plataforma nueva, no algo específico de este módulo), y
+  `mano_obra` + `total` (calculado en el servidor, nunca confiado del
+  cliente). No genera un ingreso automático en Finanzas todavía: cuándo una
+  orden "cuenta como ingreso real" según su `estado` es una decisión de
+  negocio que queda fuera de esta fase.
+- ✅ **Módulos opt-in por empresa**: `vehiculos`/`repuestos`/`postventa` se
+  agregan al catálogo (`modulos`) pero no se habilitan para ninguna empresa
+  existente — cada una se activa a mano en `empresa_modulos` cuando
+  corresponda (ver comentario en `backend/migrations/014_vertical_automotriz.sql`).
+- ✅ **Arreglo de paso, en `crudFactory.js`**: el PUT genérico borraba en
+  silencio cualquier columna que no viniera en el body de una edición
+  inline (afectaba ya a `clientes.direccion`/`notas` sin que nadie lo
+  notara) — Repuestos tiene 5 campos así, así que este bug se volvió
+  imposible de ignorar y se arregló antes de construir el módulo nuevo.
+- ✅ **`esquemaConOpcionesFrescas()` (`js/app.js`) generalizado**: antes solo
+  corría para Ventas con 2 campos escritos a mano; ahora lee `campo.fuente`
+  de cualquier esquema (ya existía como marcador sin usar) para poblar
+  selects de cualquier módulo con datos frescos de otro — así
+  `vehiculos.cliente_id`, `postventa.cliente_id/vehiculo_id/repuesto_id`,
+  etc. funcionan todos con el mismo mecanismo, sin código nuevo por módulo.
+
+Siguiente (fase acordada, no implementada todavía): Fase D (IA — primero
+analítica interna, después inteligencia de mercado externa).
 
 ## Qué falta (fases siguientes, aún no implementadas)
 

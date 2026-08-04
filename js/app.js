@@ -350,31 +350,47 @@ async function activarCapturaSiCorresponde(config) {
 
   const puedeCrear = tienePermiso(`${NAMESPACE}.crear`);
 
+  // Campos con "fuente" en su esquema (ver js/esquemas.js) piden sus
+  // opciones frescas al backend cada vez que se abre el formulario, en vez
+  // de vivir hardcodeadas -- así ventas.producto_id, vehiculos.cliente_id,
+  // postventa.cliente_id/vehiculo_id/repuesto_id, etc. funcionan todos con
+  // el mismo mecanismo (antes esto solo corría para NAMESPACE==='ventas',
+  // con 2 campos escritos a mano). 'categoriasInventario' es la única
+  // excepción: no es un módulo real con su propio endpoint, son valores
+  // derivados de inventario.categoria, así que se resuelve aparte.
+  const CONSTRUCTORES_OPCION = {
+    clientes: cl => ({ value: cl.id, label: cl.nombre }),
+    inventario: p => ({
+      value: p.id, label: `${p.nombre} - ${p.stock} disponible(s)`,
+      extra: { stock: Number(p.stock), categoria: p.categoria || '', precioSugerido: Number(p.precio_unitario) || 0 }
+    }),
+    vehiculos: v => ({ value: v.id, label: `${v.marca} ${v.modelo}${v.anio ? ' ' + v.anio : ''} · ${v.placa}` }),
+    repuestos: r => ({
+      value: r.id, label: `${r.nombre} - ${r.stock} disponible(s)`,
+      extra: { stock: Number(r.stock), precioSugerido: Number(r.precio_unitario) || 0 }
+    })
+  };
+
   async function esquemaConOpcionesFrescas() {
-    if (NAMESPACE !== 'ventas') return backend.esquema;
-    const [productos, clientesLista] = await Promise.all([
-      backend.listarDeModulo('inventario'),
-      backend.listarDeModulo('clientes')
-    ]);
-    const categoriasUnicas = [...new Set((productos || []).map(p => p.categoria).filter(Boolean))];
+    const fuentes = [...new Set(
+      backend.esquema.campos.map(c => c.fuente).filter(f => f && CONSTRUCTORES_OPCION[f])
+    )];
+    const listas = Object.fromEntries(await Promise.all(
+      fuentes.map(async f => [f, await backend.listarDeModulo(f)])
+    ));
+
+    let categoriasUnicas = null;
+    if (backend.esquema.campos.some(c => c.fuente === 'categoriasInventario')) {
+      const productos = listas.inventario || await backend.listarDeModulo('inventario');
+      categoriasUnicas = [...new Set((productos || []).map(p => p.categoria).filter(Boolean))];
+    }
+
     const campos = backend.esquema.campos.map(c => {
-      if (c.id === 'producto_id') {
-        const opciones = (productos || []).map(p => ({
-          value: p.id,
-          label: p.nombre + ' - ' + p.stock + ' disponible(s)',
-          extra: { stock: Number(p.stock), categoria: p.categoria || '', precioSugerido: Number(p.precio_unitario) || 0 }
-        }));
-        return { ...c, opcionesResueltas: opciones };
+      if (c.fuente === 'categoriasInventario') {
+        return { ...c, opcionesResueltas: (categoriasUnicas || []).map(cat => ({ value: cat, label: cat })) };
       }
-      if (c.id === 'cliente_id') {
-        const opciones = (clientesLista || []).map(cl => ({ value: cl.id, label: cl.nombre }));
-        return { ...c, opcionesResueltas: opciones };
-      }
-      if (c.id === 'categoria') {
-        const opciones = categoriasUnicas.map(cat => ({ value: cat, label: cat }));
-        return { ...c, opcionesResueltas: opciones };
-      }
-      return c;
+      if (!c.fuente || !listas[c.fuente]) return c;
+      return { ...c, opcionesResueltas: listas[c.fuente].map(CONSTRUCTORES_OPCION[c.fuente]) };
     });
     return { ...backend.esquema, campos };
   }
