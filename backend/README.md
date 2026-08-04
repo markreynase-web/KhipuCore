@@ -63,9 +63,10 @@ Deberías ver `API de Ventas escuchando en http://localhost:3001`.
 
 ## 6. Conectar el frontend
 
-En `../config/company.json`, el módulo de Ventas ya tiene `"baseDeDatos": true`
-y `apiBaseUrl` apunta a `http://localhost:3001/api`. Si cambiaste el puerto o
-vas a desplegar el backend en otro lugar, actualiza `apiBaseUrl` ahí.
+Desde Fase A (multi-tenant) la URL del backend ya no vive en un archivo por
+cliente -- es una constante fija en `../js/apiConfig.js` (`API_BASE_URL`),
+porque un solo backend atiende a todas las empresas. Si cambiaste el puerto o
+vas a desplegar el backend en otro lugar, actualiza esa constante ahí.
 
 Con el backend corriendo, abre el frontend normalmente
 (`python -m http.server 8000` en la raíz del proyecto) y entra a
@@ -74,24 +75,41 @@ dashboard, con el formulario "Nueva venta" y el botón para importar CSV
 directo a la base de datos. Si el backend no está corriendo, ese panel
 simplemente no aparece y la página funciona como antes (modo local).
 
-## Autenticación (Fase 4, paso 1)
+## Autenticación (Fase 4) + multi-tenant (Fase A)
 
 No hay pantalla de registro: el primer usuario (admin) se crea desde la terminal.
 
 ```bash
 cd backend
-npm run seed:admin -- "Tu Nombre" tu@email.com tuContraseña
+npm run seed:admin -- "Tu Nombre" tu@email.com tuContraseña ["Nombre de la empresa"]
 ```
 
 Si el email ya existe, el comando actualiza su nombre y contraseña (sirve
-para resetear la clave del admin si la olvidas).
+para resetear la clave del admin si la olvidas). El cuarto argumento
+(nombre de empresa) es opcional -- sin él, reusa la primera empresa que
+exista en `empresas` (o crea una si la base está vacía).
 
 Con eso puedes loguearte en `pages/login.html`. Endpoints:
 
 | Método | Ruta              | Qué hace |
 |---|---|---|
-| POST   | `/api/auth/login` | `{ email, password }` → `{ token, usuario }` |
+| POST   | `/api/auth/login` | `{ email, password }` → `{ token, usuario }` si el usuario pertenece a una sola empresa, o `{ requiereSeleccionEmpresa: true, preAuthToken, empresas }` si pertenece a varias |
+| POST   | `/api/auth/login/empresa` | `{ preAuthToken, empresa_id }` → `{ token, usuario }`. Segundo paso del login cuando hay más de una empresa; el `empresa_id` se revalida server-side contra `usuario_empresa`, nunca se confía a ciegas |
 | GET    | `/api/auth/me`    | Requiere `Authorization: Bearer <token>`. Confirma que el token es válido |
+| GET    | `/api/empresa/actual` | Requiere sesión. Devuelve branding + módulos habilitados de la empresa activa del token (reemplaza al viejo `config/company.json`) |
+
+**Multi-tenant (Fase A):** el JWT lleva `empresa_id`/`empresa_nombre` además
+de `rol`/`permisos` -- ambos se calculan a partir de la membresía
+`usuario_empresa`, no de la identidad global en `usuarios` (una misma
+persona puede tener rol distinto en cada empresa a la que pertenece). Toda
+ruta de datos usa `auth() + requireEmpresa()` (ver
+`src/middleware/auth.js`): un token sin `empresa_id` (de antes de este
+deploy, o un `preAuthToken`) responde 401 en vez de devolver datos vacíos en
+silencio. El aislamiento entre empresas vive en cada `WHERE empresa_id=...`
+de `crudFactory.js` y de las rutas manuales (`ventas.js`, `inventario.js`,
+`finanzas.js`, `usuarios.js`, `auditoria.js`) -- ver
+`backend/migrations/012_empresas.sql` para el esquema completo
+(`empresas`, `modulos`, `empresa_modulos`, `usuario_empresa`).
 
 ## Usando Supabase como base de datos
 
@@ -155,10 +173,10 @@ quitando filas de `rol_permiso` — no hace falta tocar código.
 
 | Método | Ruta | Permiso | Qué hace |
 |---|---|---|---|
-| GET | `/api/usuarios` | `usuarios.ver` | Lista usuarios (nombre, email, rol, activo) |
-| GET | `/api/usuarios/roles` | `usuarios.ver` | Lista roles con sus permisos |
-| POST | `/api/usuarios` | `usuarios.crear` | `{ nombre, email, password, rol }` |
-| PUT | `/api/usuarios/:id` | `usuarios.editar` | `{ nombre?, rol?, activo? }` — cambia de rol o desactiva una cuenta |
+| GET | `/api/usuarios` | `usuarios.ver` | Lista los usuarios miembros de la empresa activa (nombre, email, rol, activo) |
+| GET | `/api/usuarios/roles` | `usuarios.ver` | Lista roles con sus permisos (catálogo global) |
+| POST | `/api/usuarios` | `usuarios.crear` | `{ nombre, email, password, rol }`. Si el email ya tiene cuenta (en esta empresa o en otra) responde 409 en vez de vincularlo en silencio -- sin un flujo de invitación por correo (fuera de alcance de Fase A), auto-vincular dejaría que un admin "adopte" sin consentimiento la cuenta de alguien que ya trabaja en otra empresa |
+| PUT | `/api/usuarios/:id` | `usuarios.editar` | `{ nombre?, rol?, activo? }` — `rol`/`activo` editan la membresía (`usuario_empresa`) scoped a la empresa activa, no la cuenta global; `nombre` sí es global (mismo nombre en todas las empresas donde participa esa persona) |
 
 ### Registro de actividad (audit log)
 
@@ -172,7 +190,10 @@ sin que cada ruta tenga que acordarse de escribirla:
 
 ## Endpoints
 
-Los mismos 5 endpoints existen para cada módulo: `ventas`, `inventario`, `clientes`.
+Los mismos 5 endpoints existen para cada módulo: `ventas`, `inventario`,
+`clientes`, `finanzas`. Todos scoped por `empresa_id` (Fase A): cada uno
+solo ve/afecta los registros de la empresa activa del token, aunque el
+`:id` de otra empresa exista en la base (responde 404, no 403).
 
 | Método | Ruta                       | Qué hace |
 |---|---|---|
@@ -205,12 +226,18 @@ Columnas esperadas en el CSV de cada módulo (insensible a mayúsculas):
      columnaFecha: 'fecha'
    });
    ```
+   `empresa_id` sale gratis: `crudFactory.js` ya lo agrega solo a cada
+   GET/POST/PUT/DELETE/import (Fase A) -- no lo agregues a `columnas`, o
+   quedaría escribible desde el body de la request.
 3. **Montarla** en `src/server.js`: `app.use('/api/compras', comprasRouter)`.
 4. **Permisos**: agrega `compras.ver/crear/editar/eliminar` a la tabla `permisos`
    y asígnalos a los roles que correspondan en `rol_permiso` (mismo patrón que
    `005_roles_permisos.sql`).
 5. **Esquema del frontend** en `../js/esquemas.js`: mismo formato que `ventas`/`inventario`/`clientes` (campos del formulario + columnasTabla + mapa hacia el dashboard).
-6. **Activarlo** en `../config/company.json`: `"baseDeDatos": true` en el módulo correspondiente.
+6. **Activarlo**: agrega el módulo a la tabla `modulos` (si es nuevo) y una
+   fila en `empresa_modulos` por cada empresa que lo tenga habilitado (ver
+   `backend/migrations/012_empresas.sql`) -- ya no se edita un archivo, es
+   data en la base.
 
 Nada de esto toca `app.js`, `dashboard.js` ni los componentes — el patrón ya
 está armado para que agregar un módulo sea solo declarar su config.

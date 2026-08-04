@@ -19,8 +19,9 @@ import { Router } from 'express';
 import multer from 'multer';
 import Papa from 'papaparse';
 import { pool } from './db.js';
-import { auth } from './middleware/auth.js';
+import { auth, requireEmpresa } from './middleware/auth.js';
 import { verificarPermiso } from './middleware/permisos.js';
+import { registrarAuditoria } from './auditoria.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -38,21 +39,6 @@ function numeroOCero(v) {
 function sonIguales(antes, despues, esNumerico) {
   if (esNumerico) return numeroOCero(antes) === numeroOCero(despues);
   return String(antes ?? '') === String(despues ?? '');
-}
-
-// Nunca debe tumbar la operación principal: si falla, se registra en consola
-// pero el crear/editar/borrar ya se guardó y la respuesta al usuario sigue
-// siendo exitosa. El audit log es un "además", no un requisito para guardar.
-async function registrarAuditoria({ usuario, accion, modulo, registroId, detalle }) {
-  try {
-    await pool.query(
-      `INSERT INTO audit_log (usuario_id, usuario_nombre, accion, modulo, registro_id, detalle)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [usuario?.id ?? null, usuario?.nombre ?? 'Desconocido', accion, modulo, registroId ? String(registroId) : null, detalle ? JSON.stringify(detalle) : null]
-    );
-  } catch (err) {
-    console.error('No se pudo escribir en audit_log:', err.message);
-  }
 }
 
 /**
@@ -110,18 +96,21 @@ export function crearRouterCRUD(config) {
     return { errores, datos };
   }
 
-  // Todo lo de este router requiere sesión válida; cada ruta abajo agrega,
-  // encima, el permiso específico de esa acción.
-  router.use(auth);
+  // Todo lo de este router requiere sesión válida CON empresa resuelta;
+  // cada ruta abajo agrega, encima, el permiso específico de esa acción.
+  router.use(auth, requireEmpresa);
 
   // GET /?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
   router.get('/', verificarPermiso(permiso('ver')), async (req, res) => {
     const { desde, hasta } = req.query;
-    const condiciones = [];
-    const valores = [];
+    // empresa_id SIEMPRE va primero y SIEMPRE está presente -- a diferencia
+    // de desde/hasta, no es un filtro opcional: sin esto, cualquier empresa
+    // vería los datos de todas las demás.
+    const valores = [req.usuario.empresa_id];
+    const condiciones = [`empresa_id = $1`];
     if (desde) { valores.push(desde); condiciones.push(`${columnaFecha} >= $${valores.length}`); }
     if (hasta) { valores.push(hasta); condiciones.push(`${columnaFecha} <= $${valores.length}`); }
-    const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+    const where = `WHERE ${condiciones.join(' AND ')}`;
     try {
       const { rows } = await pool.query(
         `SELECT * FROM ${tabla} ${where} ORDER BY ${columnaFecha} DESC, id DESC LIMIT 5000`,
@@ -138,6 +127,9 @@ export function crearRouterCRUD(config) {
   router.post('/', verificarPermiso(permiso('crear')), async (req, res) => {
     const { errores, datos } = limpiarYValidar(req.body);
     if (errores.length) return res.status(400).json({ error: errores.join(', ') });
+    // Siempre server-side, nunca desde req.body -- por eso "empresa_id" no
+    // debe agregarse jamás a la lista `columnas` de ningún módulo.
+    datos.empresa_id = req.usuario.empresa_id;
     const cols = Object.keys(datos);
     try {
       const { rows } = await pool.query(
@@ -145,7 +137,7 @@ export function crearRouterCRUD(config) {
         cols.map(c => datos[c])
       );
       res.status(201).json(rows[0]);
-      registrarAuditoria({ usuario: req.usuario, accion: 'crear', modulo, registroId: rows[0].id, detalle: datos });
+      registrarAuditoria(pool, { usuario: req.usuario, accion: 'crear', modulo, registroId: rows[0].id, detalle: datos });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: `No se pudo guardar en ${tabla}.` });
@@ -160,14 +152,19 @@ export function crearRouterCRUD(config) {
     try {
       // Se lee el registro ANTES de pisarlo -- es la única forma de saber,
       // después, qué cambió de verdad (y no solo que "alguien editó algo").
-      const { rows: antesRows } = await pool.query(`SELECT * FROM ${tabla} WHERE id=$1`, [req.params.id]);
+      // Scoped por empresa_id: si el id existe pero es de otra empresa, se
+      // responde 404 (no 403) para no confirmar que ese id existe en otro lado.
+      const { rows: antesRows } = await pool.query(
+        `SELECT * FROM ${tabla} WHERE id=$1 AND empresa_id=$2`,
+        [req.params.id, req.usuario.empresa_id]
+      );
       if (!antesRows.length) return res.status(404).json({ error: 'Registro no encontrado.' });
       const antes = antesRows[0];
 
       const { rows } = await pool.query(
         `UPDATE ${tabla} SET ${cols.map((c, i) => `${c}=$${i + 1}`).join(',')}, actualizado_el=now()
-         WHERE id=$${cols.length + 1} RETURNING *`,
-        [...cols.map(c => datos[c]), req.params.id]
+         WHERE id=$${cols.length + 1} AND empresa_id=$${cols.length + 2} RETURNING *`,
+        [...cols.map(c => datos[c]), req.params.id, req.usuario.empresa_id]
       );
       if (!rows.length) return res.status(404).json({ error: 'Registro no encontrado.' });
       res.json(rows[0]);
@@ -178,7 +175,7 @@ export function crearRouterCRUD(config) {
           cambios[c] = { antes: antes[c], despues: datos[c] };
         }
       });
-      registrarAuditoria({
+      registrarAuditoria(pool, {
         usuario: req.usuario, accion: 'editar', modulo, registroId: req.params.id,
         detalle: Object.keys(cambios).length ? cambios : 'Sin cambios en los valores (se guardó igual).'
       });
@@ -194,13 +191,19 @@ export function crearRouterCRUD(config) {
       // Se guarda una "foto" completa del registro en el detalle de
       // auditoría -- una vez borrado, es la única forma de saber después
       // qué era exactamente lo que se eliminó (nombre, stock que tenía, etc).
-      const { rows: antesRows } = await pool.query(`SELECT * FROM ${tabla} WHERE id=$1`, [req.params.id]);
+      const { rows: antesRows } = await pool.query(
+        `SELECT * FROM ${tabla} WHERE id=$1 AND empresa_id=$2`,
+        [req.params.id, req.usuario.empresa_id]
+      );
       if (!antesRows.length) return res.status(404).json({ error: 'Registro no encontrado.' });
 
-      const { rowCount } = await pool.query(`DELETE FROM ${tabla} WHERE id=$1`, [req.params.id]);
+      const { rowCount } = await pool.query(
+        `DELETE FROM ${tabla} WHERE id=$1 AND empresa_id=$2`,
+        [req.params.id, req.usuario.empresa_id]
+      );
       if (!rowCount) return res.status(404).json({ error: 'Registro no encontrado.' });
       res.status(204).end();
-      registrarAuditoria({ usuario: req.usuario, accion: 'eliminar', modulo, registroId: req.params.id, detalle: { eliminado: antesRows[0] } });
+      registrarAuditoria(pool, { usuario: req.usuario, accion: 'eliminar', modulo, registroId: req.params.id, detalle: { eliminado: antesRows[0] } });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: `No se pudo borrar el registro de ${tabla}.` });
@@ -225,6 +228,7 @@ export function crearRouterCRUD(config) {
         Object.keys(filas[i]).forEach(k => { cruda[k.trim().toLowerCase()] = filas[i][k]; });
         const { errores, datos } = limpiarYValidar(cruda);
         if (errores.length) { erroresDetalle.push(`Fila ${i + 2}: ${errores.join(', ')}`); continue; }
+        datos.empresa_id = req.usuario.empresa_id;
         const cols = Object.keys(datos);
         await cliente.query(
           `INSERT INTO ${tabla} (${cols.join(',')}) VALUES (${cols.map((_, idx) => `$${idx + 1}`).join(',')})`,
@@ -242,7 +246,7 @@ export function crearRouterCRUD(config) {
     }
 
     res.json({ insertadas, errores: erroresDetalle.length, detalle: erroresDetalle.slice(0, 20) });
-    registrarAuditoria({ usuario: req.usuario, accion: 'importar', modulo, detalle: { insertadas, errores: erroresDetalle.length } });
+    registrarAuditoria(pool, { usuario: req.usuario, accion: 'importar', modulo, detalle: { insertadas, errores: erroresDetalle.length } });
   });
 
   return router;

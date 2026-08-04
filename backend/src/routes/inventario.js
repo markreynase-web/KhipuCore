@@ -5,31 +5,23 @@
 // automático en Finanzas (el costo de surtir ese stock), y borrar el
 // producto borra ese mismo egreso -- mismo patrón que ventas.js con sus
 // ingresos, para que Finanzas nunca quede con movimientos "huérfanos".
+//
+// Fase A (multi-tenant): POST/DELETE son manuales (no pasan por
+// crudFactory.js), así que agregan "empresa_id" a mano en cada consulta.
 
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { auth } from '../middleware/auth.js';
+import { auth, requireEmpresa } from '../middleware/auth.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { crearRouterCRUD } from '../crudFactory.js';
+import { registrarAuditoria } from '../auditoria.js';
 
 const router = Router();
-router.use(auth);
+router.use(auth, requireEmpresa);
 
 function numeroOCero(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-async function registrarAuditoria(cliente, { usuario, accion, registroId, detalle }) {
-  try {
-    await cliente.query(
-      `INSERT INTO audit_log (usuario_id, usuario_nombre, accion, modulo, registro_id, detalle)
-       VALUES ($1, $2, $3, 'inventario', $4, $5)`,
-      [usuario?.id ?? null, usuario?.nombre ?? 'Desconocido', accion, registroId ? String(registroId) : null, detalle ? JSON.stringify(detalle) : null]
-    );
-  } catch (err) {
-    console.error('No se pudo escribir en audit_log:', err.message);
-  }
 }
 
 // POST / -- crea el producto y, si entra con stock, un egreso en Finanzas
@@ -43,14 +35,15 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
   const stockMinNum = numeroOCero(stock_minimo);
   const precioNum = numeroOCero(precio_unitario);
   const costoNum = numeroOCero(costo_unitario);
+  const empresaId = req.usuario.empresa_id;
 
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
     const { rows } = await cliente.query(
-      `INSERT INTO inventario (fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, costo_unitario, fecha_vencimiento, notas)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [fecha_registro, String(nombre).trim(), categoria || null, stockNum, stockMinNum, precioNum, costoNum, fecha_vencimiento || null, notas || null]
+      `INSERT INTO inventario (fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, costo_unitario, fecha_vencimiento, notas, empresa_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [fecha_registro, String(nombre).trim(), categoria || null, stockNum, stockMinNum, precioNum, costoNum, fecha_vencimiento || null, notas || null, empresaId]
     );
     const producto = rows[0];
 
@@ -61,14 +54,14 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
     const montoEgreso = +(stockNum * costoNum).toFixed(2);
     if (montoEgreso > 0) {
       await cliente.query(
-        `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id)
-         VALUES ($1, 'egreso', 'Inventario', $2, $3, 'inventario', $4)`,
-        [fecha_registro, `Stock inicial: ${producto.nombre} (${stockNum} unidad(es))`, montoEgreso, producto.id]
+        `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id, empresa_id)
+         VALUES ($1, 'egreso', 'Inventario', $2, $3, 'inventario', $4, $5)`,
+        [fecha_registro, `Stock inicial: ${producto.nombre} (${stockNum} unidad(es))`, montoEgreso, producto.id, empresaId]
       );
     }
 
     await registrarAuditoria(cliente, {
-      usuario: req.usuario, accion: 'crear', registroId: producto.id,
+      usuario: req.usuario, accion: 'crear', modulo: 'inventario', registroId: producto.id,
       detalle: { ...producto, egresoGenerado: montoEgreso > 0 ? montoEgreso : null }
     });
     await cliente.query('COMMIT');
@@ -85,17 +78,18 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
 // DELETE /:id -- borra el producto y, si tenía, su egreso de stock inicial
 // en Finanzas (para no dejarlo huérfano apuntando a un producto que ya no existe).
 router.delete('/:id', verificarPermiso('inventario.eliminar'), async (req, res) => {
+  const empresaId = req.usuario.empresa_id;
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
-    const { rows } = await cliente.query(`SELECT * FROM inventario WHERE id = $1 FOR UPDATE`, [req.params.id]);
+    const { rows } = await cliente.query(`SELECT * FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`, [req.params.id, empresaId]);
     if (!rows.length) { await cliente.query('ROLLBACK'); return res.status(404).json({ error: 'Producto no encontrado.' }); }
     const producto = rows[0];
 
-    await cliente.query(`DELETE FROM finanzas WHERE origen_modulo = 'inventario' AND origen_id = $1`, [producto.id]);
-    await cliente.query(`DELETE FROM inventario WHERE id = $1`, [producto.id]);
+    await cliente.query(`DELETE FROM finanzas WHERE origen_modulo = 'inventario' AND origen_id = $1 AND empresa_id = $2`, [producto.id, empresaId]);
+    await cliente.query(`DELETE FROM inventario WHERE id = $1 AND empresa_id = $2`, [producto.id, empresaId]);
 
-    await registrarAuditoria(cliente, { usuario: req.usuario, accion: 'eliminar', registroId: producto.id, detalle: { eliminado: producto } });
+    await registrarAuditoria(cliente, { usuario: req.usuario, accion: 'eliminar', modulo: 'inventario', registroId: producto.id, detalle: { eliminado: producto } });
     await cliente.query('COMMIT');
     res.status(204).end();
   } catch (err) {
@@ -108,8 +102,9 @@ router.delete('/:id', verificarPermiso('inventario.eliminar'), async (req, res) 
 });
 
 // GET, PUT y POST /import: sin efectos secundarios en otras tablas, se
-// quedan en el CRUD genérico. Como este router ya definió su propio POST y
-// DELETE arriba, Express nunca llega a los de acá abajo para esos dos verbos.
+// quedan en el CRUD genérico (que ya scoped por empresa_id, ver
+// crudFactory.js). Como este router ya definió su propio POST y DELETE
+// arriba, Express nunca llega a los de acá abajo para esos dos verbos.
 router.use(crearRouterCRUD({
   tabla: 'inventario',
   modulo: 'inventario',

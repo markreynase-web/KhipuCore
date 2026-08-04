@@ -126,6 +126,50 @@ Paso 1 de 5, hecho:
 Siguiente: Roles → Permisos → Middleware (conectar todo esto al CRUD
 existente) → Auditoría → Panel de administración.
 
+*(Nota: esta lista de pasos quedó desactualizada por Roles/Permisos/
+Auditoría — ver `backend/src/middleware/permisos.js`, las migraciones
+005/006/009 y la sección de Fase A abajo, todas ya implementadas.)*
+
+**Fase A — Plataforma multi-tenant (SaaS)**
+
+KhipuCore deja de ser "un despliegue = una empresa" y pasa a ser un solo
+backend que sirve a muchas empresas, aisladas por fila (`empresa_id`), no por
+despliegue. Motivación completa en el historial del proyecto; resumen técnico:
+
+- ✅ **`empresa_id` en cada tabla de negocio** (`ventas`, `inventario`,
+  `clientes`, `finanzas`, `audit_log`) — ver `backend/migrations/012_empresas.sql`.
+  `roles`/`permisos`/`rol_permiso` se quedan globales a propósito (mismo
+  catálogo para todas las empresas, por ahora).
+- ✅ **Identidad global + membresía por empresa**: `usuarios.email` sigue
+  siendo único globalmente; la tabla puente `usuario_empresa` guarda a qué
+  empresa(s) pertenece cada usuario y con qué rol en cada una (una persona
+  puede ser administrador en una empresa y gerente en otra).
+- ✅ **Login inteligente en dos pasos**: `POST /api/auth/login` resuelve la
+  empresa sola si el usuario pertenece a una sola; si pertenece a varias,
+  devuelve un `preAuthToken` de 5 minutos + la lista, y
+  `POST /api/auth/login/empresa` completa el login tras elegir una
+  (revalidado server-side, nunca se confía en el `empresa_id` que manda el
+  cliente).
+- ✅ **`crudFactory.js` scoped por empresa**: un solo cambio ahí cubre
+  `clientes.js` completo e `inventario.js` (GET/PUT/import); `ventas.js`,
+  `inventario.js` (POST/DELETE), `finanzas.js`, `usuarios.js` y
+  `auditoria.js` se editaron a mano por ser rutas manuales (no pasan por el
+  factory). `PUT`/`DELETE` cruzando de empresa devuelven 404 (no 403), para
+  no confirmar que el id existe en otro lado.
+- ✅ **`GET /api/empresa/actual`** reemplaza a `config/company.json` (ya
+  borrado del repo): branding + módulos habilitados salen de la base de
+  datos, scoped a la empresa activa del token.
+- ✅ **`js/apiConfig.js`**: la URL del backend pasa de "por empresa" (vivía
+  en `company.json`) a una constante fija — ya era en la práctica un solo
+  backend para todos los clientes.
+- **Trade-off aceptado:** el JWT (8h) congela la empresa activa igual que ya
+  congelaba los permisos — alguien removido de una empresa a media sesión
+  sigue teniendo acceso hasta por 8h o hasta volver a loguearse.
+
+Siguiente (fases ya acordadas, no implementadas todavía): Fase B (landing
+page + este login inteligente como fachada pública) → Fase C (vertical
+automotriz: Vehículos/VIN, Repuestos, Postventa) → Fase D (IA).
+
 ## Qué falta (fases siguientes, aún no implementadas)
 
 - **Fase 3 — Temas**: `css/themes/` existe pero vacía. Las variables ya están
@@ -145,9 +189,8 @@ existente) → Auditoría → Panel de administración.
 
 ```
 KhipuCore/
-  index.html            → redirige al primer módulo habilitado en config/company.json
-  config/
-    company.json         → nombre de empresa, logo, y qué módulos están enabled/disabled
+  index.html            → redirige a pages/inicio.html (o a login.html si no hay sesión)
+  js/apiConfig.js        → URL fija del backend (Fase A: un solo backend para todas las empresas)
   css/
     base.css            → variables de tema, reset, header, hero, module-nav
     cards.css           → KPIs, paneles, gráficos
@@ -155,7 +198,7 @@ KhipuCore/
     themes/             → (vacío, Fase 3)
   js/
     app.js              → estado + orquestación + namespace por módulo + branding
-    config.js            → carga/cachea config/company.json
+    config.js            → carga/cachea el branding+módulos de la empresa activa (GET /api/empresa/actual, Fase A)
     dashboard.js         → render principal
     charts.js            → construcción de gráficos Chart.js
     filters.js            → filtro de rango de fechas
@@ -175,6 +218,7 @@ KhipuCore/
 ```
 
 ### Cómo dar de alta/baja un módulo a un cliente
-Solo edita `config/company.json`: pon `"enabled": true` en los módulos que ese
-cliente contrató y `false` en los que no. El menú y el redireccionamiento de
-`index.html` se ajustan solos, sin tocar código.
+Desde Fase A esto ya no se edita en un archivo: se hace en la base de datos,
+en la tabla puente `empresa_modulos` (una fila = un módulo habilitado para
+esa empresa; ver `backend/migrations/012_empresas.sql`). El menú (sidebar) y
+el dashboard de inicio se ajustan solos, sin tocar código.

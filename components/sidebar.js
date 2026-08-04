@@ -135,11 +135,16 @@ function renderSidebarFooter() {
   }
 
   const inicial = (sesion.usuario.nombre || '?').trim().charAt(0).toUpperCase();
+  // empresa_nombre solo existe desde Fase A -- sesiones viejas (si alguien
+  // no cerró sesión antes del deploy) no lo tienen, por eso el guard.
+  const empresaHtml = sesion.usuario.empresa_nombre
+    ? `<div class="sidebar-footer-rol" title="Empresa activa">${sesion.usuario.rol} · ${sesion.usuario.empresa_nombre}</div>`
+    : `<div class="sidebar-footer-rol">${sesion.usuario.rol}</div>`;
   cont.innerHTML = `
     <div class="sidebar-avatar">${inicial}</div>
     <div class="sidebar-footer-info">
       <div class="sidebar-footer-nombre">${sesion.usuario.nombre}</div>
-      <div class="sidebar-footer-rol">${sesion.usuario.rol}</div>
+      ${empresaHtml}
     </div>
     <button type="button" class="sidebar-logout" id="btnCerrarSesionSidebar" title="Cerrar sesión">⎋</button>
   `;

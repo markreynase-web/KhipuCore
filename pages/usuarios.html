@@ -49,7 +49,7 @@ import { renderSidebar } from '../components/sidebar.js';
 import { renderTopbar } from '../components/topbar.js';
 import { renderFooter } from '../components/footer.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
-import { listarRegistros, crearRegistro, actualizarRegistro } from '../js/api.js';
+import { listarRegistros, crearRegistro, actualizarRegistro, ultimoErrorAPI } from '../js/api.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
 
@@ -170,7 +170,7 @@ function abrirNuevoUsuario() {
         const res = await crearRegistro(config.apiBaseUrl, 'usuarios', valores);
         if (res) { cerrarPanelLateral(); cargarTabla(); }
         return res;
-      }, { puedeCrear: true });
+      }, { puedeCrear: true, obtenerUltimoError: ultimoErrorAPI });
     }
   });
 }

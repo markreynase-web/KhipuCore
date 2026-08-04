@@ -107,6 +107,19 @@
   .login-signup a{ color:var(--blue); font-weight:600; text-decoration:none; cursor:default; }
   .login-signup a:hover{ text-decoration:underline; }
 
+  /* Selector de empresa (Fase A): aparece en vez del form de credenciales
+     cuando un mismo usuario administra más de una empresa. */
+  .empresa-lista{ display:flex; flex-direction:column; gap:10px; margin-top:18px; }
+  .btn-empresa{
+    width:100%; text-align:left; padding:13px 14px; border:1px solid var(--paper-line); border-radius:9px;
+    background:var(--paper); color:var(--ink); font-family:'Inter', sans-serif; font-size:14.5px; font-weight:600;
+    cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .btn-empresa:hover{ border-color:var(--teal-deep); background:#fff; }
+  .btn-empresa .flecha{ color:var(--muted); }
+  .login-volver{ display:inline-block; margin-top:16px; font-size:12.5px; color:var(--muted); background:none; border:none; cursor:pointer; padding:0; font-family:'Inter', sans-serif; }
+  .login-volver:hover{ color:var(--ink); text-decoration:underline; }
+
   /* Con .login-form-col en ancho fijo (560px), el panel de marketing se
      queda con muy poco espacio útil justo antes de este quiebre (el
      tagline se corta en dos líneas, la ilustración queda chica) -- por
@@ -152,50 +165,60 @@
   <div class="login-form-col">
     <div class="login-card">
       <h2>¡Bienvenido de nuevo!</h2>
-      <p class="sub">Inicia sesión para continuar en <b>KhipuCore</b></p>
+      <p class="sub" id="loginSub">Inicia sesión para continuar en <b>KhipuCore</b></p>
 
-      <form id="formLogin">
-        <div class="campo">
-          <label for="email">Correo electrónico</label>
-          <div class="login-input-wrap">
-            <span class="ico">✉️</span>
-            <input type="email" id="email" placeholder="ejemplo@empresa.com" required autocomplete="username">
+      <div id="pasoCredenciales">
+        <form id="formLogin">
+          <div class="campo">
+            <label for="email">Correo electrónico</label>
+            <div class="login-input-wrap">
+              <span class="ico">✉️</span>
+              <input type="email" id="email" placeholder="ejemplo@empresa.com" required autocomplete="username">
+            </div>
           </div>
-        </div>
-        <div class="campo">
-          <label for="password">Contraseña</label>
-          <div class="login-input-wrap">
-            <span class="ico">🔒</span>
-            <input type="password" id="password" placeholder="Ingresa tu contraseña" required autocomplete="current-password">
-            <button type="button" class="login-toggle-pass" id="btnTogglePass" title="Mostrar/ocultar contraseña">👁️</button>
+          <div class="campo">
+            <label for="password">Contraseña</label>
+            <div class="login-input-wrap">
+              <span class="ico">🔒</span>
+              <input type="password" id="password" placeholder="Ingresa tu contraseña" required autocomplete="current-password">
+              <button type="button" class="login-toggle-pass" id="btnTogglePass" title="Mostrar/ocultar contraseña">👁️</button>
+            </div>
           </div>
-        </div>
 
-        <div class="login-row">
-          <label><input type="checkbox" id="recordarme" checked> Recordarme</label>
-          <!-- Sin backend de recuperación de contraseña todavía: queda visual,
-               no funcional (ver LEEME de esta fase). -->
-          <a href="#" class="login-forgot" id="linkOlvide" title="Próximamente">¿Olvidaste tu contraseña?</a>
-        </div>
+          <div class="login-row">
+            <label><input type="checkbox" id="recordarme" checked> Recordarme</label>
+            <!-- Sin backend de recuperación de contraseña todavía: queda visual,
+                 no funcional (ver LEEME de esta fase). -->
+            <a href="#" class="login-forgot" id="linkOlvide" title="Próximamente">¿Olvidaste tu contraseña?</a>
+          </div>
 
-        <div class="login-error" id="loginError"></div>
-        <button type="submit" class="btn-login-submit" id="btnLogin">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          Iniciar sesión
+          <div class="login-error" id="loginError"></div>
+          <button type="submit" class="btn-login-submit" id="btnLogin">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Iniciar sesión
+          </button>
+        </form>
+
+        <div class="login-divider">o continúa con</div>
+
+        <!-- Google OAuth: decidido dejarlo solo visual por ahora (ver charla
+             de esta fase) -- botón deshabilitado, sin flujo real detrás. -->
+        <button type="button" class="btn-google" id="btnGoogle" disabled title="Próximamente: inicio de sesión con Google">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3c-7.4 0-13.8 4.2-17 10.4z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-1.8 14-5.2l-6.5-5.4c-2 1.4-4.6 2.3-7.5 2.3-5.3 0-9.7-3.3-11.3-8l-6.5 5c3.2 6.3 9.6 10.6 17.1 10.6z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C41.4 36 45 30.5 45 24c0-1.4-.1-2.7-.4-3.5z"/></svg>
+            Continuar con Google
         </button>
-      </form>
 
-      <div class="login-divider">o continúa con</div>
+        <div class="login-signup">
+          ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Contácta a tu administrador</a>
+        </div>
+      </div>
 
-      <!-- Google OAuth: decidido dejarlo solo visual por ahora (ver charla
-           de esta fase) -- botón deshabilitado, sin flujo real detrás. -->
-      <button type="button" class="btn-google" id="btnGoogle" disabled title="Próximamente: inicio de sesión con Google">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3c-7.4 0-13.8 4.2-17 10.4z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-1.8 14-5.2l-6.5-5.4c-2 1.4-4.6 2.3-7.5 2.3-5.3 0-9.7-3.3-11.3-8l-6.5 5c3.2 6.3 9.6 10.6 17.1 10.6z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C41.4 36 45 30.5 45 24c0-1.4-.1-2.7-.4-3.5z"/></svg>
-          Continuar con Google
-      </button>
-
-      <div class="login-signup">
-        ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Contácta a tu administrador</a>
+      <!-- Fase A (multi-tenant): oculto salvo que el login diga que este
+           usuario administra más de una empresa. -->
+      <div id="pasoEmpresa" hidden>
+        <div class="login-error" id="empresaError"></div>
+        <div class="empresa-lista" id="listaEmpresas"></div>
+        <button type="button" class="login-volver" id="btnVolverLogin">← Usar otra cuenta</button>
       </div>
     </div>
 
@@ -205,7 +228,7 @@
 
 <script type="module">
   import { cargarConfigEmpresa } from '../js/config.js';
-  import { guardarSesion, haySesionActiva } from '../js/sesion.js';
+  import { guardarSesion, haySesionActiva, guardarPreAuth, obtenerPreAuth, borrarPreAuth } from '../js/sesion.js';
   import { renderFooter } from '../components/footer.js';
 
   renderFooter();
@@ -215,11 +238,62 @@
   const form = document.getElementById('formLogin');
   const errorEl = document.getElementById('loginError');
   const btn = document.getElementById('btnLogin');
+  const subEl = document.getElementById('loginSub');
+  const pasoCredenciales = document.getElementById('pasoCredenciales');
+  const pasoEmpresa = document.getElementById('pasoEmpresa');
+  const listaEmpresas = document.getElementById('listaEmpresas');
+  const empresaErrorEl = document.getElementById('empresaError');
 
   document.getElementById('btnTogglePass').addEventListener('click', () => {
     const input = document.getElementById('password');
     input.type = input.type === 'password' ? 'text' : 'password';
   });
+
+  function mostrarSelectorEmpresas(empresas) {
+    pasoCredenciales.hidden = true;
+    pasoEmpresa.hidden = false;
+    subEl.textContent = 'Tu cuenta administra más de una empresa. Elige con cuál quieres entrar:';
+    listaEmpresas.innerHTML = '';
+    empresas.forEach(emp => {
+      const btnEmp = document.createElement('button');
+      btnEmp.type = 'button';
+      btnEmp.className = 'btn-empresa';
+      btnEmp.innerHTML = `<span>${emp.nombre}</span><span class="flecha">→</span>`;
+      btnEmp.addEventListener('click', () => elegirEmpresa(emp.id));
+      listaEmpresas.appendChild(btnEmp);
+    });
+  }
+
+  function volverALogin() {
+    borrarPreAuth();
+    pasoEmpresa.hidden = true;
+    pasoCredenciales.hidden = false;
+    subEl.innerHTML = 'Inicia sesión para continuar en <b>KhipuCore</b>';
+    empresaErrorEl.textContent = '';
+  }
+  document.getElementById('btnVolverLogin').addEventListener('click', volverALogin);
+
+  async function elegirEmpresa(empresaId) {
+    empresaErrorEl.textContent = '';
+    const preAuth = obtenerPreAuth();
+    if (!preAuth) { volverALogin(); return; }
+
+    const config = await cargarConfigEmpresa();
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/auth/login/empresa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preAuthToken: preAuth.preAuthToken, empresa_id: empresaId })
+      });
+      const cuerpo = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(cuerpo.error || 'No se pudo completar el inicio de sesión.');
+      borrarPreAuth();
+      guardarSesion(cuerpo);
+      location.replace('../index.html');
+    } catch (err) {
+      empresaErrorEl.textContent = err.message;
+    }
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -229,7 +303,7 @@
 
     const config = await cargarConfigEmpresa();
     if (!config.apiBaseUrl) {
-      errorEl.textContent = 'Este proyecto no tiene un backend configurado (apiBaseUrl en company.json).';
+      errorEl.textContent = 'Este proyecto no tiene un backend configurado (apiBaseUrl).';
       return;
     }
 
@@ -242,6 +316,13 @@
       });
       const cuerpo = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(cuerpo.error || 'No se pudo iniciar sesión.');
+
+      if (cuerpo.requiereSeleccionEmpresa) {
+        guardarPreAuth({ preAuthToken: cuerpo.preAuthToken, empresas: cuerpo.empresas });
+        mostrarSelectorEmpresas(cuerpo.empresas);
+        return;
+      }
+
       guardarSesion(cuerpo);
       location.replace('../index.html');
     } catch (err) {

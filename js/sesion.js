@@ -42,3 +42,27 @@ export function tieneAlgunPermiso(prefijoModulo) {
   const permisos = s?.usuario?.permisos || [];
   return permisos.some(p => p.startsWith(`${prefijoModulo}.`));
 }
+
+// Fase A (multi-tenant): cuando un usuario pertenece a más de una empresa,
+// el login no entrega sesión de una vez -- entrega un preAuthToken de 5
+// minutos + la lista de empresas para que el usuario elija. Eso NO es una
+// sesión válida todavía, así que se guarda aparte, en sessionStorage (se
+// pierde solo con esa pestaña, no debe sobrevivir como localStorage).
+const CLAVE_PREAUTH = 'pd_preauth';
+
+export function guardarPreAuth({ preAuthToken, empresas }) {
+  sessionStorage.setItem(CLAVE_PREAUTH, JSON.stringify({ preAuthToken, empresas }));
+}
+
+export function obtenerPreAuth() {
+  try {
+    const cruda = sessionStorage.getItem(CLAVE_PREAUTH);
+    return cruda ? JSON.parse(cruda) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function borrarPreAuth() {
+  sessionStorage.removeItem(CLAVE_PREAUTH);
+}
