@@ -54,6 +54,7 @@
   import { API_BASE_URL } from '../js/apiConfig.js';
   import { abrirPanelLateral } from '../components/panelLateral.js';
   import { renderFooter } from '../components/footer.js';
+  import { escapeHtml } from '../js/utils.js';
 
   renderFooter();
 
@@ -148,7 +149,7 @@
           <tbody>
             ${empresas.map(e => `
               <tr data-id="${e.id}">
-                <td>${e.nombre}</td>
+                <td>${escapeHtml(e.nombre)}</td>
                 <td>${e.usuarios_count}</td>
                 <td>${e.modulos_count}</td>
                 <td><span class="sa-estado-badge ${e.activo ? 'activo' : 'inactivo'}">${e.activo ? 'Activa' : 'Inactiva'}</span></td>

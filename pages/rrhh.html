@@ -137,6 +137,7 @@
 <script type="module">
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
 import { renderTopbar } from '../components/topbar.js';
 import { renderFooter } from '../components/footer.js';
 import { haySesionActiva } from '../js/sesion.js';
@@ -192,6 +193,7 @@ function dibujarCharts() {
 (async function iniciar() {
   const config = await cargarConfigEmpresa();
   renderSidebar(config, 'rrhh');
+  renderKhipuAiWidget(config);
   await renderTopbar(config);
   renderFooter();
   pintarEmpleadosPreview();

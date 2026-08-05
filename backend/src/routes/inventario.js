@@ -37,6 +37,15 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
   const costoNum = numeroOCero(costo_unitario);
   const empresaId = req.usuario.empresa_id;
 
+  // El PUT genérico (crudFactory.js -> limpiarYValidar) ya rechaza campos
+  // numéricos negativos, pero este POST es manual y no pasaba por ahí --
+  // sin este candado se podía crear un producto con stock negativo, lo que
+  // además hacía que el egreso automático de abajo (stock*costo) saliera
+  // negativo y el guard `montoEgreso > 0` lo saltara en silencio.
+  if (stockNum < 0 || stockMinNum < 0 || precioNum < 0 || costoNum < 0) {
+    return res.status(400).json({ error: 'Stock, stock mínimo, precio y costo no pueden ser negativos.' });
+  }
+
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');

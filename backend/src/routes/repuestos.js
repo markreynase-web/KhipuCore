@@ -32,6 +32,12 @@ router.post('/', verificarPermiso('repuestos.crear'), async (req, res) => {
   const precioNum = numeroOCero(precio_unitario);
   const tiempoNum = tiempo_reposicion_dias !== undefined && tiempo_reposicion_dias !== '' ? Math.round(numeroOCero(tiempo_reposicion_dias)) : null;
 
+  // Mismo candado que inventario.js POST -- este POST es manual y no pasa
+  // por crudFactory.js, que es el único lugar que hoy rechaza negativos.
+  if (stockNum < 0 || stockMinNum < 0 || costoNum < 0 || precioNum < 0 || (tiempoNum !== null && tiempoNum < 0)) {
+    return res.status(400).json({ error: 'Stock, stock mínimo, costo, precio y tiempo de reposición no pueden ser negativos.' });
+  }
+
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');

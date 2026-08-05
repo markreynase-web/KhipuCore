@@ -13,6 +13,7 @@
 
 import { modulosHabilitados } from '../js/config.js';
 import { tienePermiso, tieneAlgunPermiso, haySesionActiva, obtenerSesion, cerrarSesion } from '../js/sesion.js';
+import { escapeHtml } from '../js/utils.js';
 
 function itemHtml(m, activo) {
   return `
@@ -56,7 +57,7 @@ export function renderSidebar(config, paginaActualId) {
     <div class="sidebar-brand">
       <img class="mark" src="../assets/logo-icon.png" alt="KhipuCore">
       <div class="sidebar-brand-text">
-        <input class="biz-name" id="bizName" value="${config.bizName || 'Gestor de Datos Empresariales'}" />
+        <input class="biz-name" id="bizName" value="${escapeHtml(config.bizName || 'Gestor de Datos Empresariales')}" />
         <div class="sidebar-subtitle" id="sidebarSubtitle"></div>
       </div>
     </div>
@@ -142,16 +143,16 @@ function renderSidebarFooter() {
     return;
   }
 
-  const inicial = (sesion.usuario.nombre || '?').trim().charAt(0).toUpperCase();
+  const inicial = escapeHtml((sesion.usuario.nombre || '?').trim().charAt(0).toUpperCase());
   // empresa_nombre solo existe desde Fase A -- sesiones viejas (si alguien
   // no cerró sesión antes del deploy) no lo tienen, por eso el guard.
   const empresaHtml = sesion.usuario.empresa_nombre
-    ? `<div class="sidebar-footer-rol" title="Empresa activa">${sesion.usuario.rol} · ${sesion.usuario.empresa_nombre}</div>`
-    : `<div class="sidebar-footer-rol">${sesion.usuario.rol}</div>`;
+    ? `<div class="sidebar-footer-rol" title="Empresa activa">${escapeHtml(sesion.usuario.rol)} · ${escapeHtml(sesion.usuario.empresa_nombre)}</div>`
+    : `<div class="sidebar-footer-rol">${escapeHtml(sesion.usuario.rol)}</div>`;
   cont.innerHTML = `
     <div class="sidebar-avatar">${inicial}</div>
     <div class="sidebar-footer-info">
-      <div class="sidebar-footer-nombre">${sesion.usuario.nombre}</div>
+      <div class="sidebar-footer-nombre">${escapeHtml(sesion.usuario.nombre)}</div>
       ${empresaHtml}
     </div>
     <button type="button" class="sidebar-logout" id="btnCerrarSesionSidebar" title="Cerrar sesión">⎋</button>

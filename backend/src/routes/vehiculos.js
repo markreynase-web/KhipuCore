@@ -28,6 +28,9 @@ router.post('/', verificarPermiso('vehiculos.crear'), async (req, res) => {
   if (!fecha_registro || !cliente_id || !placa || !marca || !modelo) {
     return res.status(400).json({ error: 'fecha_registro, cliente_id, placa, marca y modelo son requeridos.' });
   }
+  if (kilometraje_actual !== undefined && kilometraje_actual !== '' && numeroOCero(kilometraje_actual) < 0) {
+    return res.status(400).json({ error: 'El kilometraje no puede ser negativo.' });
+  }
   const empresaId = req.usuario.empresa_id;
 
   try {
@@ -56,6 +59,9 @@ router.post('/', verificarPermiso('vehiculos.crear'), async (req, res) => {
 router.put('/:id', verificarPermiso('vehiculos.editar'), async (req, res) => {
   const empresaId = req.usuario.empresa_id;
   const { fecha_registro, cliente_id, placa, marca, modelo, anio, vin, color, kilometraje_actual, notas } = req.body;
+  if (kilometraje_actual !== undefined && kilometraje_actual !== '' && numeroOCero(kilometraje_actual) < 0) {
+    return res.status(400).json({ error: 'El kilometraje no puede ser negativo.' });
+  }
 
   try {
     const { rows: antesRows } = await pool.query(`SELECT * FROM vehiculos WHERE id=$1 AND empresa_id=$2`, [req.params.id, empresaId]);

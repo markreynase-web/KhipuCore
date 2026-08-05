@@ -47,6 +47,10 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
   if (!fecha) errores.push('fecha es requerido');
   if (!['ingreso', 'egreso'].includes(tipo)) errores.push('tipo debe ser "ingreso" o "egreso"');
   if (!concepto) errores.push('concepto es requerido');
+  // El signo del movimiento lo da "tipo" (ingreso/egreso), no "monto" -- un
+  // monto negativo aquí resta de los totales de ingresos/egresos en vez de
+  // sumar, sin ningún error.
+  if (monto !== undefined && monto !== '' && numeroOCero(monto) < 0) errores.push('monto no puede ser negativo');
   if (errores.length) return res.status(400).json({ error: errores.join(', ') });
 
   try {
@@ -72,6 +76,9 @@ router.put('/:id', verificarPermiso('finanzas.editar'), async (req, res) => {
   const antes = actuales[0];
 
   const { fecha, tipo, categoria, concepto, monto, notas } = req.body;
+  if (monto !== undefined && monto !== '' && numeroOCero(monto) < 0) {
+    return res.status(400).json({ error: 'monto no puede ser negativo' });
+  }
   try {
     const montoNuevo = numeroOCero(monto);
     const { rows } = await pool.query(

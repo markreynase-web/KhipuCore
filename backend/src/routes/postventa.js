@@ -63,6 +63,15 @@ router.post('/', verificarPermiso('postventa.crear'), async (req, res) => {
 
   const cantRepuesto = cantidad_repuesto !== undefined && cantidad_repuesto !== '' ? numeroOCero(cantidad_repuesto) : 1;
   if (repuesto_id && cantRepuesto <= 0) return res.status(400).json({ error: 'La cantidad de repuesto debe ser mayor a 0.' });
+  // costo_repuestos/mano_obra son siempre manuales (ver nota de arriba) -- sin
+  // este candado, un monto negativo produce un total negativo guardado tal
+  // cual, sin ningún error.
+  if (costo_repuestos !== undefined && costo_repuestos !== '' && numeroOCero(costo_repuestos) < 0) {
+    return res.status(400).json({ error: 'El costo de repuestos no puede ser negativo.' });
+  }
+  if (mano_obra !== undefined && mano_obra !== '' && numeroOCero(mano_obra) < 0) {
+    return res.status(400).json({ error: 'La mano de obra no puede ser negativa.' });
+  }
   const estadoFinal = ESTADOS_VALIDOS.includes(estado) ? estado : 'pendiente';
 
   const cliente = await pool.connect();
@@ -132,6 +141,20 @@ router.post('/', verificarPermiso('postventa.crear'), async (req, res) => {
 router.put('/:id', verificarPermiso('postventa.editar'), async (req, res) => {
   const empresaId = req.usuario.empresa_id;
   const { fecha, tipo, kilometraje, descripcion, cantidad_repuesto, costo_repuestos, mano_obra, estado, proximo_servicio, garantia_hasta, notas } = req.body;
+
+  // Mismos candados que el POST -- faltaban acá. Sin el de cantidad_repuesto,
+  // un valor negativo hace que "stock - diferencia" aumente el stock gratis
+  // (mismo bug que ventas.js PUT); sin los de costo/mano de obra, el total
+  // guardado puede quedar negativo.
+  if (cantidad_repuesto !== undefined && cantidad_repuesto !== '' && numeroOCero(cantidad_repuesto) <= 0) {
+    return res.status(400).json({ error: 'La cantidad de repuesto debe ser mayor a 0.' });
+  }
+  if (costo_repuestos !== undefined && costo_repuestos !== '' && numeroOCero(costo_repuestos) < 0) {
+    return res.status(400).json({ error: 'El costo de repuestos no puede ser negativo.' });
+  }
+  if (mano_obra !== undefined && mano_obra !== '' && numeroOCero(mano_obra) < 0) {
+    return res.status(400).json({ error: 'La mano de obra no puede ser negativa.' });
+  }
 
   const cliente = await pool.connect();
   try {

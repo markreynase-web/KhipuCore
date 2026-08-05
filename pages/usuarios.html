@@ -53,6 +53,7 @@ import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { listarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, ultimoErrorAPI } from '../js/api.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
+import { escapeHtml } from '../js/utils.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
@@ -104,8 +105,8 @@ async function cargarTabla() {
             ].join('');
             return `
             <tr data-id="${u.id}">
-              <td>${u.nombre}</td>
-              <td>${u.email}</td>
+              <td>${escapeHtml(u.nombre)}</td>
+              <td>${escapeHtml(u.email)}</td>
               <td>${badgeRol(u.rol)}</td>
               <td>${badgeEstado(u.activo)}</td>
               ${puedeAlgo ? `<td class="col-acciones"><div class="acciones-icono">${botones}</div></td>` : ''}
@@ -145,8 +146,8 @@ function abrirEdicion(usuario) {
     montar: (body) => {
       body.innerHTML = `
         <form class="form-registro" style="grid-template-columns:1fr;" id="formEditarUsuario">
-          <div class="campo"><label>Nombre</label><input type="text" id="editNombre" value="${usuario.nombre}" required></div>
-          <div class="campo"><label>Correo (no editable)</label><input type="text" value="${usuario.email}" disabled></div>
+          <div class="campo"><label>Nombre</label><input type="text" id="editNombre" value="${escapeHtml(usuario.nombre)}" required></div>
+          <div class="campo"><label>Correo (no editable)</label><input type="text" value="${escapeHtml(usuario.email)}" disabled></div>
           <div class="campo"><label>Rol</label>
             <select id="editRol">${roles.map(r => `<option value="${r.nombre}" ${r.nombre === usuario.rol ? 'selected' : ''}>${r.nombre}</option>`).join('')}</select>
           </div>

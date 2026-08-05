@@ -1,30 +1,30 @@
 // components/khipuAiWidget.js
-// Fase D: botón flotante "Khipu AI", visible en toda página que cargue
-// js/app.js (ver el único punto de inyección en app.js, después de
-// renderSidebar). Reutiliza components/panelLateral.js (ya genérico, ya
-// probado) para el drawer de chat -- no se construye un modal nuevo.
+// Fase D: botón flotante "Khipu AI" + ventana de chat tipo burbuja
+// (Facebook Messenger) -- una ventanita fija que se despliega junto al
+// botón, no el panel lateral de ancho completo que usa el resto de la app
+// (decisión explícita del usuario: NO reutiliza components/panelLateral.js).
 
 import { buscarModulo } from '../js/config.js';
 import { tienePermiso } from '../js/sesion.js';
 import { preguntarKhipuAi } from '../js/khipuAi.js';
-import { abrirPanelLateral } from './panelLateral.js';
 
 // Vive en memoria de esta carga de página -- se pierde al recargar, a
 // propósito (mismo criterio de "generación en vivo" del resto de la Fase D:
 // nada de historial persistido en el servidor).
 let historial = [];
+let abierta = false;
 
 export function renderKhipuAiWidget(config) {
   const habilitado = !!buscarModulo(config, 'khipu_ai') && tienePermiso('khipu_ai.ver');
-  const boton = document.getElementById('khipuAiBoton');
+  const widget = document.getElementById('khipuAiWidget');
 
   if (!habilitado) {
-    if (boton) boton.remove();
+    if (widget) widget.remove();
     return;
   }
 
   asegurarEstilos();
-  asegurarBoton();
+  asegurarWidget();
 }
 
 // Igual que asegurarFavicon() en components/sidebar.js: se inyecta una sola
@@ -38,38 +38,41 @@ function asegurarEstilos() {
   document.head.appendChild(link);
 }
 
-function asegurarBoton() {
-  if (document.getElementById('khipuAiBoton')) return;
-  const boton = document.createElement('button');
-  boton.type = 'button';
-  boton.id = 'khipuAiBoton';
-  boton.className = 'khipu-ai-boton';
-  boton.setAttribute('aria-label', 'Abrir Khipu AI');
-  boton.innerHTML = '<span>🤖</span>';
-  boton.addEventListener('click', abrirChat);
-  document.body.appendChild(boton);
+function asegurarWidget() {
+  if (document.getElementById('khipuAiWidget')) return;
+
+  const wrap = document.createElement('div');
+  wrap.id = 'khipuAiWidget';
+  wrap.className = 'khipu-ai-widget';
+  wrap.innerHTML = `
+    <div class="khipu-ai-ventana" id="khipuAiVentana">
+      <div class="khipu-ai-ventana-header">
+        <span class="khipu-ai-ventana-titulo">🤖 Khipu AI</span>
+        <button type="button" class="khipu-ai-ventana-cerrar" id="khipuAiCerrar" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="khipu-ai-mensajes" id="khipuAiMensajes"></div>
+      <div class="khipu-ai-estado" id="khipuAiEstado"></div>
+      <form class="khipu-ai-form" id="khipuAiForm">
+        <input type="text" id="khipuAiInput" placeholder="Pregúntale a Khipu AI..." autocomplete="off" />
+        <button type="submit" class="btn btn-ochre" id="khipuAiEnviarBtn">Enviar</button>
+      </form>
+    </div>
+    <button type="button" class="khipu-ai-boton" id="khipuAiBoton" aria-label="Abrir Khipu AI"><span>🤖</span></button>
+  `;
+  document.body.appendChild(wrap);
+
+  document.getElementById('khipuAiBoton').addEventListener('click', () => setVentana(!abierta));
+  document.getElementById('khipuAiCerrar').addEventListener('click', () => setVentana(false));
+  document.getElementById('khipuAiForm').addEventListener('submit', onEnviar);
+
+  renderMensajes();
 }
 
-function abrirChat() {
-  abrirPanelLateral({
-    titulo: 'Khipu AI',
-    icono: '🤖',
-    montar: (body) => {
-      body.innerHTML = `
-        <div class="khipu-ai-chat">
-          <div class="khipu-ai-mensajes" id="khipuAiMensajes"></div>
-          <div class="khipu-ai-estado" id="khipuAiEstado"></div>
-          <form class="khipu-ai-form" id="khipuAiForm">
-            <input type="text" id="khipuAiInput" placeholder="Pregúntale a Khipu AI sobre tu negocio..." autocomplete="off" />
-            <button type="submit" class="btn btn-ochre" id="khipuAiEnviarBtn">Enviar</button>
-          </form>
-        </div>
-      `;
-      renderMensajes();
-      document.getElementById('khipuAiForm').addEventListener('submit', onEnviar);
-      document.getElementById('khipuAiInput').focus();
-    }
-  });
+function setVentana(mostrar) {
+  abierta = mostrar;
+  document.getElementById('khipuAiVentana')?.classList.toggle('activa', abierta);
+  document.getElementById('khipuAiBoton')?.classList.toggle('activo', abierta);
+  if (abierta) document.getElementById('khipuAiInput')?.focus();
 }
 
 function renderMensajes() {
@@ -87,10 +90,7 @@ function renderMensajes() {
       return `<div class="khipu-ai-msg ${clase}">${escaparHtml(m.texto)}${fuentes}</div>`;
     }).join('');
   }
-
-  // El scroll real vive en el panel compartido (#panelLateralBody), no en
-  // este contenedor -- ver css/panel-lateral.css.
-  document.getElementById('panelLateralBody')?.scrollTo(0, 999999);
+  cont.scrollTop = cont.scrollHeight;
 }
 
 async function onEnviar(e) {

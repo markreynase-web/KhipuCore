@@ -140,6 +140,12 @@ router.put('/:id', verificarPermiso('ventas.editar'), async (req, res) => {
   const nuevoPrecio = precio_unitario !== undefined && precio_unitario !== '' ? numeroOCero(precio_unitario) : null;
   const empresaId = req.usuario.empresa_id;
 
+  // Mismo candado que el POST (línea ~65-66) -- faltaba acá, y sin él un PUT
+  // con cantidad negativa resta stock negativo (= lo aumenta gratis) y deja
+  // un monto/ingreso negativo en finanzas y clientes.compras_totales.
+  if (nuevaCant !== null && nuevaCant <= 0) return res.status(400).json({ error: 'La cantidad debe ser mayor a 0.' });
+  if (nuevoPrecio !== null && nuevoPrecio <= 0) return res.status(400).json({ error: 'El precio unitario debe ser mayor a 0.' });
+
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
