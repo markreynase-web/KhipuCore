@@ -153,4 +153,31 @@ router.put('/:id', verificarPermiso('usuarios.editar'), async (req, res) => {
   }
 });
 
+// DELETE /api/usuarios/:id
+// Igual que PUT, esto quita la MEMBRESÍA a la empresa activa
+// (usuario_empresa), no borra la identidad global (usuarios) -- una persona
+// puede pertenecer a otras empresas, y esta ruta scoped a empresa_id no
+// tiene forma de saber si es seguro borrar esas otras membresías. Si esta
+// era su única empresa, la cuenta simplemente queda sin acceso a ninguna
+// (no puede volver a loguearse en ningún lado), pero la fila en `usuarios`
+// se queda -- limpiar identidades huérfanas queda fuera de alcance.
+router.delete('/:id', verificarPermiso('usuarios.eliminar'), async (req, res) => {
+  const idObjetivo = Number(req.params.id);
+  if (idObjetivo === req.usuario.id) {
+    return res.status(400).json({ error: 'No puedes eliminarte a ti mismo.' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM usuario_empresa WHERE usuario_id = $1 AND empresa_id = $2 RETURNING usuario_id`,
+      [idObjetivo, req.usuario.empresa_id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Usuario no encontrado en esta empresa.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo eliminar el usuario.' });
+  }
+});
+
 export default router;

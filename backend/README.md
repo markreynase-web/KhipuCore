@@ -208,6 +208,7 @@ quitando filas de `rol_permiso` — no hace falta tocar código.
 | GET | `/api/usuarios/roles` | `usuarios.ver` | Lista roles con sus permisos (catálogo global) |
 | POST | `/api/usuarios` | `usuarios.crear` | `{ nombre, email, password, rol }`. Si el email ya tiene cuenta (en esta empresa o en otra) responde 409 en vez de vincularlo en silencio -- sin un flujo de invitación por correo (fuera de alcance de Fase A), auto-vincular dejaría que un admin "adopte" sin consentimiento la cuenta de alguien que ya trabaja en otra empresa |
 | PUT | `/api/usuarios/:id` | `usuarios.editar` | `{ nombre?, rol?, activo? }` — `rol`/`activo` editan la membresía (`usuario_empresa`) scoped a la empresa activa, no la cuenta global; `nombre` sí es global (mismo nombre en todas las empresas donde participa esa persona) |
+| DELETE | `/api/usuarios/:id` | `usuarios.eliminar` | Quita la membresía a la empresa activa (`usuario_empresa`), **no** borra la identidad global (`usuarios`) -- la persona puede pertenecer a otras empresas. Solo `administrador` lo tiene (mismo criterio que el resto de la app: `gerente` nunca recibe permisos `.eliminar`, ver `backend/migrations/017_usuarios_eliminar.sql`). Nadie puede eliminarse a sí mismo (400). |
 
 ### Registro de actividad (audit log)
 

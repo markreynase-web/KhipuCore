@@ -29,6 +29,14 @@ export function renderSidebar(config, paginaActualId) {
   const sinSesion = !haySesionActiva();
 
   const modulosPrincipales = modulosHabilitados(config).filter(m => {
+    // Khipu AI no es una página navegable (no tiene captura/Vista Ejecutiva
+    // ni un .html real detrás) -- es solo un flag de catálogo para que el
+    // panel de super admin pueda habilitarlo/deshabilitarlo por empresa. Sin
+    // este filtro caía en la rama de abajo (baseDeDatos:false = "módulo
+    // libre, mostrar siempre", pensada para Compras/RRHH) y aparecía como
+    // pestaña rota -> 404 al hacer clic (ver components/khipuAiWidget.js
+    // para el botón flotante, que es la única UI real de este módulo).
+    if (m.id === 'khipu_ai') return false;
     if (!m.baseDeDatos) return true;
     if (sinSesion) return true; // el guard de app.js ya redirige a login antes si el módulo lo exige
     return tienePermiso(`${m.id}.ver`);

@@ -61,6 +61,7 @@
 <script type="module">
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
 import { renderTopbar } from '../components/topbar.js';
 import { renderFooter } from '../components/footer.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
@@ -170,6 +171,7 @@ async function cargarAuditoria() {
 (async function iniciar() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'auditoria');
+  renderKhipuAiWidget(config);
   await renderTopbar(config);
   renderFooter();
 

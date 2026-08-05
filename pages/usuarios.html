@@ -46,10 +46,11 @@
 <script type="module">
 import { cargarConfigEmpresa } from '../js/config.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
 import { renderTopbar } from '../components/topbar.js';
 import { renderFooter } from '../components/footer.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
-import { listarRegistros, crearRegistro, actualizarRegistro, ultimoErrorAPI } from '../js/api.js';
+import { listarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, ultimoErrorAPI } from '../js/api.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
 
@@ -83,31 +84,56 @@ async function cargarTabla() {
   if (!usuarios.length) { cont.innerHTML = '<p class="tabla-vacia">No hay usuarios registrados todavía.</p>'; return; }
 
   const puedeEditar = tienePermiso('usuarios.editar');
+  const puedeEliminar = tienePermiso('usuarios.eliminar');
+  const puedeAlgo = puedeEditar || puedeEliminar;
+  const miId = obtenerSesion()?.usuario?.id;
 
   cont.innerHTML = `
     <div class="tabla-registros-wrap" style="margin-top:14px;">
       <table class="tabla-registros">
-        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th>${puedeEditar ? '<th class="col-acciones"></th>' : ''}</tr></thead>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th>${puedeAlgo ? '<th class="col-acciones"></th>' : ''}</tr></thead>
         <tbody>
-          ${usuarios.map(u => `
+          ${usuarios.map(u => {
+            // Nadie puede eliminarse a sí mismo (mismo candado que el backend,
+            // ver DELETE /api/usuarios/:id) -- acá evita mostrar un botón que
+            // de todas formas el servidor va a rechazar.
+            const esUnoMismo = String(u.id) === String(miId);
+            const botones = [
+              puedeEditar ? `<button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button>` : '',
+              (puedeEliminar && !esUnoMismo) ? `<button type="button" class="icon-btn peligro" data-accion="eliminar" title="Quitar acceso">🗑️</button>` : ''
+            ].join('');
+            return `
             <tr data-id="${u.id}">
               <td>${u.nombre}</td>
               <td>${u.email}</td>
               <td>${badgeRol(u.rol)}</td>
               <td>${badgeEstado(u.activo)}</td>
-              ${puedeEditar ? `<td class="col-acciones"><div class="acciones-icono"><button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button></div></td>` : ''}
-            </tr>`).join('')}
+              ${puedeAlgo ? `<td class="col-acciones"><div class="acciones-icono">${botones}</div></td>` : ''}
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>
   `;
 
-  if (!puedeEditar) return;
   cont.querySelectorAll('[data-accion="editar"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.closest('tr').dataset.id;
       const usuario = usuarios.find(u => String(u.id) === id);
       abrirEdicion(usuario);
+    });
+  });
+
+  cont.querySelectorAll('[data-accion="eliminar"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('tr').dataset.id;
+      const usuario = usuarios.find(u => String(u.id) === id);
+      if (!confirm(`¿Quitarle acceso a "${usuario.nombre}" a esta empresa? No se puede deshacer.`)) return;
+      btn.disabled = true;
+      const res = await eliminarRegistro(config.apiBaseUrl, 'usuarios', id);
+      if (res) { cargarTabla(); return; }
+      btn.disabled = false;
+      alert(ultimoErrorAPI() || 'No se pudo eliminar el usuario.');
     });
   });
 }
@@ -178,6 +204,7 @@ function abrirNuevoUsuario() {
 (async function iniciar() {
   config = await cargarConfigEmpresa();
   renderSidebar(config, 'usuarios');
+  renderKhipuAiWidget(config);
   await renderTopbar(config);
   renderFooter();
 
