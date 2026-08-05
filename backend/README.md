@@ -271,7 +271,7 @@ automáticos -- son la misma llamada con distinto mensaje de entrada:
   qué módulos tiene habilitados la empresa (ej. sin `repuestos` habilitado,
   Claude ni ve esas herramientas).
 - **Generación en vivo, sin caché**: cada pregunta es una llamada real y
-  facturada a la API de Claude (modelo `claude-opus-5`) -- decisión
+  facturada a la API de Claude (modelo `claude-sonnet-5`) -- decisión
   informada, se prioriza frescura sobre costo. Requiere la env var
   `ANTHROPIC_API_KEY`; sin ella, el endpoint responde 500 con un mensaje
   claro en vez de tumbar el resto del backend.

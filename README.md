@@ -248,10 +248,11 @@ herramientas se ajusta según qué módulos tiene habilitados cada empresa.
 Se accede vía un **widget flotante** (🤖, esquina inferior derecha)
 disponible en toda la app una vez habilitada, no una página de módulo
 aparte — decisión explícita para que esté a mano desde cualquier pantalla.
-Modelo **Claude Opus 5** y **generación en vivo** (cada pregunta es una
-llamada real, sin cachear la respuesta): ambas, decisiones informadas del
-usuario, priorizando calidad y frescura sobre costo — con un límite de 40
-preguntas/día por usuario como techo barato de abuso. Opt-in por empresa,
+Modelo **Claude Sonnet 5** (mejor relación costo/calidad para preguntas
+cortas con tool use, frente a Opus) y **generación en vivo** (cada pregunta
+es una llamada real, sin cachear la respuesta, priorizando frescura sobre
+costo) — con un límite de 40 preguntas/día por usuario como techo barato de
+abuso. Opt-in por empresa,
 igual que Vehículos/Repuestos/Postventa (`backend/migrations/016_khipu_ai.sql`),
 habilitable desde el panel de super administrador sin código nuevo (es una
 fila más del catálogo `modulos` que ese panel ya gestiona).

@@ -90,7 +90,7 @@ Si el usuario pide un resumen o reporte general sin especificar más, combina 2-
 
     for (let iteracion = 0; iteracion < MAX_ITERACIONES; iteracion++) {
       const respuesta = await client.messages.create({
-        model: 'claude-opus-5',
+        model: 'claude-sonnet-5',
         max_tokens: 4096,
         system: systemPrompt,
         tools: toolsParaClaude,
