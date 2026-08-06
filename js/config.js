@@ -36,18 +36,37 @@ function oscurecer(hex, factor = 0.78) {
 }
 
 // Personalización de marca por empresa (opt-in, la pone el super admin):
-// sobreescribe --ochre/--ochre-deep -- las variables CSS que ya manejan
-// botones primarios, estados activos del sidebar, etc. en css/base.css --
-// en vez de tocar cada archivo .css uno por uno. Sin color guardado (o si
-// llega mal formado), no se toca nada y queda el amarillo de KhipuCore.
+// sobreescribe --ochre/--ochre-deep Y --coral/--coral-deep.
+//
+// El botón primario de toda la app (.btn-ochre, en css/base.css) en
+// realidad usa --coral/--coral-deep, no --ochre -- el nombre de la clase
+// quedó de un diseño anterior y nunca se actualizó. Sin sobreescribir
+// --coral también, el color elegido no se veía en ningún botón real (solo
+// en detalles menores: bordes de foco, la pestaña "activo", el widget de
+// Khipu AI) -- por eso "no se notaba en la interfaz".
+//
+// Aviso: --coral también se usa para indicadores de "peligro/negativo"
+// (botones de eliminar, KPIs en rojo, la flecha de tendencia hacia abajo).
+// Con el color de marca puesto, esos indicadores usan ese mismo color en
+// vez de rojo -- es el trade-off de que ambos usos compartan una sola
+// variable en el CSS actual; separarlos en dos variables distintas es un
+// cambio más grande que se puede hacer después si hace falta.
+//
+// Sin color guardado (o si llega mal formado), no se toca nada y quedan
+// los colores de KhipuCore de siempre.
 function aplicarTema(config) {
   const raiz = document.documentElement.style;
   if (config.colorPrimario && /^#[0-9a-fA-F]{6}$/.test(config.colorPrimario)) {
+    const oscuro = oscurecer(config.colorPrimario);
     raiz.setProperty('--ochre', config.colorPrimario);
-    raiz.setProperty('--ochre-deep', oscurecer(config.colorPrimario));
+    raiz.setProperty('--ochre-deep', oscuro);
+    raiz.setProperty('--coral', config.colorPrimario);
+    raiz.setProperty('--coral-deep', oscuro);
   } else {
     raiz.removeProperty('--ochre');
     raiz.removeProperty('--ochre-deep');
+    raiz.removeProperty('--coral');
+    raiz.removeProperty('--coral-deep');
   }
 }
 

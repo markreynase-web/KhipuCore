@@ -178,11 +178,19 @@
         if (!modulos) { body.innerHTML = 'No se pudieron cargar los módulos.'; return; }
 
         body.innerHTML = `
+          <div class="sa-subtitulo">Nombre</div>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+            <input type="text" id="empresaNombre" value="${escapeHtml(empresa.nombre)}" style="flex:1; font-family:'Inter',sans-serif; font-size:13px; padding:9px 11px; border:1px solid var(--paper-line); border-radius:8px; background:#fff; color:var(--ink);">
+            <button type="button" class="btn btn-ochre" id="btnGuardarNombre">Guardar</button>
+          </div>
+          <div class="form-status" id="nombreStatus" style="margin:-14px 0 20px;"></div>
+
           <div class="sa-subtitulo">Estado</div>
-          <label class="sa-modulo-item" style="margin-bottom:20px;">
+          <label class="sa-modulo-item" style="margin-bottom:6px;">
             <input type="checkbox" id="empresaActiva" ${empresa.activo ? 'checked' : ''}>
             Empresa activa (si se desmarca, nadie de esta empresa puede iniciar sesión)
           </label>
+          <div class="form-status" id="activoStatus" style="margin-bottom:20px;"></div>
 
           <div class="sa-subtitulo">Color de marca</div>
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
@@ -212,8 +220,32 @@
           </form>
         `;
 
+        document.getElementById('btnGuardarNombre').addEventListener('click', async () => {
+          const statusEl = document.getElementById('nombreStatus');
+          const nuevoNombre = document.getElementById('empresaNombre').value.trim();
+          if (!nuevoNombre) {
+            statusEl.textContent = 'El nombre no puede estar vacío.';
+            statusEl.style.color = 'var(--coral)';
+            return;
+          }
+          const res = await api(`/superadmin/empresas/${empresa.id}`, {
+            method: 'PUT', body: JSON.stringify({ nombre: nuevoNombre })
+          });
+          if (res) {
+            empresa.nombre = nuevoNombre;
+            document.getElementById('panelLateralTitulo').textContent = `Gestionar: ${nuevoNombre}`;
+            statusEl.textContent = 'Guardado.';
+            statusEl.style.color = 'var(--teal)';
+            await cargarEmpresas();
+          } else {
+            statusEl.textContent = 'No se pudo guardar.';
+            statusEl.style.color = 'var(--coral)';
+          }
+        });
+
         document.getElementById('empresaActiva').addEventListener('change', async (e) => {
           const activo = e.target.checked;
+          const statusEl = document.getElementById('activoStatus');
           // Solo se confirma al DESACTIVAR (la dirección riesgosa) -- reactivar
           // es una acción de recuperación, no hace falta frenarla igual.
           if (!activo && !confirm(`¿Desactivar "${empresa.nombre}"? Nadie de esa empresa va a poder iniciar sesión hasta que la reactives.`)) {
@@ -221,15 +253,21 @@
             return;
           }
           e.target.disabled = true;
+          statusEl.textContent = 'Guardando...';
+          statusEl.style.color = 'var(--muted)';
           const res = await api(`/superadmin/empresas/${empresa.id}`, {
             method: 'PUT', body: JSON.stringify({ activo })
           });
           e.target.disabled = false;
           if (res) {
             empresa.activo = activo;
+            statusEl.textContent = activo ? 'Guardado: empresa activa.' : 'Guardado: empresa desactivada.';
+            statusEl.style.color = 'var(--teal)';
             await cargarEmpresas(); // refresca el badge de estado en la tabla de fondo
           } else {
             e.target.checked = !activo; // revertir si falló
+            statusEl.textContent = 'No se pudo guardar el cambio.';
+            statusEl.style.color = 'var(--coral)';
           }
         });
 
