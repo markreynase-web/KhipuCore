@@ -55,7 +55,7 @@ export function renderSidebar(config, paginaActualId) {
 
   cont.innerHTML = `
     <div class="sidebar-brand">
-      <img class="mark" src="../assets/logo-icon.png" alt="KhipuCore">
+      <a href="../index.html" title="Ir a la página principal"><img class="mark" src="../assets/logo-icon.png" alt="KhipuCore"></a>
       <div class="sidebar-brand-text">
         <input class="biz-name" id="bizName" value="${escapeHtml(config.bizName || 'Gestor de Datos Empresariales')}" />
         <div class="sidebar-subtitle" id="sidebarSubtitle"></div>

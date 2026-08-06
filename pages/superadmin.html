@@ -15,7 +15,7 @@
   body{ background:var(--paper); }
   .sa-shell{ max-width:1040px; margin:0 auto; padding:28px 24px 20px; }
   .sa-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
-  .sa-brand{ display:flex; align-items:center; gap:10px; }
+  .sa-brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
   .sa-brand img{ width:34px; height:34px; }
   .sa-brand-text{ display:flex; align-items:center; gap:8px; font-family:'Inter', sans-serif; font-weight:800; font-size:16px; color:var(--ink); }
   .sa-brand-tag{ font-size:11px; font-weight:700; color:var(--teal-deep); background:var(--teal-soft); padding:3px 9px; border-radius:20px; }
@@ -37,10 +37,10 @@
 
 <div class="sa-shell">
   <div class="sa-header">
-    <div class="sa-brand">
+    <a class="sa-brand" href="../index.html" title="Ir a la página principal">
       <img src="../assets/logo-icon.png" alt="KhipuCore">
       <div class="sa-brand-text">KhipuCore <span class="sa-brand-tag">Super Admin</span></div>
-    </div>
+    </a>
     <button type="button" class="btn btn-ghost" id="btnCerrarSesion" style="color:var(--ink); border:1px solid var(--paper-line);">Cerrar sesión</button>
   </div>
 
