@@ -135,12 +135,24 @@ Rutas en `routes/superadmin.js`, protegidas con `auth() + requireSuperAdmin()`
 |---|---|---|
 | GET | `/api/superadmin/empresas` | Todas las empresas + conteo de usuarios y módulos habilitados |
 | POST | `/api/superadmin/empresas` | `{ nombre, logo? }` |
-| PUT | `/api/superadmin/empresas/:id` | `{ nombre?, logo?, activo? }` |
+| PUT | `/api/superadmin/empresas/:id` | `{ nombre?, logo?, activo?, color_primario? }` -- `color_primario` es la excepción: si no viene en el body se deja igual, pero si viene como `null`/vacío se borra a propósito (no usa `COALESCE`, ver el comentario en el código). |
 | GET | `/api/superadmin/modulos` | Catálogo completo de `modulos` |
 | GET | `/api/superadmin/empresas/:id/modulos` | Catálogo + flag `habilitado` para esa empresa |
 | POST | `/api/superadmin/empresas/:id/modulos` | `{ modulo_id }` → habilita |
 | DELETE | `/api/superadmin/empresas/:id/modulos/:moduloId` | Deshabilita |
 | POST | `/api/superadmin/empresas/:id/admin` | `{ nombre, email, password? }` → crea (o reusa si el email ya existe globalmente) un usuario y lo vincula como `administrador` de esa empresa. A diferencia de `POST /api/usuarios` (que rechaza un email ya existente para no vincular sin consentimiento), acá SÍ se reusa a propósito: es el super admin pidiendo explícitamente esa acción, no un efecto secundario de un formulario común. |
+
+**Personalización de marca por empresa** (`empresas.color_primario`, migración
+`018_empresa_tema.sql`): un solo color hex, opt-in, que el super admin fija
+desde el panel de "Gestionar empresa". El frontend lo aplica sobreescribiendo
+las variables CSS `--ochre`/`--ochre-deep` (`aplicarTema()` en `js/config.js`,
+llamada automáticamente dentro de `cargarConfigEmpresa()` -- así ninguna
+página nueva puede olvidarse de aplicarlo, mismo problema que ya pasó con el
+widget de Khipu AI). El tono oscuro (`--ochre-deep`, usado en hover/estados
+activos) se deriva del color elegido, no se pide aparte. Sin color guardado,
+queda el amarillo de KhipuCore de siempre. A propósito es solo un color, no
+un editor de layout -- personalizar qué se muestra o cómo se organiza la UI
+queda fuera de alcance.
 
 ## Usando Supabase como base de datos
 

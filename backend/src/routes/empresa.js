@@ -18,7 +18,7 @@ const router = Router();
 router.get('/actual', auth, requireEmpresa, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT e.id, e.nombre AS "bizName", e.logo,
+      `SELECT e.id, e.nombre AS "bizName", e.logo, e.color_primario AS "colorPrimario",
               COALESCE(json_agg(json_build_object(
                 'id', m.id, 'label', m.label, 'icon', m.icon,
                 'page', m.page, 'baseDeDatos', m.base_de_datos, 'enabled', true

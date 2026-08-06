@@ -178,6 +178,19 @@
         if (!modulos) { body.innerHTML = 'No se pudieron cargar los módulos.'; return; }
 
         body.innerHTML = `
+          <div class="sa-subtitulo">Estado</div>
+          <label class="sa-modulo-item" style="margin-bottom:20px;">
+            <input type="checkbox" id="empresaActiva" ${empresa.activo ? 'checked' : ''}>
+            Empresa activa (si se desmarca, nadie de esta empresa puede iniciar sesión)
+          </label>
+
+          <div class="sa-subtitulo">Color de marca</div>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+            <input type="color" id="colorPrimario" value="${empresa.color_primario || '#E3B23C'}" style="width:44px; height:34px; padding:2px; border:1px solid var(--paper-line); border-radius:8px; cursor:pointer;">
+            <button type="button" class="btn btn-ghost" id="btnQuitarColor" style="${empresa.color_primario ? '' : 'display:none;'}">Usar el de KhipuCore</button>
+            <span class="form-status" id="colorStatus"></span>
+          </div>
+
           <div class="sa-subtitulo">Módulos habilitados</div>
           <div class="sa-modulos-lista" id="listaModulos">
             ${modulos.map(m => `
@@ -198,6 +211,54 @@
             </div>
           </form>
         `;
+
+        document.getElementById('empresaActiva').addEventListener('change', async (e) => {
+          const activo = e.target.checked;
+          // Solo se confirma al DESACTIVAR (la dirección riesgosa) -- reactivar
+          // es una acción de recuperación, no hace falta frenarla igual.
+          if (!activo && !confirm(`¿Desactivar "${empresa.nombre}"? Nadie de esa empresa va a poder iniciar sesión hasta que la reactives.`)) {
+            e.target.checked = true;
+            return;
+          }
+          e.target.disabled = true;
+          const res = await api(`/superadmin/empresas/${empresa.id}`, {
+            method: 'PUT', body: JSON.stringify({ activo })
+          });
+          e.target.disabled = false;
+          if (res) {
+            empresa.activo = activo;
+            await cargarEmpresas(); // refresca el badge de estado en la tabla de fondo
+          } else {
+            e.target.checked = !activo; // revertir si falló
+          }
+        });
+
+        document.getElementById('colorPrimario').addEventListener('change', async (e) => {
+          const statusEl = document.getElementById('colorStatus');
+          const res = await api(`/superadmin/empresas/${empresa.id}`, {
+            method: 'PUT', body: JSON.stringify({ color_primario: e.target.value })
+          });
+          if (res) {
+            empresa.color_primario = e.target.value;
+            statusEl.textContent = 'Guardado.';
+            statusEl.style.color = 'var(--teal)';
+            document.getElementById('btnQuitarColor').style.display = '';
+            await cargarEmpresas();
+          }
+        });
+
+        document.getElementById('btnQuitarColor').addEventListener('click', async () => {
+          const res = await api(`/superadmin/empresas/${empresa.id}`, {
+            method: 'PUT', body: JSON.stringify({ color_primario: null })
+          });
+          if (res) {
+            empresa.color_primario = null;
+            document.getElementById('colorPrimario').value = '#E3B23C';
+            document.getElementById('btnQuitarColor').style.display = 'none';
+            document.getElementById('colorStatus').textContent = '';
+            await cargarEmpresas();
+          }
+        });
 
         document.getElementById('listaModulos').querySelectorAll('input[type="checkbox"]').forEach(chk => {
           chk.addEventListener('change', async () => {

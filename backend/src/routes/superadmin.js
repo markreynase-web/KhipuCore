@@ -45,18 +45,34 @@ router.post('/empresas', async (req, res) => {
   }
 });
 
+// color_primario: null/'' = "quitar personalización, volver al color de
+// KhipuCore por defecto". A diferencia de nombre/logo/activo, un PUT que
+// no lo manda debe DEJARLO IGUAL (no borrarlo) -- COALESCE no alcanza para
+// eso, porque no distingue "no vino en el body" de "vino vacío a propósito
+// para borrarlo"; ambos casos necesitan comportamiento distinto acá. Por
+// eso se manda un flag aparte (colorProvisto) y un CASE en el UPDATE. Se
+// valida el formato hex porque el frontend lo inyecta directo como valor
+// de una propiedad CSS (ver aplicarTema() en js/config.js).
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 router.put('/empresas/:id', async (req, res) => {
   const { nombre, logo, activo } = req.body || {};
+  const colorProvisto = Object.prototype.hasOwnProperty.call(req.body || {}, 'color_primario');
+  const colorPrimario = req.body?.color_primario;
+  if (colorPrimario && !HEX_COLOR.test(colorPrimario)) {
+    return res.status(400).json({ error: 'color_primario debe ser un color hex válido, ej. #E3B23C.' });
+  }
   try {
     const { rows } = await pool.query(
       `UPDATE empresas SET
          nombre = COALESCE($1, nombre),
          logo = COALESCE($2, logo),
          activo = COALESCE($3, activo),
+         color_primario = CASE WHEN $4 THEN $5 ELSE color_primario END,
          actualizado_el = now()
-       WHERE id = $4
+       WHERE id = $6
        RETURNING *`,
-      [nombre || null, logo || null, activo === undefined ? null : activo, req.params.id]
+      [nombre || null, logo || null, activo === undefined ? null : activo, colorProvisto, colorPrimario || null, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Empresa no encontrada.' });
     res.json(rows[0]);

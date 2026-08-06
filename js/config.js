@@ -17,17 +17,46 @@ import { haySesionActiva, obtenerSesion } from './sesion.js';
 const CONFIG_POR_DEFECTO = {
   bizName: 'Mi proyecto de datos',
   logo: 'PD',
+  colorPrimario: null,
   apiBaseUrl: API_BASE_URL,
   modules: []
 };
 
 let cache = null;
 
+// Deriva un tono más oscuro (para --ochre-deep, el que usan hover/estados
+// activos) a partir del color primario elegido -- así el super admin solo
+// escoge UN color por empresa y el resto sale coherente, sin pedir dos.
+function oscurecer(hex, factor = 0.78) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * factor);
+  const g = Math.round(((n >> 8) & 255) * factor);
+  const b = Math.round((n & 255) * factor);
+  return '#' + [r, g, b].map(c => Math.max(0, Math.min(255, c)).toString(16).padStart(2, '0')).join('');
+}
+
+// Personalización de marca por empresa (opt-in, la pone el super admin):
+// sobreescribe --ochre/--ochre-deep -- las variables CSS que ya manejan
+// botones primarios, estados activos del sidebar, etc. en css/base.css --
+// en vez de tocar cada archivo .css uno por uno. Sin color guardado (o si
+// llega mal formado), no se toca nada y queda el amarillo de KhipuCore.
+function aplicarTema(config) {
+  const raiz = document.documentElement.style;
+  if (config.colorPrimario && /^#[0-9a-fA-F]{6}$/.test(config.colorPrimario)) {
+    raiz.setProperty('--ochre', config.colorPrimario);
+    raiz.setProperty('--ochre-deep', oscurecer(config.colorPrimario));
+  } else {
+    raiz.removeProperty('--ochre');
+    raiz.removeProperty('--ochre-deep');
+  }
+}
+
 export async function cargarConfigEmpresa() {
   if (cache) return cache;
 
   if (!haySesionActiva()) {
     cache = CONFIG_POR_DEFECTO;
+    aplicarTema(cache);
     return cache;
   }
 
@@ -43,6 +72,7 @@ export async function cargarConfigEmpresa() {
     console.warn('No se pudo cargar la información de la empresa, usando valores por defecto.', err);
     cache = CONFIG_POR_DEFECTO;
   }
+  aplicarTema(cache);
   return cache;
 }
 
