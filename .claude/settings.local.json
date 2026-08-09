@@ -15,7 +15,9 @@
       "Bash(git init *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Read(//c/Users/TUFGAM~1/AppData/Local/Temp/claude/c--Users-Tuf-Gaming-Desktop-KhipuCorp-Khipu1/604b0a59-a054-4e15-bb5a-acf06e8dce9f/scratchpad/**)",
+      "Bash(node shot2.js)"
     ]
   }
 }

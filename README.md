@@ -259,49 +259,71 @@ fila más del catálogo `modulos` que ese panel ya gestiona).
 
 ## Qué falta (fases siguientes, aún no implementadas)
 
-- **Fase 3 — Temas**: `css/themes/` existe pero vacía. Las variables ya están
-  centralizadas en `css/base.css`, así que el siguiente paso es solo crear
-  `azul.css`, `negro.css`, etc. redefiniendo esas mismas variables y un selector
-  que cambie cuál se aplica.
-- **Fase 4 — Componentes reutilizables**: `components/nav.js` es el primero.
-  `dashboard.js` sigue escribiendo el resto del HTML directamente en vez de
-  usar piezas reutilizables (KpiCard, Tabla, etc.).
-- **Nivel 2 de config (pendiente si se quiere)**: permitir que
-  `config/company.json` fije, por módulo, qué columna del CSV va en cada KPI
-  en vez de dejarlo 100% a la auto-detección.
-- `assets/` existe pero vacía (para logo en imagen, más allá del texto corto
-  actual en `config.logo`).
+- **Personalización visual por empresa**: se resolvió más simple que el plan
+  original de `css/themes/` (que llegó a existir vacía como andamiaje y ya se
+  eliminó del repo) — una sola columna `color_primario` por empresa
+  (`backend/migrations/018_empresa_tema.sql`, a propósito UN color y no un
+  sistema de temas completo), aplicada en runtime como variable CSS desde
+  `js/config.js`.
+- **Componentes reutilizables**: ya existen varios en `components/`
+  (`sidebar.js`, `panelLateral.js`, `topbar.js`, `footer.js`,
+  `tablaRegistros.js`, `formularioRegistro.js`, `khipuAiWidget.js`) —
+  `nav.js` fue el primero y desde entonces fue reemplazado por `sidebar.js`.
+  Lo que sigue pendiente: `dashboard.js` todavía escribe el HTML de
+  KPIs/gráficos directamente en vez de usar piezas reutilizables tipo
+  `KpiCard`.
+
+*(Nota: el "Nivel 2 de config" y el punto sobre `assets/` vacía que estaban
+aquí antes dependían de `config/company.json`, que ya no existe — ver
+"Fase A" más abajo. `assets/` ya tiene `login-hero.png` y `logo-icon.png`.)*
 
 ## Estructura
 
 ```
-KhipuCore/
-  index.html            → redirige a pages/inicio.html (o a login.html si no hay sesión)
-  js/apiConfig.js        → URL fija del backend (Fase A: un solo backend para todas las empresas)
+Khipu1/
+  index.html             → redirige a pages/inicio.html (o a login.html si no hay sesión)
   css/
-    base.css            → variables de tema, reset, header, hero, module-nav
-    cards.css           → KPIs, paneles, gráficos
-    tables.css          → tabla de debug, badges de rol
-    themes/             → (vacío, Fase 3)
+    base.css             → variables de tema, reset, header, hero, module-nav
+    cards.css            → KPIs, paneles, gráficos
+    forms.css            → formularios, tabla editable
+    layout.css           → estructura general de página
+    panel-lateral.css    → panel lateral deslizable
+    tables.css           → tabla de debug, badges de rol
+    khipu-ai-widget.css  → widget flotante de Khipu AI
   js/
-    app.js              → estado + orquestación + namespace por módulo + branding
-    config.js            → carga/cachea el branding+módulos de la empresa activa (GET /api/empresa/actual, Fase A)
-    dashboard.js         → render principal
-    charts.js            → construcción de gráficos Chart.js
-    filters.js            → filtro de rango de fechas
-    parsing.js            → CSV/ZIP + detección de columnas
-    storage.js            → localStorage con namespace por módulo
-    utils.js              → formateo, parsing flexible, escapeHtml
+    app.js, apiConfig.js, api.js, config.js, dashboard.js, charts.js,
+    filters.js, parsing.js, storage.js, utils.js, esquemas.js, sesion.js,
+    modoBackend.js, khipuAi.js
+                          → estado, render, fetch al backend, parsing de
+                            CSV/ZIP, y el cliente del widget de Khipu AI
   components/
-    nav.js                → menú dinámico de módulos (primer componente reutilizable, Fase 4)
-  assets/                → (vacío, para logo en imagen más adelante)
+    sidebar.js            → menú dinámico de módulos (reemplaza al viejo nav.js)
+    panelLateral.js        → abre/cierra el panel lateral deslizable
+    topbar.js, footer.js   → cabecera y pie compartidos
+    tablaRegistros.js      → tabla editable reutilizable
+    formularioRegistro.js  → formulario reutilizable
+    khipuAiWidget.js       → UI del widget flotante de Khipu AI
   pages/
-    ventas.html, inventario.html, compras.html, clientes.html,
-    rrhh.html, finanzas.html, produccion.html, marketing.html
+    inicio.html, login.html, ventas.html, inventario.html, compras.html,
+    clientes.html, rrhh.html, finanzas.html, produccion.html, marketing.html,
+    postventa.html, repuestos.html, vehiculos.html, auditoria.html,
+    usuarios.html, superadmin.html, privacidad.html
                           → una página física por módulo, mismo motor JS/CSS,
                             cada una con <body data-modulo="..."> propio
   lib/
     chart.js, papaparse.min.js, jszip.min.js  → librerías de terceros sin cambios
+  assets/
+    login-hero.png, logo-icon.png
+  backend/
+    src/
+      server.js            → arma la app Express y monta todas las rutas
+      db.js                 → pool de conexión
+      crudFactory.js        → genera CRUD estándar por módulo
+      registroAuditoria.js  → helper para registrar auditoría (usado por crudFactory y varias rutas manuales)
+      khipuAiTools.js       → herramientas de datos que usa Khipu AI (tool use)
+      middleware/           → auth.js, permisos.js
+      routes/                → una ruta por módulo (auth, clientes, ventas, ...)
+    migrations/              → historial de esquema SQL, no se edita retroactivamente
 ```
 
 ### Cómo dar de alta/baja un módulo a un cliente

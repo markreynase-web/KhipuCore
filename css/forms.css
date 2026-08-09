@@ -41,23 +41,6 @@
 .tabla-registros td input{ width:100%; font-size:13px; padding:4px 6px; border:1px solid var(--ochre-deep); border-radius:6px; }
 .tabla-registros .col-acciones{ white-space:nowrap; text-align:right; width:110px; }
 
-.menu-acciones{ position:relative; display:inline-block; }
-.btn-menu-acciones{ background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:4px 8px; border-radius:8px; color:var(--muted); }
-.btn-menu-acciones:hover{ background:var(--paper); color:var(--ink); }
-.menu-acciones-lista{
-  display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:5;
-  background:#fff; border:1px solid var(--paper-line); border-radius:8px;
-  box-shadow:var(--card-shadow); min-width:140px; padding:6px; text-align:left;
-}
-.menu-acciones.abierto .menu-acciones-lista{ display:block; }
-.menu-acciones-lista button{
-  display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer;
-  font-family:'Inter', sans-serif; font-size:13px; padding:8px 10px; border-radius:5px; color:var(--ink);
-  white-space:nowrap;
-}
-.menu-acciones-lista button:hover{ background:var(--paper); }
-.menu-acciones-lista button.peligro{ color:var(--coral); }
-
 .btn-guardar-fila{
   background:var(--teal); color:#fff; border:none; border-radius:8px;
   font-family:'Inter', sans-serif; font-size:12px; font-weight:600;

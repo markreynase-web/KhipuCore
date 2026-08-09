@@ -11,7 +11,7 @@ import { pool } from '../db.js';
 import { auth, requireEmpresa } from '../middleware/auth.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { crearRouterCRUD } from '../crudFactory.js';
-import { registrarAuditoria } from '../auditoria.js';
+import { registrarAuditoria } from '../registroAuditoria.js';
 
 const router = Router();
 router.use(auth, requireEmpresa);

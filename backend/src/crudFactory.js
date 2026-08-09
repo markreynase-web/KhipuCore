@@ -21,7 +21,7 @@ import Papa from 'papaparse';
 import { pool } from './db.js';
 import { auth, requireEmpresa } from './middleware/auth.js';
 import { verificarPermiso } from './middleware/permisos.js';
-import { registrarAuditoria } from './auditoria.js';
+import { registrarAuditoria } from './registroAuditoria.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
