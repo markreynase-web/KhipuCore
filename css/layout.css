@@ -17,25 +17,50 @@
   border-radius:0 22px 22px 0;
   overflow:hidden;
 }
+/* Contenido real del sidebar, separado del elemento .sidebar en sí (que es
+   el que reserva el espacio en el layout -- 236px, o 72px colapsado): así
+   .sidebar-inner puede "salirse" de esos 72px como flyout al hacer hover
+   sin que .main-area se corra (ver el bloque .colapsado más abajo). */
+.sidebar-inner{ display:flex; flex-direction:column; width:100%; height:100%; }
+
 .sidebar-brand{ display:flex; align-items:center; gap:12px; padding:20px 18px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
 .sidebar-brand .mark{ width:36px; height:36px; }
-.sidebar-brand-text{ min-width:0; }
+.sidebar-brand-text{ min-width:0; flex:1; }
 .sidebar-brand .biz-name{
   display:block; width:100%; border:none; background:transparent; padding:0;
-  font-family:'Inter', sans-serif; font-weight:700; font-size:14px; color:#fff;
+  font-family:var(--font-body); font-weight:700; font-size:14px; color:#fff;
 }
 .sidebar-brand .biz-name:focus{ outline:none; }
 .sidebar-subtitle{ font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-top:3px; }
+.sidebar-collapse-btn{
+  flex-shrink:0; width:22px; height:22px; border-radius:50%; border:none; cursor:pointer;
+  background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.6);
+  display:flex; align-items:center; justify-content:center;
+}
+.sidebar-collapse-btn:hover{ background:rgba(255,255,255,0.12); color:#fff; }
+.sidebar-collapse-btn svg{ transition:transform 0.18s ease; }
 
-.sidebar-nav{ flex:1; padding:16px 12px; overflow-y:auto; }
+/* Scrollbar delgada y del tema oscuro -- el scrollbar gris nativo del SO
+   (grueso, con flechas) se veía fuera de lugar contra el sidebar navy. */
+.sidebar-nav{
+  flex:1; padding:16px 12px; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.18) transparent;
+}
+.sidebar-nav::-webkit-scrollbar{ width:6px; }
+.sidebar-nav::-webkit-scrollbar-track{ background:transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.18); border-radius:10px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,0.32); }
 .sidebar-group{ margin-bottom:20px; }
-.sidebar-group-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:rgba(255,255,255,0.35); font-weight:700; padding:0 10px; margin-bottom:6px; }
+.sidebar-group-label{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:rgba(255,255,255,0.35); font-weight:600; padding:0 10px; margin-bottom:6px; }
 .sidebar-item{
-  display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px;
+  position:relative; display:flex; align-items:center; gap:10px; padding:9px 12px;
+  border-radius:10px;
   font-size:13px; font-weight:600; color:rgba(255,255,255,0.8); text-decoration:none; margin-bottom:2px;
+  transition:background 0.14s ease, color 0.14s ease;
 }
 .sidebar-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
-.sidebar-item.active{ background:var(--teal); color:var(--ink); }
+.sidebar-item.active{ background:var(--teal); color:#fff; box-shadow:0 4px 14px -4px rgba(15,166,156,0.55); }
+.sidebar-item.active .sidebar-icon{ color:#fff; }
 .sidebar-icon{ font-size:15px; line-height:1; width:18px; text-align:center; flex-shrink:0; }
 
 .sidebar-footer{ border-top:1px solid rgba(255,255,255,0.08); padding:14px 16px; display:flex; align-items:center; gap:10px; }
@@ -51,13 +76,79 @@
 .sidebar-logout:hover{ color:var(--coral); }
 .sidebar-login-link{ font-size:13px; color:#fff; text-decoration:none; font-weight:600; }
 
+/* Entrada fija de Khipu AI (Rediseño v3, ver components/sidebar.js
+   khipuAiEntradaHtml()) -- mismo bloque visual que .sidebar-footer, pero es
+   un <button> (dispara el evento 'khipu-ai:abrir'), no información estática. */
+.sidebar-khipu-ai{
+  width:100%; border:none; border-top:1px solid rgba(255,255,255,0.08); background:none; cursor:pointer;
+  padding:12px 16px; display:flex; align-items:center; gap:10px; text-align:left; font-family:inherit;
+  transition:background 0.14s ease;
+}
+.sidebar-khipu-ai:hover{ background:rgba(255,255,255,0.06); }
+.sidebar-khipu-ai-icon{
+  width:30px; height:30px; border-radius:50%; background:var(--cyan); color:var(--ink);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.sidebar-khipu-ai-chevron{ color:rgba(255,255,255,0.4); font-size:16px; flex-shrink:0; }
+
+/* Colapsar/expandir (v3, solo desktop >900px -- debajo de eso el sidebar ya
+   cambia de forma por completo, ver los @media más abajo, y no debe pelear
+   con esas reglas). Estado persistido en localStorage por sidebar.js
+   (el botón fija/desfija; el mouse solo "espía" mientras está fijado).
+   .sidebar en sí se queda en 72px SIEMPRE que está colapsado -- eso es lo
+   que .main-area ve y lo que evita que el contenido se corra al pasar el
+   mouse. .sidebar-inner es quien realmente crece a 236px como flyout por
+   encima de .main-area (position:absolute + box-shadow), disparado por
+   :hover sobre el propio .sidebar (así el flyout no se cierra si el mouse
+   se mueve del botón angosto hacia el contenido ancho que acaba de aparecer). */
+@media (min-width:901px){
+  .sidebar.colapsado{ width:72px; overflow:visible; }
+  .sidebar.colapsado .sidebar-inner{
+    position:absolute; top:0; left:0; width:72px; height:100%;
+    background:var(--ink); border-radius:0 22px 22px 0; overflow:hidden;
+    transition:width 0.16s ease, box-shadow 0.16s ease; z-index:40;
+  }
+  .sidebar.colapsado:hover .sidebar-inner{
+    width:236px; box-shadow:0 24px 60px -16px rgba(14,27,69,0.45); overflow:visible; z-index:50;
+  }
+  .sidebar.colapsado .sidebar-brand{ position:relative; justify-content:center; }
+  .sidebar.colapsado .sidebar-brand-text,
+  .sidebar.colapsado .sidebar-group-label,
+  .sidebar.colapsado .sidebar-item span:not(.sidebar-icon),
+  .sidebar.colapsado .sidebar-footer-info,
+  .sidebar.colapsado .sidebar-logout,
+  .sidebar.colapsado .sidebar-khipu-ai-chevron{ display:none; }
+  .sidebar.colapsado .sidebar-collapse-btn{ position:absolute; top:14px; right:-10px; background:var(--ink); border:1px solid rgba(255,255,255,0.14); }
+  .sidebar.colapsado .sidebar-collapse-btn svg{ transform:rotate(180deg); }
+  .sidebar.colapsado .sidebar-item{ justify-content:center; padding-left:8px; padding-right:8px; }
+  .sidebar.colapsado .sidebar-footer{ justify-content:center; }
+  .sidebar.colapsado .sidebar-khipu-ai{ justify-content:center; padding-left:8px; padding-right:8px; }
+
+  /* Al pasar el mouse, el flyout se ve exactamente como el sidebar expandido
+     -- estas reglas ganan sobre las de arriba por especificidad (:hover
+     suma un nivel), sin importar el orden en el archivo. */
+  .sidebar.colapsado:hover .sidebar-brand{ justify-content:space-between; }
+  .sidebar.colapsado:hover .sidebar-brand-text{ display:block; }
+  .sidebar.colapsado:hover .sidebar-group-label{ display:block; }
+  .sidebar.colapsado:hover .sidebar-item span:not(.sidebar-icon){ display:inline; }
+  .sidebar.colapsado:hover .sidebar-footer-info{ display:block; }
+  .sidebar.colapsado:hover .sidebar-logout{ display:inline-block; }
+  .sidebar.colapsado:hover .sidebar-khipu-ai-chevron{ display:inline; }
+  /* El chevron se queda apuntando "expandir" durante el hover a propósito:
+     el clic todavía fija el sidebar expandido (el hover es solo una vista
+     previa temporal), así que el ícono debe seguir prometiendo esa acción. */
+  .sidebar.colapsado:hover .sidebar-item{ justify-content:flex-start; padding-left:12px; padding-right:12px; }
+  .sidebar.colapsado:hover .sidebar-footer{ justify-content:flex-start; }
+  .sidebar.colapsado:hover .sidebar-khipu-ai{ justify-content:flex-start; padding-left:16px; padding-right:16px; }
+}
+
 .main-area{ flex:1; min-width:0; }
 
 .topbar{
   background:#fff; color:var(--ink); padding:10px 32px; border-bottom:1px solid var(--paper-line);
   display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
 }
-.topbar-title h1{ font-family:'Inter', sans-serif; font-size:16px; font-weight:700; margin:0; color:var(--ink); }
+.topbar-title h1{ font-family:var(--font-display); font-size:16px; font-weight:700; margin:0; color:var(--ink); }
 .topbar-subtitle{ font-size:10.5px; color:var(--muted); letter-spacing:0.04em; margin-top:1px; }
 
 /* Buscador global (components/topbar.js): input + dropdown de resultados
@@ -68,7 +159,7 @@
   width:100%; font-family:'Inter', sans-serif; font-size:13px; padding:7px 12px 7px 34px;
   border:1px solid var(--paper-line); border-radius:10px; background:var(--paper); color:var(--ink);
 }
-.topbar-search input:focus{ outline:none; border-color:var(--coral); background:#fff; }
+.topbar-search input:focus{ outline:none; border-color:var(--ochre-deep); background:#fff; }
 .topbar-search .ico{ position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--muted); pointer-events:none; }
 .topbar-search-resultados{
   display:none; position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:30;
@@ -76,7 +167,7 @@
   max-height:360px; overflow-y:auto; padding:8px;
 }
 .topbar-search-resultados.abierto{ display:block; }
-.topbar-search-grupo-titulo{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:700; padding:6px 8px 4px; }
+.topbar-search-grupo-titulo{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; padding:6px 8px 4px; }
 .topbar-search-item{
   display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; cursor:pointer; font-size:13px; color:var(--ink);
 }
@@ -179,6 +270,8 @@ main{ max-width:1180px; margin:0 auto; padding:28px 32px; }
   .sidebar-group{ display:flex; align-items:center; gap:4px; margin-bottom:0; white-space:nowrap; }
   .sidebar-group-label{ display:none; }
   .sidebar-footer{ display:none; }
+  .sidebar-khipu-ai{ display:none; }
+  .sidebar-collapse-btn{ display:none; }
   main{ padding:20px 16px; }
   .toolbar, .topbar{ padding:14px 16px; }
 }
@@ -216,6 +309,7 @@ main{ max-width:1180px; margin:0 auto; padding:28px 32px; }
   .sidebar-group{ display:block; white-space:normal; gap:0; margin-bottom:20px; }
   .sidebar-group-label{ display:block; }
   .sidebar-footer{ display:flex; }
+  .sidebar-khipu-ai{ display:flex; }
 
   .sidebar-overlay-movil{
     display:none; position:fixed; inset:0; background:rgba(20,33,61,0.5); z-index:55;

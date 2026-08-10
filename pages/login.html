@@ -6,200 +6,333 @@
 <title>Iniciar sesión — KhipuCore</title>
 <link rel="icon" href="../assets/logo-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css">
-<link rel="stylesheet" href="../css/cards.css">
-<link rel="stylesheet" href="../css/forms.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-  /* height (no min-height) + overflow:hidden en .login-shell: la tarjeta
-     nunca es más alta que la ventana visible, así en laptops no hace falta
-     scrollear para ver el botón de ingresar. Lo que se ajusta para que
-     quepa es el contenido de adentro (ilustración con max-height en vh,
-     paddings/márgenes más chicos), no la tarjeta. */
-  body{ background:var(--paper); display:flex; align-items:center; justify-content:center; height:100vh; padding:20px; overflow:hidden; }
+  /* Mismos tokens que index.html (landing): esta pantalla es autocontenida
+     a propósito -- no usa css/base.css para color, tipografía ni radios --
+     así se ve como una extensión directa de la landing, no como una página
+     de "otro producto". login.html se carga siempre sin sesión, así que el
+     color por empresa (js/config.js -> aplicarTema) nunca se aplica acá de
+     todos modos (ver cargarConfigEmpresa: sin sesión = config por defecto). */
+  :root{
+    --ink:        #0E1B45;
+    --brand:      #16295C;
+    --brand-2:    #1C6F96;
+    --teal:       #0FA69C;
+    --cyan:       #2EE2CE;
+    --mist:       #E3FBF6;
+    --paper:      #FFFFFF;
+    --danger:     #C4544B;
+
+    --text-1:     var(--brand);
+    --text-2:     #4E5A78;
+    --text-on-dark-1: #F3F8FC;
+    --text-on-dark-2: #A9BBDB;
+
+    --border-light: #E1E7F0;
+    --border-dark:  rgba(255,255,255,0.14);
+
+    --r-pill: 999px;
+    --r-lg: 20px;
+    --r-md: 12px;
+
+    --font-display: 'Bricolage Grotesque', 'Inter', sans-serif;
+    --font-body: 'Inter', 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+    --ease: cubic-bezier(.22,.61,.36,1);
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
+  }
+  html,body{ height:100%; }
+  body{
+    margin:0; min-height:100vh; background:var(--mist);
+    display:flex; align-items:center; justify-content:center; padding:28px 20px;
+    font-family:var(--font-body); color:var(--text-1); -webkit-font-smoothing:antialiased;
+  }
+  img{ display:block; max-width:100%; }
+  :focus-visible{ outline:2.5px solid var(--brand-2); outline-offset:2px; border-radius:6px; }
+
   .login-shell{
-    display:flex; width:100%; max-width:1360px; height:100%;
-    border-radius:26px; overflow:hidden; box-shadow:0 30px 80px -24px rgba(2,23,57,0.4);
+    display:flex; width:100%; max-width:1180px; min-height:640px;
+    background:var(--paper); border-radius:var(--r-lg); overflow:hidden;
+    box-shadow:0 30px 80px -28px rgba(14,27,69,0.35);
   }
 
-  /* Columna izquierda: marketing, oculta en pantallas chicas (el login
-     sigue funcionando igual, solo se prioriza el formulario en mobile).
-     El max-width iba en ESTA columna antes, y en pantallas anchas dejaba una
-     franja gris vacía entre el contenido y el formulario (que además quedaba
-     "flotando" sin llegar al borde derecho). Ahora el max-width se mueve al
-     contenido de adentro (.login-marketing-inner) y esta columna sí llena
-     todo el espacio libre, empujando el formulario hasta el borde derecho. */
-  .login-marketing{
-    flex:1; padding:32px 64px; display:flex; flex-direction:column; justify-content:center; align-items:center;
-    background:#021739; color:#fff; min-height:0; overflow:hidden;
+  /* ---------- Panel izquierdo: marca ---------- */
+  .login-aside{
+    position:relative; flex:1 1 46%; min-width:0; background:var(--ink); color:var(--text-on-dark-1);
+    display:flex; flex-direction:column;
+    padding:40px 44px 32px; overflow:hidden;
   }
-  .login-marketing-inner{ width:100%; max-width:760px; display:flex; flex-direction:column; align-items:center; min-height:0; }
-  .login-marketing .sidebar-brand{ display:flex; align-items:center; gap:14px; margin-bottom:12px; flex-shrink:0; }
-  .login-marketing .mark{ width:58px; height:58px; }
-  .login-brand-word{ font-family:'Inter', sans-serif; font-weight:800; font-size:34px; color:#fff; letter-spacing:0.01em; }
-  .login-brand-word .acc{ color:var(--teal); }
-  .login-brand-tagline{ font-size:12.5px; letter-spacing:0.1em; color:var(--teal); font-weight:600; margin-top:4px; flex-shrink:0; }
+  /* Resplandor suave detrás de los dispositivos -- da profundidad sin
+     competir visualmente con la captura real del producto (a diferencia
+     del canvas animado del intento anterior, que sí competía). */
+  .login-aside::before{
+    content:''; position:absolute; left:50%; top:56%; width:520px; height:420px;
+    background:radial-gradient(circle, rgba(46,226,206,0.16), rgba(46,226,206,0) 70%);
+    transform:translate(-50%,-50%); pointer-events:none;
+  }
+  .login-aside > *{ position:relative; z-index:1; }
 
-  /* assets/login-hero.png: recorte de la ilustración que compartió el
-     dueño del proyecto (mismo mockup de donde salió la paleta de colores).
-     max-height en vh (no solo max-width) para que se achique en pantallas
-     bajas en vez de desbordar la tarjeta. */
-  .login-hero{ margin:28px 0; box-shadow:0 20px 50px -20px rgba(0,0,0,0.5); max-height:42vh; width:auto; max-width:100%; object-fit:contain; flex-shrink:1; min-height:0; }
+  .login-brand{ display:flex; align-items:center; gap:12px; }
+  .login-brand img{ width:46px; height:46px; border-radius:12px; }
+  .login-brand .word{ font-family:var(--font-display); font-weight:700; font-size:21px; letter-spacing:-0.01em; }
+  .login-brand .word .acc{ color:var(--cyan); }
+  .login-eyebrow{
+    font-family:var(--font-mono); font-weight:500; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--cyan); margin-top:16px;
+  }
 
-  .login-marketing h1{ font-family:'Inter', sans-serif; font-weight:800; font-size:28px; line-height:1.3; margin:0 0 10px; color:#fff; flex-shrink:0; }
-  .login-marketing h1 .acc{ color:var(--teal); }
-  .login-marketing p.lead{ font-size:15px; color:rgba(255,255,255,0.65); line-height:1.55; max-width:440px; margin:0; flex-shrink:0; }
+  .login-aside-mid{ margin-top:26px; }
+  .login-aside-mid h1{
+    font-family:var(--font-display); font-weight:700; font-size:clamp(23px,2.5vw,28px);
+    line-height:1.22; margin:0 0 8px; text-wrap:balance; letter-spacing:-0.01em;
+  }
+  .login-aside-mid h1 .acc{ color:var(--cyan); }
+  .login-aside-mid p{ font-size:14.5px; line-height:1.55; color:var(--text-on-dark-2); max-width:380px; margin:0; }
 
-  .login-dots{ display:flex; gap:7px; margin-top:28px; flex-shrink:0; }
-  .login-dots span{ width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.25); }
-  .login-dots span:first-child{ background:var(--teal); }
+  /* Composición de dispositivos: la misma captura real del panel de Inicio
+     de KhipuCore (assets/loginpreviw.jpeg), recortada distinto en cada
+     marco -- laptop ancla arriba-izquierda (marca + KPIs), teléfono hace
+     zoom a esa misma esquina para simular una vista "móvil". No es una
+     captura móvil real (no existe todavía una vista responsive dedicada),
+     así que el recorte es la forma honesta de sugerirla sin inventar UI. */
+  .device-composition{ position:relative; flex:1; min-height:0; margin:22px 0; display:flex; align-items:center; }
+  .device-laptop{ position:relative; width:min(100%, 400px); margin:0 auto; }
+  .device-screen{
+    position:relative; aspect-ratio:16/10; border-radius:10px; overflow:hidden;
+    border:7px solid #1E2E5C; background:#0A1230; box-shadow:0 26px 55px -22px rgba(0,0,0,0.6);
+  }
+  .device-screen img{ width:100%; height:100%; object-fit:cover; object-position:left top; display:block; }
+  .device-base{
+    height:12px; margin:0 -4px; border-radius:0 0 7px 7px;
+    background:linear-gradient(180deg,#22335E,#141F3D);
+  }
+  .device-phone{
+    position:absolute; right:-4%; bottom:-16%; width:23%; max-width:96px; aspect-ratio:9/19;
+    border-radius:18px; border:5px solid #1E2E5C; background:#0A1230; overflow:hidden;
+    box-shadow:0 18px 40px -18px rgba(0,0,0,0.65);
+  }
+  .device-phone img{
+    width:100%; height:100%; object-fit:cover; object-position:0 0;
+    transform:scale(2.15); transform-origin:top left;
+  }
 
-  /* Columna derecha: el formulario en sí. Más ancha que antes (460→560) y
-     con la tarjeta interna más grande, a pedido -- antes se veía chica y
-     "perdida" en medio de la pantalla en monitores anchos. overflow-y:auto
-     como respaldo: si algún día el formulario crece (ej. mensaje de error
-     largo) y no entra en pantallas muy bajas, scrollea adentro de la
-     columna en vez de romper el layout. */
-  .login-form-col{
-    width:560px; flex-shrink:0; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:40px; border-left:1px solid var(--paper-line); overflow-y:auto;
+  .login-trust{
+    display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-on-dark-2);
+    padding-top:18px; border-top:1px solid var(--border-dark);
+  }
+  .login-trust svg{ color:var(--cyan); flex-shrink:0; }
+
+  @media (max-width:1023px){
+    .login-aside{ flex-basis:36%; padding:32px 28px; }
+    .login-aside-mid, .device-composition{ display:none; }
+    .login-trust{ font-size:11.5px; }
+  }
+  @media (max-width:760px){
+    .login-aside{ display:none; }
+  }
+
+  /* ---------- Panel derecho: formulario ---------- */
+  .login-main{
+    flex:1 1 54%; min-width:0; display:flex; align-items:center; justify-content:center;
+    padding:40px; background:var(--paper);
   }
   .login-card{ width:100%; max-width:400px; }
-  .login-card h2{ font-family:'Inter', sans-serif; font-weight:800; font-size:26px; margin:0 0 6px; color:var(--ink); }
-  .login-card p.sub{ color:var(--muted); font-size:14px; margin:0 0 28px; }
-  .login-card p.sub b{ color:var(--teal-deep); }
-  .login-card form{ display:flex; flex-direction:column; gap:14px; }
-  .login-card .campo{ display:flex; flex-direction:column; gap:5px; }
-  .login-card label{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; }
-  .login-input-wrap{ position:relative; }
-  .login-input-wrap span.ico{ position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--muted); }
-  .login-card input[type="email"], .login-card input[type="password"], .login-card input[type="text"]{
-    width:100%; font-family:'Inter', sans-serif; font-size:14.5px; padding:12px 12px 12px 34px;
-    border:1px solid var(--paper-line); border-radius:9px; background:var(--paper); color:var(--ink);
-  }
-  .login-card input:focus{ outline:none; border-color:var(--teal-deep); }
-  .login-toggle-pass{ position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--muted); font-size:13px; }
+  .login-card h2{ font-family:var(--font-display); font-weight:700; font-size:27px; margin:0 0 6px; color:var(--text-1); letter-spacing:-0.01em; }
+  .login-card p.sub{ color:var(--text-2); font-size:14.5px; line-height:1.5; margin:0 0 26px; }
 
-  .login-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; font-size:12.5px; }
-  .login-row label{ display:flex; align-items:center; gap:6px; text-transform:none; letter-spacing:normal; font-weight:500; color:var(--ink); }
-  .login-forgot{ color:var(--blue); text-decoration:none; cursor:default; font-weight:600; }
+  #formLogin{ display:flex; flex-direction:column; gap:16px; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-size:12px; font-weight:600; color:var(--text-1); }
+  .field-shell{ position:relative; }
+  .field-shell .ico{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-2); pointer-events:none; display:flex; }
+  .field-shell input{
+    width:100%; height:47px; padding:0 14px 0 42px; border-radius:var(--r-md);
+    border:1.5px solid var(--border-light); background:#fff; color:var(--text-1);
+    font-family:var(--font-body); font-size:14.5px; transition:border-color .16s var(--ease), box-shadow .16s var(--ease);
+  }
+  .field-shell input::placeholder{ color:#9AA6C0; }
+  .field-shell input:hover{ border-color:#C7D2E3; }
+  .field-shell input:focus{ outline:none; border-color:var(--brand-2); box-shadow:0 0 0 4px rgba(28,111,150,0.12); }
+  .field.has-error .field-shell input{ border-color:var(--danger); }
+  .field.has-error .field-shell input:focus{ box-shadow:0 0 0 4px rgba(196,84,75,0.14); }
+
+  .toggle-pass{
+    position:absolute; right:8px; top:50%; transform:translateY(-50%); width:32px; height:32px;
+    display:flex; align-items:center; justify-content:center; background:none; border:none; border-radius:8px;
+    cursor:pointer; color:var(--text-2);
+  }
+  .toggle-pass:hover{ background:var(--mist); color:var(--brand-2); }
+  .toggle-pass .ico-eye-off{ display:none; }
+  .toggle-pass.is-visible .ico-eye{ display:none; }
+  .toggle-pass.is-visible .ico-eye-off{ display:block; }
+
+  .login-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; }
+  .chk-remember{ position:relative; display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text-1); font-weight:500; }
+  .chk-remember input{ position:absolute; width:18px; height:18px; margin:0; opacity:0; cursor:pointer; }
+  .chk-remember .chk-box{
+    width:18px; height:18px; border-radius:5px; border:1.5px solid var(--border-light); background:#fff;
+    display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .14s, border-color .14s;
+  }
+  .chk-remember .chk-box svg{ opacity:0; width:11px; height:11px; color:#fff; transition:opacity .1s; }
+  .chk-remember input:checked + .chk-box{ background:var(--brand); border-color:var(--brand); }
+  .chk-remember input:checked + .chk-box svg{ opacity:1; }
+  .chk-remember input:focus-visible + .chk-box{ outline:2.5px solid var(--brand-2); outline-offset:2px; }
+
+  .login-forgot{ font-size:13px; color:var(--brand-2); text-decoration:none; font-weight:600; }
   .login-forgot:hover{ text-decoration:underline; }
 
-  .btn-login-submit{
-    width:100%; justify-content:center; padding:13px; font-size:14.5px; margin-top:4px;
-    background:var(--teal-deep); color:#fff; border:none; border-radius:9px; font-weight:700;
-    display:flex; align-items:center; gap:8px; cursor:pointer; font-family:'Inter', sans-serif;
-  }
-  .btn-login-submit:hover{ background:#009AB2; }
-  .btn-login-submit:disabled{ opacity:0.7; cursor:default; }
-  .login-error{ font-size:13px; color:var(--coral); min-height:18px; text-align:center; }
+  .login-error{ font-size:13px; color:var(--danger); min-height:18px; text-align:center; line-height:1.4; }
 
-  .login-divider{ display:flex; align-items:center; gap:10px; margin:20px 0; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
-  .login-divider::before, .login-divider::after{ content:''; flex:1; height:1px; background:var(--paper-line); }
+  .btn-submit{
+    position:relative; width:100%; height:49px; border-radius:var(--r-pill); border:none;
+    background:var(--brand); color:#fff; font-family:var(--font-body); font-weight:600; font-size:14.5px;
+    display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; margin-top:2px;
+    transition:background .16s var(--ease), box-shadow .16s var(--ease), transform .05s;
+  }
+  .btn-submit:hover:not(:disabled){ background:#1B3272; box-shadow:0 0 0 5px rgba(46,226,206,0.18); }
+  .btn-submit:active:not(:disabled){ transform:translateY(1px); }
+  .btn-submit:disabled{ opacity:0.75; cursor:not-allowed; }
+  .btn-submit .spinner{
+    display:none; position:absolute; width:18px; height:18px; border-radius:50%;
+    border:2.5px solid rgba(255,255,255,0.35); border-top-color:#fff; animation:login-spin 0.7s linear infinite;
+  }
+  .btn-submit.is-loading .btn-label, .btn-submit.is-loading .btn-arrow{ visibility:hidden; }
+  .btn-submit.is-loading .spinner{ display:block; }
+  @keyframes login-spin{ to{ transform:rotate(360deg); } }
+
+  .login-divider{ display:flex; align-items:center; gap:10px; margin:22px 0; font-family:var(--font-mono); font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.08em; }
+  .login-divider::before, .login-divider::after{ content:''; flex:1; height:1px; background:var(--border-light); }
 
   .btn-google{
-    width:100%; justify-content:center; background:#fff; border:1px solid var(--paper-line); color:var(--ink);
-    padding:11px; cursor:not-allowed; position:relative; border-radius:9px; font-weight:600;
-    display:flex; align-items:center; gap:10px; font-family:'Inter', sans-serif; font-size:14px;
+    width:100%; height:47px; justify-content:center; background:#fff; border:1.5px solid var(--border-light); color:var(--text-1);
+    cursor:not-allowed; border-radius:var(--r-md); font-weight:600; display:flex; align-items:center; gap:10px;
+    font-family:var(--font-body); font-size:14px;
   }
 
-  .login-signup{ text-align:center; font-size:12.5px; color:var(--muted); margin-top:22px; }
-  .login-signup a{ color:var(--blue); font-weight:600; text-decoration:none; cursor:default; }
+  .login-signup{ text-align:center; font-size:13px; color:var(--text-2); margin-top:22px; }
+  .login-signup a{ color:var(--brand-2); font-weight:600; text-decoration:none; }
   .login-signup a:hover{ text-decoration:underline; }
 
-  /* Selector de empresa (Fase A): aparece en vez del form de credenciales
-     cuando un mismo usuario administra más de una empresa. */
+  .login-security{
+    display:flex; align-items:center; justify-content:center; gap:6px; margin-top:20px;
+    font-size:12px; color:var(--text-2);
+  }
+  .login-security svg{ color:var(--teal); flex-shrink:0; }
+
+  /* Selector de empresa (Fase A) */
   .empresa-lista{ display:flex; flex-direction:column; gap:10px; margin-top:18px; }
   .btn-empresa{
-    width:100%; text-align:left; padding:13px 14px; border:1px solid var(--paper-line); border-radius:9px;
-    background:var(--paper); color:var(--ink); font-family:'Inter', sans-serif; font-size:14.5px; font-weight:600;
+    width:100%; text-align:left; padding:14px 16px; border:1.5px solid var(--border-light); border-radius:var(--r-md);
+    background:#fff; color:var(--text-1); font-family:var(--font-body); font-size:14.5px; font-weight:600;
     cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    transition:border-color .14s, background .14s;
   }
-  .btn-empresa:hover{ border-color:var(--teal-deep); background:#fff; }
-  .btn-empresa .flecha{ color:var(--muted); }
-  .login-volver{ display:inline-block; margin-top:16px; font-size:12.5px; color:var(--muted); background:none; border:none; cursor:pointer; padding:0; font-family:'Inter', sans-serif; }
-  .login-volver:hover{ color:var(--ink); text-decoration:underline; }
+  .btn-empresa:hover{ border-color:var(--brand-2); background:var(--mist); }
+  .btn-empresa .flecha{ color:var(--brand-2); }
+  .login-volver{ display:inline-block; margin-top:16px; font-size:12.5px; color:var(--text-2); background:none; border:none; cursor:pointer; padding:0; font-family:var(--font-body); }
+  .login-volver:hover{ color:var(--text-1); text-decoration:underline; }
 
-  /* Con .login-form-col en ancho fijo (560px), el panel de marketing se
-     queda con muy poco espacio útil justo antes de este quiebre (el
-     tagline se corta en dos líneas, la ilustración queda chica) -- por
-     eso el corte está más arriba que el resto de la app (860px), no en
-     el breakpoint típico de tablet. */
-  @media (max-width: 1180px){
-    /* Sin el panel de marketing, ya no hay dos columnas que tienen que
-       calzar juntas en la altura de la ventana -- se puede volver al
-       tamaño natural (y dejar que la página scrollee si hiciera falta,
-       ej. teclado en pantalla achicando el viewport en el celular). */
-    body{ height:auto; min-height:100vh; overflow:visible; }
-    .login-shell{ height:auto; }
-    .login-marketing{ display:none; }
-    .login-form-col{ width:100%; border-left:none; }
-  }
-  @media (max-width: 480px){
-    body{ padding:12px; }
-    .login-form-col{ padding:32px 22px; }
+  .login-card footer{ margin-top:26px; text-align:center; font-size:11.5px; color:#9AA6C0; }
+  .login-card footer a{ color:var(--text-2); }
+
+  @media (max-width:760px){
+    body{ padding:0; align-items:flex-start; }
+    .login-shell{ min-height:100vh; border-radius:0; box-shadow:none; }
+    .login-main{ padding:36px 24px; }
   }
 </style>
 </head>
 <body>
 
 <div class="login-shell">
-  <div class="login-marketing">
-   <div class="login-marketing-inner">
-    <div class="sidebar-brand">
-      <a href="../index.html" title="Ir a la página principal"><img class="mark" src="../assets/logo-icon.png" alt="KhipuCore"></a>
-      <div>
-        <div class="login-brand-word"><span class="acc">K</span>hipu<span class="acc">C</span>ore</div>
+  <aside class="login-aside">
+    <div>
+      <div class="login-brand">
+        <img src="../assets/logo-icon.png" alt="KhipuCore">
+        <span class="word"><span class="acc">K</span>hipu<span class="acc">C</span>ore</span>
+      </div>
+      <div class="login-eyebrow">Organiza · Controla · Conecta · Crece</div>
+    </div>
+
+    <div class="login-aside-mid">
+      <h1>El conocimiento ancestral convertido en <span class="acc">inteligencia empresarial</span>.</h1>
+      <p>Administra clientes, productos, ventas y más desde una plataforma inteligente y segura.</p>
+    </div>
+
+    <div class="device-composition" aria-hidden="true">
+      <div class="device-laptop">
+        <div class="device-screen">
+          <img src="../assets/loginpreviw.jpeg" alt="">
+        </div>
+        <div class="device-base"></div>
+        <div class="device-phone">
+          <img src="../assets/loginpreviw.jpeg" alt="">
+        </div>
       </div>
     </div>
-    <div class="login-brand-tagline">ORGANIZA - CONTROLA - CONECTA - CRECE</div>
 
-    <img class="login-hero" src="../assets/login-hero.png" alt="Panel de control de KhipuCore" style="width:100%; max-width:640px; border-radius:10px;">
+    <div class="login-trust">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5l5 2v3c0 3.5-2.3 5.8-5 6.7-2.7-.9-5-3.2-5-6.7v-3l5-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.8 8l1.4 1.4L10.4 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Tu información está protegida.
+    </div>
+  </aside>
 
-    <h1>Tu <span class="acc">negocio</span>, en un solo lugar</h1>
-    <p class="lead">Administra clientes, productos, ventas y más desde una plataforma inteligente y segura.</p>
-    <div class="login-dots"><span></span><span></span><span></span><span></span></div>
-   </div>
-  </div>
-
-  <div class="login-form-col">
+  <div class="login-main">
     <div class="login-card">
-      <h2>¡Bienvenido de nuevo!</h2>
-      <p class="sub" id="loginSub">Inicia sesión para continuar en <b>KhipuCore</b></p>
+      <h2>Bienvenido a KhipuCore</h2>
+      <p class="sub" id="loginSub">Inicia sesión para continuar gestionando tu empresa.</p>
 
       <div id="pasoCredenciales">
-        <form id="formLogin">
-          <div class="campo">
+        <form id="formLogin" novalidate>
+          <div class="field" id="campoEmail">
             <label for="email">Correo electrónico</label>
-            <div class="login-input-wrap">
-              <span class="ico">✉️</span>
+            <div class="field-shell">
+              <span class="ico" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4.5" width="15" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 6l7 5 7-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
               <input type="email" id="email" placeholder="ejemplo@empresa.com" required autocomplete="username">
             </div>
           </div>
-          <div class="campo">
+          <div class="field" id="campoPassword">
             <label for="password">Contraseña</label>
-            <div class="login-input-wrap">
-              <span class="ico">🔒</span>
+            <div class="field-shell">
+              <span class="ico" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="4.5" y="9" width="11" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
               <input type="password" id="password" placeholder="Ingresa tu contraseña" required autocomplete="current-password">
-              <button type="button" class="login-toggle-pass" id="btnTogglePass" title="Mostrar/ocultar contraseña">👁️</button>
+              <button type="button" class="toggle-pass" id="btnTogglePass" aria-label="Mostrar contraseña">
+                <svg class="ico-eye" width="17" height="17" viewBox="0 0 20 20" fill="none"><path d="M1.5 10S4.8 4 10 4s8.5 6 8.5 6-3.3 6-8.5 6-8.5-6-8.5-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                <svg class="ico-eye-off" width="17" height="17" viewBox="0 0 20 20" fill="none"><path d="M2.5 2.5l15 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.7 8.8a2.5 2.5 0 0 0 3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5.3 5.5C3.2 6.9 1.5 10 1.5 10s3.3 6 8.5 6c1.5 0 2.8-.4 3.9-1.1M16 14C17.5 12.6 18.5 10 18.5 10S15.2 4 10 4c-.5 0-1 0-1.4.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
             </div>
           </div>
 
           <div class="login-row">
-            <label><input type="checkbox" id="recordarme" checked> Recordarme</label>
+            <label class="chk-remember">
+              <input type="checkbox" id="recordarme" checked>
+              <span class="chk-box" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l2.7 2.7L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              Recordarme
+            </label>
             <!-- Sin backend de recuperación de contraseña todavía: queda visual,
                  no funcional (ver LEEME de esta fase). -->
             <a href="#" class="login-forgot" id="linkOlvide" title="Próximamente">¿Olvidaste tu contraseña?</a>
           </div>
 
-          <div class="login-error" id="loginError"></div>
-          <button type="submit" class="btn-login-submit" id="btnLogin">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-            Iniciar sesión
+          <div class="login-error" id="loginError" role="alert" aria-live="assertive"></div>
+          <button type="submit" class="btn-submit" id="btnLogin">
+            <span class="spinner" aria-hidden="true"></span>
+            <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            <span class="btn-label">Iniciar sesión</span>
           </button>
         </form>
 
-        <div class="login-divider">o continúa con</div>
+        <div class="login-divider">O continúa con</div>
 
         <!-- Google OAuth: decidido dejarlo solo visual por ahora (ver charla
              de esta fase) -- botón deshabilitado, sin flujo real detrás. -->
@@ -211,18 +344,23 @@
         <div class="login-signup">
           ¿No tienes una cuenta? <a href="#" id="linkSolicitar" title="Próximamente">Contácta a tu administrador</a>
         </div>
+
+        <div class="login-security">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          Tus datos viajan cifrados y quedan protegidos.
+        </div>
       </div>
 
       <!-- Fase A (multi-tenant): oculto salvo que el login diga que este
            usuario administra más de una empresa. -->
       <div id="pasoEmpresa" hidden>
-        <div class="login-error" id="empresaError"></div>
+        <div class="login-error" id="empresaError" role="alert" aria-live="assertive"></div>
         <div class="empresa-lista" id="listaEmpresas"></div>
         <button type="button" class="login-volver" id="btnVolverLogin">← Usar otra cuenta</button>
       </div>
-    </div>
 
-    <footer style="padding:20px 20px 0;"></footer>
+      <footer></footer>
+    </div>
   </div>
 </div>
 
@@ -243,10 +381,28 @@
   const pasoEmpresa = document.getElementById('pasoEmpresa');
   const listaEmpresas = document.getElementById('listaEmpresas');
   const empresaErrorEl = document.getElementById('empresaError');
+  const campoEmail = document.getElementById('campoEmail');
+  const campoPassword = document.getElementById('campoPassword');
 
-  document.getElementById('btnTogglePass').addEventListener('click', () => {
+  const btnTogglePass = document.getElementById('btnTogglePass');
+  btnTogglePass.addEventListener('click', () => {
     const input = document.getElementById('password');
-    input.type = input.type === 'password' ? 'text' : 'password';
+    const ahoraVisible = input.type === 'password';
+    input.type = ahoraVisible ? 'text' : 'password';
+    btnTogglePass.classList.toggle('is-visible', ahoraVisible);
+    btnTogglePass.setAttribute('aria-label', ahoraVisible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  });
+
+  function limpiarError(campo) {
+    campo.classList.remove('has-error');
+    campo.querySelector('input').removeAttribute('aria-invalid');
+  }
+  function marcarError(campo) {
+    campo.classList.add('has-error');
+    campo.querySelector('input').setAttribute('aria-invalid', 'true');
+  }
+  [campoEmail, campoPassword].forEach(campo => {
+    campo.querySelector('input').addEventListener('input', () => limpiarError(campo));
   });
 
   function mostrarSelectorEmpresas(empresas) {
@@ -268,7 +424,7 @@
     borrarPreAuth();
     pasoEmpresa.hidden = true;
     pasoCredenciales.hidden = false;
-    subEl.innerHTML = 'Inicia sesión para continuar en <b>KhipuCore</b>';
+    subEl.textContent = 'Inicia sesión para continuar gestionando tu empresa.';
     empresaErrorEl.textContent = '';
   }
   document.getElementById('btnVolverLogin').addEventListener('click', volverALogin);
@@ -308,6 +464,7 @@
     }
 
     btn.disabled = true;
+    btn.classList.add('is-loading');
     try {
       const res = await fetch(`${config.apiBaseUrl}/auth/login`, {
         method: 'POST',
@@ -326,13 +483,17 @@
       guardarSesion(cuerpo);
       location.replace('../index.html');
     } catch (err) {
+      marcarError(campoEmail);
+      marcarError(campoPassword);
       errorEl.textContent = err.message.includes('fetch') || err.message.includes('Failed')
         ? 'No se pudo conectar con el servidor. Revisa que el backend esté corriendo.'
         : err.message;
     } finally {
       btn.disabled = false;
+      btn.classList.remove('is-loading');
     }
   });
+
 </script>
 
 </body>

@@ -4,20 +4,42 @@
 // baseDeDatos:true solo aparece si el usuario tiene "{modulo}.ver"; los
 // módulos deshabilitados en config/company.json ni siquiera se agregan al DOM.
 //
-// Agrega una sección fija "CONFIGURACIÓN" con Usuarios y Auditoría (Fase 6):
-// esas dos SÍ están conectadas a endpoints reales del backend
-// (/api/usuarios, /api/auditoria) y solo se muestran si el usuario tiene
-// "usuarios.ver" / "auditoria.ver". No hay una sección "Reportes" todavía
-// -- decidimos no ponerla hasta tener algo real detrás, para no dejar un
-// link muerto en el menú.
+// Agrega una sección fija "Administración" con Usuarios y Auditoría (Fase 6,
+// renombrada de "Configuración" en el Rediseño v3): esas dos SÍ están
+// conectadas a endpoints reales del backend (/api/usuarios, /api/auditoria)
+// y solo se muestran si el usuario tiene "usuarios.ver" / "auditoria.ver".
+// No hay una sección "Reportes" todavía -- decidimos no ponerla hasta tener
+// algo real detrás, para no dejar un link muerto en el menú.
 
-import { modulosHabilitados } from '../js/config.js';
+import { modulosHabilitados, buscarModulo } from '../js/config.js';
 import { tienePermiso, tieneAlgunPermiso, haySesionActiva, obtenerSesion, cerrarSesion } from '../js/sesion.js';
 import { escapeHtml } from '../js/utils.js';
+import { ICONO_SPARK } from './khipuAiWidget.js';
+
+// Grupo de sidebar por id de módulo (Rediseño v3). Client-side a propósito:
+// la tabla `modulos` no tiene columna de categoría y no vale la pena una
+// migración para algo puramente presentacional. Un módulo nuevo que no
+// aparezca acá cae en 'gestion' por defecto (ver el reduce más abajo).
+const GRUPO_POR_MODULO = {
+  ventas: 'gestion', compras: 'gestion', inventario: 'gestion', clientes: 'gestion',
+  finanzas: 'gestion', postventa: 'gestion', produccion: 'gestion', repuestos: 'gestion',
+  rrhh: 'recursos', vehiculos: 'recursos'
+};
+const GRUPOS_ORDEN = [
+  { id: 'gestion', label: 'Gestión' },
+  { id: 'recursos', label: 'Recursos' }
+];
+
+const CLAVE_COLAPSADO = 'khipu_sidebar_colapsado';
+
+// Chevron del botón de colapsar -- apunta a la izquierda ("contraer") por
+// defecto; css/layout.css lo rota 180° cuando .sidebar tiene .colapsado, en
+// vez de cambiar el ícono a mano en cada toggle.
+const ICONO_CHEVRON = '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2.5L4.5 7L9 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 function itemHtml(m, activo) {
   return `
-    <a class="sidebar-item${activo ? ' active' : ''}" href="${m.href}">
+    <a class="sidebar-item${activo ? ' active' : ''}" href="${m.href}" title="${escapeHtml(m.label)}">
       <span class="sidebar-icon">${m.icon || '•'}</span>
       <span>${m.label}</span>
     </a>`;
@@ -43,45 +65,113 @@ export function renderSidebar(config, paginaActualId) {
     return tienePermiso(`${m.id}.ver`);
   });
 
-  const seccionConfig = [];
+  const seccionAdmin = [];
   if (sinSesion || tieneAlgunPermiso('usuarios')) {
-    seccionConfig.push({ id: 'usuarios', label: 'Usuarios', icon: '👤', href: 'usuarios.html' });
+    seccionAdmin.push({ id: 'usuarios', label: 'Usuarios', icon: '👤', href: 'usuarios.html' });
   }
   if (sinSesion || tieneAlgunPermiso('auditoria')) {
-    seccionConfig.push({ id: 'auditoria', label: 'Auditoría', icon: '🛡️', href: 'auditoria.html' });
+    seccionAdmin.push({ id: 'auditoria', label: 'Auditoría', icon: '🛡️', href: 'auditoria.html' });
   }
+
+  // Agrupa los módulos habilitados según GRUPO_POR_MODULO, preservando el
+  // orden de GRUPOS_ORDEN -- un grupo sin módulos simplemente no se pinta.
+  const modulosPorGrupo = new Map(GRUPOS_ORDEN.map(g => [g.id, []]));
+  modulosPrincipales.forEach(m => {
+    const grupoId = GRUPO_POR_MODULO[m.id] || 'gestion';
+    modulosPorGrupo.get(grupoId).push(m);
+  });
+  const gruposHtml = GRUPOS_ORDEN
+    .filter(g => modulosPorGrupo.get(g.id).length)
+    .map(g => `
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">${g.label}</div>
+        ${modulosPorGrupo.get(g.id).map(m => itemHtml({ ...m, href: m.page }, m.id === paginaActualId)).join('')}
+      </div>`)
+    .join('');
 
   asegurarFavicon();
 
   cont.innerHTML = `
-    <div class="sidebar-brand">
-      <a href="../index.html" title="Ir a la página principal"><img class="mark" src="../assets/logo-icon.png" alt="KhipuCore"></a>
-      <div class="sidebar-brand-text">
-        <input class="biz-name" id="bizName" value="${escapeHtml(config.bizName || 'Gestor de Datos Empresariales')}" />
-        <div class="sidebar-subtitle" id="sidebarSubtitle"></div>
+    <div class="sidebar-inner">
+      <div class="sidebar-brand">
+        <a href="../index.html" title="Ir a la página principal"><img class="mark" src="../assets/logo-icon.png" alt="KhipuCore"></a>
+        <div class="sidebar-brand-text">
+          <input class="biz-name" id="bizName" value="${escapeHtml(config.bizName || 'Gestor de Datos Empresariales')}" />
+          <div class="sidebar-subtitle" id="sidebarSubtitle"></div>
+        </div>
+        <button type="button" class="sidebar-collapse-btn" id="btnColapsarSidebar" title="Contraer menú" aria-label="Contraer menú">${ICONO_CHEVRON}</button>
       </div>
+      <nav class="sidebar-nav">
+        ${!sinSesion ? `
+          <div class="sidebar-group">
+            <div class="sidebar-group-label">Principal</div>
+            ${itemHtml({ id: 'inicio', label: 'Inicio', icon: '🏠', href: 'inicio.html' }, paginaActualId === 'inicio')}
+          </div>` : ''}
+        ${gruposHtml}
+        ${seccionAdmin.length ? `
+          <div class="sidebar-group">
+            <div class="sidebar-group-label">Administración</div>
+            ${seccionAdmin.map(m => itemHtml(m, m.id === paginaActualId)).join('')}
+          </div>` : ''}
+      </nav>
+      <div class="sidebar-footer" id="sidebarFooter"></div>
+      ${khipuAiEntradaHtml(config)}
     </div>
-    <nav class="sidebar-nav">
-      ${!sinSesion ? `
-        <div class="sidebar-group">
-          ${itemHtml({ id: 'inicio', label: 'Inicio', icon: '🏠', href: 'inicio.html' }, paginaActualId === 'inicio')}
-        </div>` : ''}
-      ${modulosPrincipales.length ? `
-        <div class="sidebar-group">
-          <div class="sidebar-group-label">Módulo principal</div>
-          ${modulosPrincipales.map(m => itemHtml({ ...m, href: m.page }, m.id === paginaActualId)).join('')}
-        </div>` : ''}
-      ${seccionConfig.length ? `
-        <div class="sidebar-group">
-          <div class="sidebar-group-label">Configuración</div>
-          ${seccionConfig.map(m => itemHtml(m, m.id === paginaActualId)).join('')}
-        </div>` : ''}
-    </nav>
-    <div class="sidebar-footer" id="sidebarFooter"></div>
   `;
 
   renderSidebarFooter();
   asegurarControlesMovil();
+  aplicarEstadoColapsado();
+  wireKhipuAiEntrada();
+}
+
+// Entrada fija de Khipu AI al pie del sidebar (Rediseño v3): mismo gate que
+// el botón flotante (components/khipuAiWidget.js) -- módulo habilitado por
+// la empresa Y permiso del usuario -- para que no aparezca una entrada que
+// lleva a algo que ese usuario/empresa no tiene. Al hacer clic dispara un
+// evento global (ver khipuAiWidget.js) en vez de abrir su propia ventana:
+// es un segundo punto de entrada al MISMO chat, no un chat aparte.
+function khipuAiEntradaHtml(config) {
+  const habilitado = !!buscarModulo(config, 'khipu_ai') && tienePermiso('khipu_ai.ver');
+  if (!habilitado) return '';
+  return `
+    <button type="button" class="sidebar-khipu-ai" id="sidebarKhipuAiTrigger" title="Abrir Khipu AI">
+      <div class="sidebar-khipu-ai-icon">${ICONO_SPARK}</div>
+      <div class="sidebar-footer-info">
+        <div class="sidebar-footer-nombre">Khipu AI</div>
+        <div class="sidebar-footer-rol">Asistente empresarial</div>
+      </div>
+      <span class="sidebar-khipu-ai-chevron">›</span>
+    </button>`;
+}
+
+function wireKhipuAiEntrada() {
+  document.getElementById('sidebarKhipuAiTrigger')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('khipu-ai:abrir'));
+  });
+}
+
+// Colapsar/expandir el sidebar en desktop (v3): estado persistido en
+// localStorage porque esto NO es una SPA -- cada página carga de cero y
+// renderSidebar() corre de nuevo, así que sin persistencia el sidebar
+// "saltaría" a expandido en cada clic de navegación.
+function aplicarEstadoColapsado() {
+  const sidebar = document.getElementById('sidebar');
+  const btn = document.getElementById('btnColapsarSidebar');
+  if (!sidebar || !btn) return;
+
+  function pintar(colapsado) {
+    sidebar.classList.toggle('colapsado', colapsado);
+    btn.title = colapsado ? 'Expandir menú' : 'Contraer menú';
+    btn.setAttribute('aria-label', btn.title);
+  }
+
+  pintar(localStorage.getItem(CLAVE_COLAPSADO) === '1');
+  btn.addEventListener('click', () => {
+    const colapsado = !sidebar.classList.contains('colapsado');
+    localStorage.setItem(CLAVE_COLAPSADO, colapsado ? '1' : '0');
+    pintar(colapsado);
+  });
 }
 
 // Ícono de pestaña del navegador -- se agrega una sola vez por página, acá

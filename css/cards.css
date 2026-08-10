@@ -3,6 +3,9 @@
 .kpi-card .label{ font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:600; }
 .kpi-card .value{ font-size:26px; font-weight:700; margin-top:6px; }
 .kpi-card .sub{ font-size:12px; color:var(--muted); margin-top:4px; }
+.kpi-card-delta{ font-family:var(--font-mono); font-size:12px; margin-top:4px; display:inline-flex; align-items:center; gap:4px; }
+.kpi-card-delta.up{ color:var(--green); }
+.kpi-card-delta.down{ color:var(--danger); }
 
 /* Variante con ícono de color (solo pages/inicio.html: son 5 métricas fijas
    de negocio, cada una con un significado propio -- a diferencia de las
@@ -30,8 +33,37 @@
 
 .grid-2{ display:grid; grid-template-columns:1.6fr 1fr; gap:22px; margin-bottom:28px; }
 .panel{ background:#fff; border-radius:14px; padding:24px; box-shadow:var(--card-shadow); }
-.panel h3{ font-family:'Inter', sans-serif; font-size:15px; font-weight:700; margin:0 0 18px 0; display:flex; align-items:center; justify-content:space-between; }
-.panel h3 span.tag{ font-family:'Inter'; font-size:11px; font-weight:600; color:var(--muted); background:var(--paper); padding:3px 8px; border-radius:20px; border:1px solid var(--paper-line); }
+.panel h3{ font-family:var(--font-display); font-size:15px; font-weight:700; margin:0 0 18px 0; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.panel h3 span.tag{ font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--muted); background:var(--paper); padding:3px 8px; border-radius:20px; border:1px solid var(--paper-line); }
+.panel-link{ font-family:var(--font-body); font-size:12px; font-weight:600; color:var(--ochre-deep); text-decoration:none; }
+.panel-link:hover{ text-decoration:underline; }
+
+.chart-periodo-select{
+  font-family:var(--font-body); font-size:12px; font-weight:600; padding:5px 8px;
+  border-radius:6px; border:1px solid var(--paper-line); background:#fff; color:var(--ink);
+}
+.chart-periodo-custom{ display:inline-flex; align-items:center; gap:6px; margin-left:6px; }
+.chart-periodo-custom input[type="date"]{
+  font-family:var(--font-body); font-size:12px; padding:4px 6px; border-radius:6px;
+  border:1px solid var(--paper-line); color:var(--ink); color-scheme:light;
+}
+
+/* Selector de período tipo "tabs segmentadas" -- pensado para reusarse en
+   cualquier dashboard bespoke que necesite elegir un rango (Ventas es el
+   primero; Clientes/Finanzas/etc. pueden reusar esto tal cual). */
+.periodo-bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; margin-bottom:20px; flex-wrap:wrap; }
+.periodo-tabs{ display:inline-flex; background:var(--paper); border-radius:10px; padding:3px; gap:2px; }
+.periodo-tab{
+  font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--muted);
+  background:none; border:none; padding:7px 14px; border-radius:8px; cursor:pointer; transition:background .14s, color .14s;
+}
+.periodo-tab:hover{ color:var(--ink); }
+.periodo-tab.activo{ background:#fff; color:var(--ink); box-shadow:var(--card-shadow); }
+.periodo-custom-range{ display:inline-flex; align-items:center; gap:6px; }
+.periodo-custom-range input[type="date"]{
+  font-family:var(--font-body); font-size:12px; padding:5px 8px; border-radius:6px;
+  border:1px solid var(--paper-line); color:var(--ink); color-scheme:light;
+}
 
 .chart-wrap{ position:relative; height:280px; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .chart-wrap canvas{ max-width:100%; max-height:100%; }
@@ -53,11 +85,15 @@
 .rank-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--paper-line); font-size:13px; }
 .rank-row:last-child{ border-bottom:none; }
 .rank-num{
-  font-family:'Inter', sans-serif; font-weight:700; font-size:11px; color:var(--teal-deep); background:var(--teal-soft);
+  font-family:var(--font-mono); font-weight:600; font-size:11px; color:var(--teal-deep); background:var(--teal-soft);
   width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 .rank-name{ flex:1; font-weight:500; }
 .rank-val{ font-weight:600; }
+
+.stock-risk-badge{ font-family:var(--font-mono); font-size:10px; font-weight:600; padding:2px 7px; border-radius:20px; white-space:nowrap; }
+.stock-risk-bajo{ color:var(--orange); background:var(--orange-soft); }
+.stock-risk-critico{ color:var(--danger); background:#FBEAF0; }
 
 .cat-row{ margin-bottom:12px; }
 .cat-row .top{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px; }
@@ -66,8 +102,8 @@
 
 .secundarios-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
 .sec-chart-panel{ border:1px solid var(--paper-line); border-radius:8px; padding:14px; }
-.sec-chart-panel h4{ font-family:'Inter', sans-serif; font-size:14px; font-weight:700; margin:0 0 10px 0; display:flex; align-items:center; justify-content:space-between; }
-.sec-chart-panel .tag{ font-family:'Inter'; font-size:10px; font-weight:600; color:var(--muted); background:var(--paper); padding:2px 7px; border-radius:20px; border:1px solid var(--paper-line); }
+.sec-chart-panel h4{ font-family:var(--font-display); font-size:14px; font-weight:700; margin:0 0 10px 0; display:flex; align-items:center; justify-content:space-between; }
+.sec-chart-panel .tag{ font-family:var(--font-mono); font-size:10px; font-weight:600; color:var(--muted); background:var(--paper); padding:2px 7px; border-radius:20px; border:1px solid var(--paper-line); }
 
 @media (max-width: 820px){
   .kpis{ grid-template-columns:1fr; }

@@ -8,7 +8,7 @@
 
 import { fmtCorto, fmtNum } from './utils.js';
 
-const GRID = '#E6E8F0';
+const GRID = '#E1E7F0';
 
 // Colores para gráficos con varias porciones/series a la vez (dona, barras
 // agrupadas). Se repite en orden -- con las 8 categorías que ya recorta el

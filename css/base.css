@@ -1,40 +1,52 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 /* Estas variables son el "tema". En la Fase de temas, cada archivo en
    css/themes/*.css redefine este mismo set de variables.
-   Rediseño (UI/UX v2): paleta tipo "dashboard SaaS" -- sidebar azul marino,
-   acento coral, e íconos de color por métrica (azul/verde/naranja/morado).
-   Los tonos de acento no son inventados: son los mismos que ya vivían
-   sueltos en el código (role-badge, login-feature-icon, sidebar-item.active
-   viejo) ahora reunidos en variables con nombre. */
+   Rediseño (UI/UX v3): migra la paleta "dashboard SaaS" de antes al mismo
+   sistema navy/cyan ya usado en index.html (landing) y pages/login.html --
+   se mantienen los MISMOS nombres de variable (para no tocar cada archivo
+   que ya las consume) pero los valores ahora salen de ese sistema, no se
+   inventan. Ver el detalle de cada reasignación en el plan de esta fase.
+   --paper es la única excepción deliberada: en la landing significa
+   "superficie blanca pura", pero acá significa "fondo hundido/gris" (bg de
+   inputs, hover de filas) -- ponerlo blanco puro haría esos estados
+   invisibles contra las tarjetas blancas, así que usa un gris muy sutil ya
+   aprobado en la landing (.browser-chrome) en vez del --paper de ahí. */
 :root{
-  --ink:#152667;
-  --paper:#F3F4F9;
-  --paper-line:#E6E8F0;
-  --ochre:#E3B23C;
-  --ochre-deep:#B8871F;
-  --teal:#3DE1DC;
-  --teal-deep:#00B3CD;
-  --teal-soft:#DDF8F6;
-  --coral:#E85C4A;
-  --coral-deep:#C8493A;
-  --blue:#006CA1;
-  --blue-soft:#DAEFF4;
-  --green:#0F6E56;
-  --green-soft:#E1F5EE;
-  --orange:#B8871F;
-  --orange-soft:#FCEFD8;
+  --ink:#0E1B45;
+  --paper:#F4F7FB;
+  --paper-line:#E1E7F0;
+  --ochre:#2EE2CE;
+  --ochre-deep:#1C6F96;
+  --teal:#0FA69C;
+  --teal-deep:#1C6F96;
+  --teal-soft:#E3FBF6;
+  --coral:#C4544B;
+  --coral-deep:#99423B;
+  --blue:#1C6F96;
+  --blue-soft:#DDEEF4;
+  --green:#0C8E6B;
+  --green-soft:#DFF4EC;
+  --orange:#C98A3C;
+  --orange-soft:#F8EAD4;
   --purple:#5B4FE0;
   --purple-soft:#EDEBFB;
-  --muted:#5C6B8A;
-  --card-shadow: 0 1px 0 rgba(20,33,61,0.06), 0 8px 24px -12px rgba(20,33,61,0.18);
+  --muted:#4E5A78;
+  --card-shadow: 0 1px 2px rgba(14,27,69,0.04), 0 8px 24px -12px rgba(14,27,69,0.18);
+
+  --cyan:#2EE2CE;
+  --danger:#C4544B;
+  --font-display:'Bricolage Grotesque','Inter',sans-serif;
+  --font-body:'Inter','Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono', ui-monospace, monospace;
 }
 *{ box-sizing:border-box; }
 body{
   margin:0; background:var(--paper);
-  color:var(--ink); font-family:'Inter', sans-serif; -webkit-font-smoothing:antialiased;
+  color:var(--ink); font-family:var(--font-body); -webkit-font-smoothing:antialiased;
 }
-.num{ font-family:'Inter', sans-serif; }
+h1,h2,h3,h4{ font-family:var(--font-display); }
+.num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 
 /* Ícono de marca (assets/logo-icon.png). Lo usan el sidebar
    (components/sidebar.js, ver css/layout.css para el tamaño específico ahí),

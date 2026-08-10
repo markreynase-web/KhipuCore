@@ -19,6 +19,13 @@ import { tienePermiso, haySesionActiva } from './sesion.js';
 import { ESQUEMAS } from './esquemas.js';
 import { crearRegistro } from './api.js';
 import { crearGraficoLineasComparativo } from './charts.js';
+import { renderVentasDashboard } from './ventasDashboard.js';
+
+// Rediseño v3: algunos módulos reemplazan por completo el motor genérico de
+// dashboard.js con su propia "Vista Ejecutiva" (KPIs/gráficos pensados para
+// lo que ese módulo necesita, no columnas auto-detectadas de un CSV). Un
+// módulo sin entrada acá sigue usando renderTodo() tal cual, sin cambios.
+const RENDERERS_BESPOKE = { ventas: renderVentasDashboard };
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,
 // inventario.html, clientes.html, ...) declara el suyo en <body data-modulo="...">,
@@ -116,6 +123,20 @@ function opcionesGraficoPrincipal() {
 
 async function refrescarDesdeBackend() {
   if (!backendActivo) return;
+
+  const renderBespoke = RENDERERS_BESPOKE[NAMESPACE];
+  if (renderBespoke) {
+    // Filas crudas, no las transformadas de modoBackend.js -- esas solo
+    // guardan _fecha/_numero/_cat1/_cat2 (lo que necesita el motor
+    // genérico) y pierden cliente_id/producto_id y el resto de columnas
+    // reales que un dashboard bespoke sí necesita. Sin filtro de fecha acá:
+    // cada dashboard bespoke trae su propio selector de período y filtra
+    // client-side (mismo patrón ya usado en Inicio).
+    const filas = await backendActivo.listarCrudo({});
+    renderBespoke(filas);
+    return;
+  }
+
   const fuente = await backendActivo.obtenerFuente({
     desde: document.getElementById('fechaDesde').value || undefined,
     hasta: document.getElementById('fechaHasta').value || undefined
