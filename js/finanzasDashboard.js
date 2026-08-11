@@ -14,13 +14,15 @@
 
 import { fmtNum, escapeHtml } from './utils.js';
 import { filtrarPeriodo } from './filters.js';
-import { crearGraficoLineasComparativo } from './charts.js';
+import { crearGraficoLineasComparativo, crearGraficoDona, crearGraficoLineaFecha } from './charts.js';
 import { kpiCard } from './kpiCard.js';
 
 let filasCache = [];
 let periodoActual = 'mes';
 let eventosListos = false;
 let chartTendencia = null;
+let chartIngresos = null;
+let chartMargen = null;
 
 function rangoDePeriodo(periodo) {
   const hoy = new Date();
@@ -73,6 +75,8 @@ function dibujar() {
   dibujarTendencia(actual);
   dibujarCategorias(actual);
   dibujarMovimientos(actual);
+  dibujarIngresosPorCategoria(actual);
+  dibujarMargenEnElTiempo(actual);
 }
 
 function dibujarVacio() {
@@ -81,6 +85,8 @@ function dibujarVacio() {
   document.getElementById('finChartTendenciaWrap').innerHTML = '';
   document.getElementById('finCategorias').innerHTML = '';
   document.getElementById('finMovimientos').innerHTML = '<div class="rank-row">Elegí un rango de fechas para ver el resumen.</div>';
+  document.getElementById('finChartIngresosWrap').innerHTML = '';
+  document.getElementById('finChartMargenWrap').innerHTML = '';
 }
 
 function dibujarHero(actual, anterior) {
@@ -202,4 +208,60 @@ function dibujarMovimientos(actual) {
       <div class="movimiento-monto ${esIngreso ? 'ingreso' : 'egreso'}">${esIngreso ? '+' : '−'}${fmtNum(Number(f.monto) || 0)}</div>
     </div>`;
   }).join('') : '<div class="rank-row">Sin movimientos en este período.</div>';
+}
+
+// Distinto de "Gastos por categoría" (que muestra egresos): acá es de dónde
+// viene la plata, no en qué se va -- misma forma (dona) que Categorías de
+// Ventas, dato completamente distinto.
+function dibujarIngresosPorCategoria(actual) {
+  const ingresos = actual.filter(f => f.tipo === 'ingreso');
+  const porCategoria = new Map();
+  ingresos.forEach(f => {
+    const cat = f.categoria || 'Sin categoría';
+    porCategoria.set(cat, (porCategoria.get(cat) || 0) + (Number(f.monto) || 0));
+  });
+  const entradas = [...porCategoria.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  const wrap = document.getElementById('finChartIngresosWrap');
+  wrap.innerHTML = '<canvas id="finChartIngresos"></canvas>';
+  if (chartIngresos) { chartIngresos.destroy(); chartIngresos = null; }
+  if (!entradas.length) {
+    wrap.innerHTML = '<div class="chart-empty">Sin ingresos en este período.</div>';
+    return;
+  }
+  const ctx = document.getElementById('finChartIngresos').getContext('2d');
+  chartIngresos = crearGraficoDona(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]) });
+}
+
+// Distinto del balance (monto absoluto): acá es el % que queda de cada peso
+// de ingreso, mes a mes -- agrupado por mes (no por día) para que se lea
+// bien sin importar si el período elegido son 30 días o el año completo.
+// Los meses sin ingresos se omiten -- un margen "0%" sin ingresos sería
+// inventado, no un dato real.
+function dibujarMargenEnElTiempo(actual) {
+  const porMes = new Map();
+  actual.forEach(f => {
+    if (!f._fecha) return;
+    const mes = f._fecha.slice(0, 7);
+    const acc = porMes.get(mes) || { ingresos: 0, egresos: 0 };
+    if (f.tipo === 'ingreso') acc.ingresos += Number(f.monto) || 0;
+    else acc.egresos += Number(f.monto) || 0;
+    porMes.set(mes, acc);
+  });
+  const conIngreso = [...porMes.keys()].sort().filter(m => porMes.get(m).ingresos > 0);
+
+  const wrap = document.getElementById('finChartMargenWrap');
+  wrap.innerHTML = '<canvas id="finChartMargen"></canvas>';
+  if (chartMargen) { chartMargen.destroy(); chartMargen = null; }
+  if (!conIngreso.length) {
+    wrap.innerHTML = '<div class="chart-empty">Sin ingresos suficientes para calcular el margen en este período.</div>';
+    return;
+  }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim();
+  const ctx = document.getElementById('finChartMargen').getContext('2d');
+  chartMargen = crearGraficoLineaFecha(ctx, {
+    fechas: conIngreso,
+    valores: conIngreso.map(m => { const d = porMes.get(m); return ((d.ingresos - d.egresos) / d.ingresos) * 100; }),
+    label: 'Margen neto %', color, colorFondo: 'rgba(28,111,150,0.12)'
+  });
 }

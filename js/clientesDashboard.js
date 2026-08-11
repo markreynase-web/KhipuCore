@@ -17,6 +17,7 @@ import { fmtNum, escapeHtml } from './utils.js';
 import { filtrarPeriodo } from './filters.js';
 import { kpiCard, deltaPorcentaje } from './kpiCard.js';
 import { abrirPanelLateral } from '../components/panelLateral.js';
+import { crearGraficoDona, crearGraficoBarras } from './charts.js';
 
 const SEGMENTOS = {
   vip:           { label: 'VIP',           icono: '👑' },
@@ -38,6 +39,10 @@ let postventaCache = [];
 let periodoActual = 'mes';
 let segmentoFiltro = null;
 let eventosListos = false;
+let chartSegmento = null;
+let chartNuevos = null;
+let chartValor = null;
+let chartFrecuencia = null;
 
 function rangoDePeriodo(periodo) {
   const hoy = new Date();
@@ -136,6 +141,10 @@ function dibujar() {
   dibujarKpis(desde, hasta, segmentados);
   dibujarSegmentos(segmentados);
   dibujarLista(segmentados);
+  dibujarChartSegmento(segmentados);
+  dibujarChartNuevosPorMes();
+  dibujarChartValorPorSegmento(segmentados);
+  dibujarChartFrecuencia(segmentados);
 }
 
 function dibujarKpis(desde, hasta, segmentados) {
@@ -204,6 +213,98 @@ function dibujarLista(segmentados) {
       </div>
     </div>`;
   }).join('') : '<div class="rank-row">No hay clientes en este segmento.</div>';
+}
+
+// Complementa los chips de segmento (que ya muestran el conteo como
+// número) con la proporción visual -- útil quando hay varios segmentos con
+// conteos parecidos y cuesta comparar solo con números.
+function dibujarChartSegmento(segmentados) {
+  const conteos = new Map();
+  segmentados.forEach(c => { const meta = SEGMENTOS[c._segmento]; conteos.set(meta.label, (conteos.get(meta.label) || 0) + 1); });
+  const entradas = [...conteos.entries()].filter(([, n]) => n > 0);
+
+  const wrap = document.getElementById('clientesChartSegmentoWrap');
+  wrap.innerHTML = '<canvas id="clientesChartSegmento"></canvas>';
+  if (chartSegmento) { chartSegmento.destroy(); chartSegmento = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Sin clientes registrados.</div>'; return; }
+  const ctx = document.getElementById('clientesChartSegmento').getContext('2d');
+  chartSegmento = crearGraficoDona(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]) });
+}
+
+// Independiente de los tabs de período de arriba (esos solo afectan los
+// KPIs) -- acá siempre se muestra una ventana fija de 12 meses porque es un
+// gráfico de tendencia de adquisición, no un corte puntual.
+function dibujarChartNuevosPorMes() {
+  const hoy = new Date();
+  const meses = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const conteoPorMes = new Map(meses.map(m => [m, 0]));
+  clientesCache.forEach(c => {
+    if (!c.fecha_registro) return;
+    const mes = String(c.fecha_registro).slice(0, 7);
+    if (conteoPorMes.has(mes)) conteoPorMes.set(mes, conteoPorMes.get(mes) + 1);
+  });
+
+  const wrap = document.getElementById('clientesChartNuevosWrap');
+  wrap.innerHTML = '<canvas id="clientesChartNuevos"></canvas>';
+  if (chartNuevos) { chartNuevos.destroy(); chartNuevos = null; }
+  const etiquetas = meses.map(m => { const [y, mm] = m.split('-'); return new Date(Number(y), Number(mm) - 1, 1).toLocaleDateString('es-PE', { month: 'short', year: '2-digit' }); });
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim();
+  const ctx = document.getElementById('clientesChartNuevos').getContext('2d');
+  chartNuevos = crearGraficoBarras(ctx, { etiquetas, valores: meses.map(m => conteoPorMes.get(m)), label: 'Clientes nuevos', color });
+}
+
+// Distinto de la dona de segmentos (que cuenta clientes): acá se compara
+// cuánto vale en promedio un cliente de cada segmento -- confirma (o no) que
+// los VIP realmente valen más, en vez de asumirlo por el nombre del segmento.
+function dibujarChartValorPorSegmento(segmentados) {
+  const porSegmento = new Map();
+  segmentados.forEach(c => {
+    const acc = porSegmento.get(c._segmento) || { total: 0, cantidad: 0 };
+    acc.total += Number(c.compras_totales) || 0;
+    acc.cantidad += 1;
+    porSegmento.set(c._segmento, acc);
+  });
+  const entradas = Object.keys(SEGMENTOS)
+    .map(id => ({ id, label: SEGMENTOS[id].label, datos: porSegmento.get(id) }))
+    .filter(e => e.datos && e.datos.cantidad > 0);
+
+  const wrap = document.getElementById('clientesChartValorWrap');
+  wrap.innerHTML = '<canvas id="clientesChartValor"></canvas>';
+  if (chartValor) { chartValor.destroy(); chartValor = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Sin clientes registrados.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--purple').trim();
+  const ctx = document.getElementById('clientesChartValor').getContext('2d');
+  chartValor = crearGraficoBarras(ctx, {
+    etiquetas: entradas.map(e => e.label), valores: entradas.map(e => e.datos.total / e.datos.cantidad),
+    label: 'Valor promedio', color
+  });
+}
+
+// Retención en otra forma: no "cuánto vale" (eso es el chart anterior) sino
+// "cuántas veces vuelve" -- cuántos clientes están en cada franja de
+// cantidad de compras. Ayuda a ver si el negocio depende de compradores
+// únicos o de clientes que repiten.
+function dibujarChartFrecuencia(segmentados) {
+  const franjas = [
+    { label: '0 compras', test: n => n === 0 },
+    { label: '1 compra', test: n => n === 1 },
+    { label: '2-3 compras', test: n => n >= 2 && n <= 3 },
+    { label: '4-6 compras', test: n => n >= 4 && n <= 6 },
+    { label: '7+ compras', test: n => n >= 7 }
+  ];
+  const conteos = franjas.map(f => segmentados.filter(c => f.test(c._compras)).length);
+
+  const wrap = document.getElementById('clientesChartFrecuenciaWrap');
+  wrap.innerHTML = '<canvas id="clientesChartFrecuencia"></canvas>';
+  if (chartFrecuencia) { chartFrecuencia.destroy(); chartFrecuencia = null; }
+  if (!segmentados.length) { wrap.innerHTML = '<div class="chart-empty">Sin clientes registrados.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim();
+  const ctx = document.getElementById('clientesChartFrecuencia').getContext('2d');
+  chartFrecuencia = crearGraficoBarras(ctx, { etiquetas: franjas.map(f => f.label), valores: conteos, label: 'Clientes', color });
 }
 
 function abrirPerfilCliente(id) {

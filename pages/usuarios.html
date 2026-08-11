@@ -50,6 +50,25 @@
           </div>
         </div>
       </div>
+
+      <div class="secundarios-grid">
+        <div class="sec-chart-panel">
+          <h4>Usuarios por rol <span class="tag">Distribución</span></h4>
+          <div class="chart-wrap" id="usrChartRolWrap" style="height:200px;"><canvas id="usrChartRol"></canvas></div>
+        </div>
+        <div class="sec-chart-panel">
+          <h4>Activos vs. inactivos <span class="tag">Proporción</span></h4>
+          <div class="chart-wrap" id="usrChartEstadoWrap" style="height:200px;"><canvas id="usrChartEstado"></canvas></div>
+        </div>
+        <div class="sec-chart-panel">
+          <h4>Usuarios nuevos <span class="tag">Últimos 6 meses</span></h4>
+          <div class="chart-wrap" id="usrChartNuevosWrap" style="height:200px;"><canvas id="usrChartNuevos"></canvas></div>
+        </div>
+        <div class="sec-chart-panel">
+          <h4>Permisos por módulo <span class="tag">Todos los roles</span></h4>
+          <div class="chart-wrap" id="usrChartPermisosWrap" style="height:200px;"><canvas id="usrChartPermisos"></canvas></div>
+        </div>
+      </div>
     </main>
 
     <footer></footer>
@@ -68,11 +87,30 @@ import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLatera
 import { renderFormulario } from '../components/formularioRegistro.js';
 import { escapeHtml, fmtNum } from '../js/utils.js';
 import { kpiCard } from '../js/kpiCard.js';
+import { crearGraficoDona, crearGraficoBarras } from '../js/charts.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
 let config;
 let roles = [];
+let chartRol = null;
+let chartEstado = null;
+let chartNuevos = null;
+let chartPermisos = null;
+
+function ultimosNMeses(n) {
+  const hoy = new Date();
+  const meses = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return meses;
+}
+function etiquetaMes(mesStr) {
+  const [y, mm] = mesStr.split('-');
+  return new Date(Number(y), Number(mm) - 1, 1).toLocaleDateString('es-PE', { month: 'short', year: '2-digit' });
+}
 
 async function pedirRoles() {
   const sesion = obtenerSesion();
@@ -115,6 +153,7 @@ async function cargarTabla() {
   const usuarios = await listarRegistros(config.apiBaseUrl, 'usuarios');
   if (!usuarios) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
   dibujarKpis(usuarios);
+  dibujarChartsUsuarios(usuarios);
   if (!usuarios.length) { cont.innerHTML = '<p class="tabla-vacia">No hay usuarios registrados todavía.</p>'; return; }
 
   const puedeEditar = tienePermiso('usuarios.editar');
@@ -263,6 +302,86 @@ function dibujarRoles() {
   });
 }
 
+// Distinto de "Administradores" (un solo número en los KPIs): acá se ve la
+// composición completa por rol, no solo el más privilegiado.
+function dibujarChartRol(usuarios) {
+  const porRol = new Map();
+  usuarios.forEach(u => { const r = u.rol || 'Sin rol'; porRol.set(r, (porRol.get(r) || 0) + 1); });
+  const entradas = [...porRol.entries()].sort((a, b) => b[1] - a[1]);
+
+  const wrap = document.getElementById('usrChartRolWrap');
+  wrap.innerHTML = '<canvas id="usrChartRol"></canvas>';
+  if (chartRol) { chartRol.destroy(); chartRol = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Sin usuarios registrados.</div>'; return; }
+  const ctx = document.getElementById('usrChartRol').getContext('2d');
+  chartRol = crearGraficoDona(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]) });
+}
+
+function dibujarChartEstado(usuarios) {
+  const activos = usuarios.filter(u => u.activo).length;
+  const inactivos = usuarios.length - activos;
+  const entradas = [['Activos', activos], ['Inactivos', inactivos]].filter(([, n]) => n > 0);
+
+  const wrap = document.getElementById('usrChartEstadoWrap');
+  wrap.innerHTML = '<canvas id="usrChartEstado"></canvas>';
+  if (chartEstado) { chartEstado.destroy(); chartEstado = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Sin usuarios registrados.</div>'; return; }
+  const COLOR = { 'Activos': '#0F6E56', 'Inactivos': '#C4544B' };
+  const ctx = document.getElementById('usrChartEstado').getContext('2d');
+  chartEstado = crearGraficoDona(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]), colores: entradas.map(e => COLOR[e[0]]) });
+}
+
+// Crecimiento del equipo -- usa u.creado_el (sí existe en la respuesta de
+// GET /api/usuarios, confirmado en backend/src/routes/usuarios.js).
+function dibujarChartNuevos(usuarios) {
+  const meses = ultimosNMeses(6);
+  const conteoPorMes = new Map(meses.map(m => [m, 0]));
+  usuarios.forEach(u => {
+    if (!u.creado_el) return;
+    const mes = String(u.creado_el).slice(0, 7);
+    if (conteoPorMes.has(mes)) conteoPorMes.set(mes, conteoPorMes.get(mes) + 1);
+  });
+
+  const wrap = document.getElementById('usrChartNuevosWrap');
+  wrap.innerHTML = '<canvas id="usrChartNuevos"></canvas>';
+  if (chartNuevos) { chartNuevos.destroy(); chartNuevos = null; }
+  const total = [...conteoPorMes.values()].reduce((s, n) => s + n, 0);
+  if (!total) { wrap.innerHTML = '<div class="chart-empty">Sin altas de usuario en los últimos 6 meses.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim();
+  const ctx = document.getElementById('usrChartNuevos').getContext('2d');
+  chartNuevos = crearGraficoBarras(ctx, { etiquetas: meses.map(etiquetaMes), valores: meses.map(m => conteoPorMes.get(m)), label: 'Usuarios nuevos', color });
+}
+
+function dibujarChartsUsuarios(usuarios) {
+  dibujarChartRol(usuarios);
+  dibujarChartEstado(usuarios);
+  dibujarChartNuevos(usuarios);
+}
+
+// Dónde se concentra el acceso a través de TODOS los roles configurados --
+// distinto del panel "Roles y permisos" (que muestra el detalle de un rol a
+// la vez, al hacer clic). Reusa la misma convención "modulo.accion" que
+// agruparPermisos() ya usa para el panel lateral de un rol puntual.
+function dibujarChartPermisos() {
+  const porModulo = new Map();
+  roles.forEach(r => {
+    (r.permisos || []).forEach(p => {
+      const [modulo] = p.split('.');
+      if (!modulo) return;
+      porModulo.set(modulo, (porModulo.get(modulo) || 0) + 1);
+    });
+  });
+  const entradas = [...porModulo.entries()].sort((a, b) => b[1] - a[1]);
+
+  const wrap = document.getElementById('usrChartPermisosWrap');
+  wrap.innerHTML = '<canvas id="usrChartPermisos"></canvas>';
+  if (chartPermisos) { chartPermisos.destroy(); chartPermisos = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Sin roles configurados todavía.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--purple').trim();
+  const ctx = document.getElementById('usrChartPermisos').getContext('2d');
+  chartPermisos = crearGraficoBarras(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]), label: 'Permisos otorgados', color });
+}
+
 function abrirEdicion(usuario) {
   abrirPanelLateral({
     titulo: `Editar usuario`,
@@ -340,6 +459,7 @@ function abrirNuevoUsuario() {
 
   roles = await pedirRoles();
   dibujarRoles();
+  dibujarChartPermisos();
 
   const btnNuevo = document.getElementById('btnNuevoUsuario');
   if (tienePermiso('usuarios.crear')) {

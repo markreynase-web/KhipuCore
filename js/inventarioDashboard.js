@@ -24,8 +24,13 @@
 import { fmtNum, escapeHtml } from './utils.js';
 import { kpiCard } from './kpiCard.js';
 import { nivelRiesgoStock } from './stockRisk.js';
+import { crearGraficoDona, crearGraficoBarrasComparativo, crearGraficoBarras } from './charts.js';
 
 const VENTANA_VELOCIDAD_DIAS = 30;
+
+let chartRiesgo = null;
+let chartCostoVenta = null;
+let chartVencimientos = null;
 
 function diasHasta(fechaStr) {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -65,6 +70,9 @@ function dibujar(productos, ventas) {
   dibujarCategorias(conVelocidad);
   dibujarMasVendidos(ventas);
   dibujarVencimientos(conVelocidad);
+  dibujarChartRiesgo(conVelocidad);
+  dibujarChartCostoVenta(conVelocidad);
+  dibujarChartVencimientosPorMes(conVelocidad);
 }
 
 function dibujarKpis(productos) {
@@ -159,4 +167,87 @@ function dibujarVencimientos(productos) {
     const urgente = dias <= 7;
     return `<div class="rank-row"><span class="rank-name">${escapeHtml(p.nombre)}</span><span class="rank-val" style="${urgente ? 'color:var(--danger);' : ''}">${escapeHtml(String(p.fecha_vencimiento).slice(0, 10))}${dias < 0 ? ' (vencido)' : ` (${dias} día${dias === 1 ? '' : 's'})`}</span></div>`;
   }).join('') : '<div class="rank-row">Ningún producto vence en los próximos 30 días.</div>';
+}
+
+// Distinto de la lista "Alertas de stock" (que muestra los productos uno
+// por uno, ordenados): acá es la proporción del catálogo completo en cada
+// nivel -- responde "¿qué tan grave es la situación en general?", no
+// "¿cuáles son los peores?".
+function dibujarChartRiesgo(productos) {
+  let critico = 0, bajo = 0, normal = 0;
+  productos.forEach(p => {
+    const riesgo = nivelRiesgoStock(p.stock, p.stock_minimo);
+    if (!riesgo) normal++;
+    else if (riesgo.nivel === 'critico') critico++;
+    else bajo++;
+  });
+  const COLOR_POR_NIVEL = { 'Normal': '#0F6E56', 'Bajo': '#C98A3C', 'Crítico': '#C4544B' };
+  const entradas = [['Normal', normal], ['Bajo', bajo], ['Crítico', critico]].filter(([, n]) => n > 0);
+
+  const wrap = document.getElementById('invChartRiesgoWrap');
+  wrap.innerHTML = '<canvas id="invChartRiesgo"></canvas>';
+  if (chartRiesgo) { chartRiesgo.destroy(); chartRiesgo = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Todavía no hay productos registrados.</div>'; return; }
+  const ctx = document.getElementById('invChartRiesgo').getContext('2d');
+  chartRiesgo = crearGraficoDona(ctx, {
+    etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]),
+    colores: entradas.map(e => COLOR_POR_NIVEL[e[0]])
+  });
+}
+
+// Distinto de "Valor por categoría" (que muestra un solo número, el valor a
+// costo): acá se comparan costo y precio de venta lado a lado, categoría
+// por categoría -- deja ver dónde está el margen y dónde no.
+function dibujarChartCostoVenta(productos) {
+  const porCategoria = new Map();
+  productos.forEach(p => {
+    const cat = p.categoria || 'Sin categoría';
+    const acc = porCategoria.get(cat) || { costo: 0, venta: 0 };
+    acc.costo += (Number(p.stock) || 0) * (Number(p.costo_unitario) || 0);
+    acc.venta += (Number(p.stock) || 0) * (Number(p.precio_unitario) || 0);
+    porCategoria.set(cat, acc);
+  });
+  const entradas = [...porCategoria.entries()].sort((a, b) => b[1].venta - a[1].venta).slice(0, 8);
+
+  const wrap = document.getElementById('invChartCostoVentaWrap');
+  wrap.innerHTML = '<canvas id="invChartCostoVenta"></canvas>';
+  if (chartCostoVenta) { chartCostoVenta.destroy(); chartCostoVenta = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Todavía no hay productos registrados.</div>'; return; }
+  const estilos = getComputedStyle(document.documentElement);
+  const ctx = document.getElementById('invChartCostoVenta').getContext('2d');
+  chartCostoVenta = crearGraficoBarrasComparativo(ctx, {
+    etiquetas: entradas.map(e => e[0]),
+    serieA: entradas.map(e => e[1].costo), serieB: entradas.map(e => e[1].venta),
+    labelA: 'Costo', labelB: 'Valor de venta',
+    colorA: estilos.getPropertyValue('--orange').trim(), colorB: estilos.getPropertyValue('--teal').trim()
+  });
+}
+
+// Distinto de "Próximos vencimientos" (lista de productos puntuales, sólo
+// los próximos 30 días): acá es un vistazo más amplio (6 meses) para
+// planificar compras/promos con anticipación, no solo reaccionar a lo
+// inminente.
+function dibujarChartVencimientosPorMes(productos) {
+  const hoy = new Date();
+  const meses = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const conteoPorMes = new Map(meses.map(m => [m, 0]));
+  productos.forEach(p => {
+    if (!p.fecha_vencimiento) return;
+    const mes = String(p.fecha_vencimiento).slice(0, 7);
+    if (conteoPorMes.has(mes)) conteoPorMes.set(mes, conteoPorMes.get(mes) + 1);
+  });
+
+  const wrap = document.getElementById('invChartVencimientosWrap');
+  wrap.innerHTML = '<canvas id="invChartVencimientos"></canvas>';
+  if (chartVencimientos) { chartVencimientos.destroy(); chartVencimientos = null; }
+  const totalVencimientos = [...conteoPorMes.values()].reduce((s, n) => s + n, 0);
+  if (!totalVencimientos) { wrap.innerHTML = '<div class="chart-empty">Sin vencimientos en los próximos 6 meses.</div>'; return; }
+  const etiquetas = meses.map(m => { const [y, mm] = m.split('-'); return new Date(Number(y), Number(mm) - 1, 1).toLocaleDateString('es-PE', { month: 'short', year: '2-digit' }); });
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+  const ctx = document.getElementById('invChartVencimientos').getContext('2d');
+  chartVencimientos = crearGraficoBarras(ctx, { etiquetas, valores: meses.map(m => conteoPorMes.get(m)), label: 'Productos que vencen', color });
 }

@@ -18,14 +18,18 @@
 
 import { fmtNum, escapeHtml } from './utils.js';
 import { filtrarPeriodo } from './filters.js';
-import { crearGraficoLineaFecha, crearGraficoDona } from './charts.js';
+import { crearGraficoLineaFecha, crearGraficoDona, crearGraficoBarras } from './charts.js';
 import { kpiCard, deltaPorcentaje } from './kpiCard.js';
+
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 let filasCache = [];
 let periodoActual = 'mes';
 let eventosListos = false;
 let chartTendencia = null;
 let chartCategoria = null;
+let chartDiaSemana = null;
+let chartTicket = null;
 
 function rangoDePeriodo(periodo) {
   const hoy = new Date();
@@ -83,6 +87,8 @@ function dibujar() {
   dibujarRankingProductos(actual);
   dibujarRankingClientes(actual);
   dibujarCategorias(actual);
+  dibujarDiaSemana(actual);
+  dibujarTicketPromedio(actual);
 }
 
 function dibujarVacio() {
@@ -91,6 +97,8 @@ function dibujarVacio() {
   document.getElementById('ventasChartCategoriaWrap').innerHTML = '';
   document.getElementById('ventasRankProductos').innerHTML = '';
   document.getElementById('ventasRankClientes').innerHTML = '';
+  document.getElementById('ventasChartDiaSemanaWrap').innerHTML = '';
+  document.getElementById('ventasChartTicketWrap').innerHTML = '';
 }
 
 function dibujarKpis(actual, anterior) {
@@ -189,4 +197,59 @@ function dibujarCategorias(actual) {
   }
   const ctx = document.getElementById('ventasChartCategoria').getContext('2d');
   chartCategoria = crearGraficoDona(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]) });
+}
+
+// "¿Qué día vendemos más?" -- distinto de la tendencia diaria (esa muestra
+// evolución en el tiempo); acá se suma todo el período por día de semana,
+// para ver el patrón que se repite semana a semana (útil para promociones,
+// turnos de personal, etc.).
+function dibujarDiaSemana(actual) {
+  const porDia = new Array(7).fill(0); // 0=Lunes .. 6=Domingo
+  actual.forEach(f => {
+    if (!f._fecha) return;
+    const diaJs = new Date(`${f._fecha}T00:00:00`).getDay(); // 0=Domingo..6=Sábado
+    const idx = diaJs === 0 ? 6 : diaJs - 1;
+    porDia[idx] += Number(f.monto) || 0;
+  });
+
+  const wrap = document.getElementById('ventasChartDiaSemanaWrap');
+  wrap.innerHTML = '<canvas id="ventasChartDiaSemana"></canvas>';
+  if (chartDiaSemana) { chartDiaSemana.destroy(); chartDiaSemana = null; }
+  if (!actual.length) {
+    wrap.innerHTML = '<div class="chart-empty">Sin ventas en este período.</div>';
+    return;
+  }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim();
+  const ctx = document.getElementById('ventasChartDiaSemana').getContext('2d');
+  chartDiaSemana = crearGraficoBarras(ctx, { etiquetas: DIAS_SEMANA, valores: porDia, label: 'Ventas', color });
+}
+
+// Ticket promedio por día -- distinto del KPI "Ticket promedio" (que es un
+// solo número del período completo): acá se ve si el ticket promedio sube o
+// baja a lo largo del período, no solo el total vendido (que ya muestra
+// "Tendencia de ventas").
+function dibujarTicketPromedio(actual) {
+  const porDia = new Map(); // fecha -> {total, cantidad}
+  actual.forEach(f => {
+    if (!f._fecha) return;
+    const acc = porDia.get(f._fecha) || { total: 0, cantidad: 0 };
+    acc.total += Number(f.monto) || 0;
+    acc.cantidad += 1;
+    porDia.set(f._fecha, acc);
+  });
+  const fechas = [...porDia.keys()].sort();
+
+  const wrap = document.getElementById('ventasChartTicketWrap');
+  wrap.innerHTML = '<canvas id="ventasChartTicket"></canvas>';
+  if (chartTicket) { chartTicket.destroy(); chartTicket = null; }
+  if (!fechas.length) {
+    wrap.innerHTML = '<div class="chart-empty">Sin ventas en este período.</div>';
+    return;
+  }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--purple').trim();
+  const ctx = document.getElementById('ventasChartTicket').getContext('2d');
+  chartTicket = crearGraficoLineaFecha(ctx, {
+    fechas, valores: fechas.map(f => { const d = porDia.get(f); return d.total / d.cantidad; }),
+    label: 'Ticket promedio', color, colorFondo: 'rgba(91,79,224,0.12)'
+  });
 }

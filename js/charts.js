@@ -93,6 +93,32 @@ export function crearGraficoDona(ctx, { etiquetas, valores, colores = PALETA_CAT
   });
 }
 
+// Dos series en barras agrupadas lado a lado (ej. "Costo vs. valor de venta
+// por categoría", "Abiertos vs. completados por mes") -- mismo patrón de
+// tooltip combinado que crearGraficoLineasComparativo, pero en barras
+// porque acá se compara categorías discretas, no una tendencia continua.
+export function crearGraficoBarrasComparativo(ctx, { etiquetas, serieA, serieB, labelA, labelB, colorA, colorB }) {
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: etiquetas,
+      datasets: [
+        { label: labelA, data: serieA, backgroundColor: colorA, borderRadius: 5, borderSkipped: false, maxBarThickness: 28 },
+        { label: labelB, data: serieB, backgroundColor: colorB, borderRadius: 5, borderSkipped: false, maxBarThickness: 28 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctxItem => ` ${ctxItem.dataset.label}: ${fmtNum(ctxItem.parsed.y)}` } }
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxRotation: 45 } }, y: { grid: { color: GRID } } }
+    }
+  });
+}
+
 export function crearGraficoLineaSecundario(ctx, { fechas, valores, label, color, colorFondo }) {
   return new Chart(ctx, {
     type: 'line',

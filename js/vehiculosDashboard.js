@@ -23,6 +23,7 @@
 import { fmtNum, escapeHtml } from './utils.js';
 import { kpiCard } from './kpiCard.js';
 import { abrirPanelLateral } from '../components/panelLateral.js';
+import { crearGraficoBarras, crearGraficoLineaFecha, crearGraficoDona } from './charts.js';
 
 const ETIQUETA_TIPO = { mantenimiento: 'Mantenimiento', garantia: 'Garantía', reparacion: 'Reparación', revision: 'Revisión' };
 const ETIQUETA_ESTADO = { pendiente: 'Pendiente', en_proceso: 'En proceso', completado: 'Completado' };
@@ -31,6 +32,24 @@ const VENTANA_ALERTA_DIAS = 30;
 let vehiculosCache = [];
 let postventaCache = [];
 let eventosListos = false;
+let chartMarca = null;
+let chartAnio = null;
+let chartGastoTiempo = null;
+let chartGarantia = null;
+
+function ultimosNMeses(n) {
+  const hoy = new Date();
+  const meses = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return meses;
+}
+function etiquetaMes(mesStr) {
+  const [y, mm] = mesStr.split('-');
+  return new Date(Number(y), Number(mm) - 1, 1).toLocaleDateString('es-PE', { month: 'short', year: '2-digit' });
+}
 
 function diasHasta(fechaStr) {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -88,6 +107,10 @@ function dibujar() {
   dibujarFlota(enriquecidos);
   dibujarGasto(enriquecidos);
   dibujarAtencion(enriquecidos);
+  dibujarChartMarca(enriquecidos);
+  dibujarChartAnio(enriquecidos);
+  dibujarChartGastoTiempo();
+  dibujarChartGarantia(enriquecidos);
 }
 
 function dibujarKpis(vehiculos) {
@@ -158,6 +181,88 @@ function dibujarAtencion(vehiculos) {
       <span class="rank-val" style="${dias <= 7 ? 'color:var(--danger);' : ''}">${escapeHtml(etiqueta)} · ${dias}d</span>
     </div>`;
   }).join('') : '<div class="rank-row">Ningún vehículo necesita atención en los próximos 30 días.</div>';
+}
+
+// Composición de la flota por fabricante -- útil para decidir de qué marca
+// conviene tener más repuestos en stock, distinto del ranking de gasto (que
+// es por vehículo puntual, no por marca).
+function dibujarChartMarca(vehiculos) {
+  const porMarca = new Map();
+  vehiculos.forEach(v => { const m = v.marca || 'Sin marca'; porMarca.set(m, (porMarca.get(m) || 0) + 1); });
+  const entradas = [...porMarca.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  const wrap = document.getElementById('vehChartMarcaWrap');
+  wrap.innerHTML = '<canvas id="vehChartMarca"></canvas>';
+  if (chartMarca) { chartMarca.destroy(); chartMarca = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Todavía no hay vehículos registrados.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim();
+  const ctx = document.getElementById('vehChartMarca').getContext('2d');
+  chartMarca = crearGraficoBarras(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]), label: 'Vehículos', color });
+}
+
+// Antigüedad de la flota -- una flota vieja implica más mantenimiento
+// preventivo; distinto de "por marca" (fabricante, no edad).
+function dibujarChartAnio(vehiculos) {
+  const porAnio = new Map();
+  vehiculos.forEach(v => { if (!v.anio) return; porAnio.set(v.anio, (porAnio.get(v.anio) || 0) + 1); });
+  const anios = [...porAnio.keys()].sort((a, b) => a - b);
+
+  const wrap = document.getElementById('vehChartAnioWrap');
+  wrap.innerHTML = '<canvas id="vehChartAnio"></canvas>';
+  if (chartAnio) { chartAnio.destroy(); chartAnio = null; }
+  if (!anios.length) { wrap.innerHTML = '<div class="chart-empty">Sin año registrado en los vehículos.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--purple').trim();
+  const ctx = document.getElementById('vehChartAnio').getContext('2d');
+  chartAnio = crearGraficoBarras(ctx, { etiquetas: anios.map(String), valores: anios.map(a => porAnio.get(a)), label: 'Vehículos', color });
+}
+
+// Tendencia del gasto de mantenimiento de TODA la flota mes a mes --
+// distinto de "Mayor gasto en mantenimiento" (que rankea vehículos
+// puntuales en un solo número acumulado, sin eje de tiempo).
+function dibujarChartGastoTiempo() {
+  const meses = ultimosNMeses(6);
+  const porMes = new Map(meses.map(m => [m, 0]));
+  postventaCache.forEach(o => {
+    if (!o.fecha) return;
+    const mes = String(o.fecha).slice(0, 7);
+    if (porMes.has(mes)) porMes.set(mes, porMes.get(mes) + (Number(o.total) || 0));
+  });
+
+  const wrap = document.getElementById('vehChartGastoWrap');
+  wrap.innerHTML = '<canvas id="vehChartGastoTiempo"></canvas>';
+  if (chartGastoTiempo) { chartGastoTiempo.destroy(); chartGastoTiempo = null; }
+  const total = [...porMes.values()].reduce((s, n) => s + n, 0);
+  if (!total) { wrap.innerHTML = '<div class="chart-empty">Sin órdenes de servicio en los últimos 6 meses.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--orange').trim();
+  const ctx = document.getElementById('vehChartGastoTiempo').getContext('2d');
+  chartGastoTiempo = crearGraficoLineaFecha(ctx, {
+    fechas: meses.map(etiquetaMes), valores: meses.map(m => porMes.get(m)), label: 'Gasto', color, colorFondo: 'rgba(201,138,60,0.14)'
+  });
+}
+
+// Proporción de la flota en cada estado de garantía -- distinto de
+// "Necesitan atención pronto" (esa es una lista de vehículos puntuales;
+// acá es el panorama general de toda la flota).
+function dibujarChartGarantia(vehiculos) {
+  let vencePronto = 0, activa = 0, sinGarantia = 0;
+  vehiculos.forEach(v => {
+    const vigentes = v._ordenes.filter(o => o.garantia_hasta && diasHasta(o.garantia_hasta) >= 0);
+    if (!vigentes.length) { sinGarantia++; return; }
+    const masProxima = [...vigentes].sort((a, b) => diasHasta(a.garantia_hasta) - diasHasta(b.garantia_hasta))[0];
+    if (diasHasta(masProxima.garantia_hasta) <= VENTANA_ALERTA_DIAS) vencePronto++; else activa++;
+  });
+  const COLOR_POR_ESTADO = { 'Sin garantía': '#7A8CAE', 'Activa': '#0F6E56', 'Vence pronto': '#C4544B' };
+  const entradas = [['Sin garantía', sinGarantia], ['Activa', activa], ['Vence pronto', vencePronto]].filter(([, n]) => n > 0);
+
+  const wrap = document.getElementById('vehChartGarantiaWrap');
+  wrap.innerHTML = '<canvas id="vehChartGarantia"></canvas>';
+  if (chartGarantia) { chartGarantia.destroy(); chartGarantia = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Todavía no hay vehículos registrados.</div>'; return; }
+  const ctx = document.getElementById('vehChartGarantia').getContext('2d');
+  chartGarantia = crearGraficoDona(ctx, {
+    etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]),
+    colores: entradas.map(e => COLOR_POR_ESTADO[e[0]])
+  });
 }
 
 function abrirFichaVehiculo(id) {

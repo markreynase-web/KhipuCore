@@ -21,6 +21,7 @@
 import { fmtNum, escapeHtml } from './utils.js';
 import { kpiCard } from './kpiCard.js';
 import { nivelRiesgoStock } from './stockRisk.js';
+import { crearGraficoDona, crearGraficoBarras, crearGraficoLineaFecha } from './charts.js';
 
 const VENTANA_VELOCIDAD_DIAS = 30;
 
@@ -28,6 +29,24 @@ let repuestosCache = [];
 let postventaCache = [];
 let terminoBusqueda = '';
 let eventosListos = false;
+let chartRiesgo = null;
+let chartProveedor = null;
+let chartReposicion = null;
+let chartConsumo = null;
+
+function ultimosNMeses(n) {
+  const hoy = new Date();
+  const meses = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return meses;
+}
+function etiquetaMes(mesStr) {
+  const [y, mm] = mesStr.split('-');
+  return new Date(Number(y), Number(mm) - 1, 1).toLocaleDateString('es-PE', { month: 'short', year: '2-digit' });
+}
 
 function calcularVelocidad(repuesto, postventa) {
   const limite = new Date(); limite.setDate(limite.getDate() - VENTANA_VELOCIDAD_DIAS);
@@ -68,6 +87,10 @@ function dibujar() {
   dibujarKpis(enriquecidos);
   dibujarResultados(enriquecidos);
   dibujarMasUsados();
+  dibujarChartRiesgo(enriquecidos);
+  dibujarChartProveedor(enriquecidos);
+  dibujarChartReposicion(enriquecidos);
+  dibujarChartConsumo();
 }
 
 function dibujarKpis(repuestos) {
@@ -137,4 +160,92 @@ function dibujarMasUsados() {
   document.getElementById('repMasUsados').innerHTML = conUso.length
     ? conUso.map((x, i) => `<div class="rank-row"><span class="rank-num">${i + 1}</span><span class="rank-name">${escapeHtml(x.r.nombre)}</span><span class="rank-val">${fmtNum(x.unidades)} u.</span></div>`).join('')
     : `<div class="rank-row">Sin uso registrado en los últimos ${VENTANA_VELOCIDAD_DIAS} días.</div>`;
+}
+
+// Proporción del catálogo en cada nivel de riesgo -- distinto de la lista
+// "Resultados" (que muestra repuestos puntuales, filtrables por búsqueda).
+function dibujarChartRiesgo(repuestos) {
+  let critico = 0, bajo = 0, normal = 0;
+  repuestos.forEach(r => {
+    const riesgo = nivelRiesgoStock(r.stock, r.stock_minimo);
+    if (!riesgo) normal++;
+    else if (riesgo.nivel === 'critico') critico++;
+    else bajo++;
+  });
+  const COLOR_POR_NIVEL = { 'Normal': '#0F6E56', 'Bajo': '#C98A3C', 'Crítico': '#C4544B' };
+  const entradas = [['Normal', normal], ['Bajo', bajo], ['Crítico', critico]].filter(([, n]) => n > 0);
+
+  const wrap = document.getElementById('repChartRiesgoWrap');
+  wrap.innerHTML = '<canvas id="repChartRiesgo"></canvas>';
+  if (chartRiesgo) { chartRiesgo.destroy(); chartRiesgo = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Todavía no hay repuestos registrados.</div>'; return; }
+  const ctx = document.getElementById('repChartRiesgo').getContext('2d');
+  chartRiesgo = crearGraficoDona(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]), colores: entradas.map(e => COLOR_POR_NIVEL[e[0]]) });
+}
+
+// Cuánto capital está inmovilizado en stock, por proveedor -- distinto del
+// KPI "Repuestos registrados" (que es un solo total, sin desglosar por
+// quién provee qué).
+function dibujarChartProveedor(repuestos) {
+  const porProveedor = new Map();
+  repuestos.forEach(r => {
+    const prov = r.proveedor || 'Sin proveedor';
+    const valor = (Number(r.stock) || 0) * (Number(r.costo_unitario) || 0);
+    porProveedor.set(prov, (porProveedor.get(prov) || 0) + valor);
+  });
+  const entradas = [...porProveedor.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  const wrap = document.getElementById('repChartProveedorWrap');
+  wrap.innerHTML = '<canvas id="repChartProveedor"></canvas>';
+  if (chartProveedor) { chartProveedor.destroy(); chartProveedor = null; }
+  if (!entradas.length) { wrap.innerHTML = '<div class="chart-empty">Sin valor de inventario registrado.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim();
+  const ctx = document.getElementById('repChartProveedor').getContext('2d');
+  chartProveedor = crearGraficoBarras(ctx, { etiquetas: entradas.map(e => e[0]), valores: entradas.map(e => e[1]), label: 'Valor en stock', color });
+}
+
+// Riesgo de cadena de suministro: cuántos repuestos tardan poco vs. mucho en
+// reponerse -- un catálogo con mucho "31+ días" es más vulnerable a
+// quiebres de stock que uno con reposición rápida.
+function dibujarChartReposicion(repuestos) {
+  const franjas = [
+    { label: '0-7 días', test: d => d >= 0 && d <= 7 },
+    { label: '8-15 días', test: d => d >= 8 && d <= 15 },
+    { label: '16-30 días', test: d => d >= 16 && d <= 30 },
+    { label: '31+ días', test: d => d > 30 }
+  ];
+  const conDato = repuestos.filter(r => r.tiempo_reposicion_dias !== null && r.tiempo_reposicion_dias !== undefined && r.tiempo_reposicion_dias !== '');
+  const conteos = franjas.map(f => conDato.filter(r => f.test(Number(r.tiempo_reposicion_dias))).length);
+
+  const wrap = document.getElementById('repChartReposicionWrap');
+  wrap.innerHTML = '<canvas id="repChartReposicion"></canvas>';
+  if (chartReposicion) { chartReposicion.destroy(); chartReposicion = null; }
+  if (!conDato.length) { wrap.innerHTML = '<div class="chart-empty">Sin datos de tiempo de reposición.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--purple').trim();
+  const ctx = document.getElementById('repChartReposicion').getContext('2d');
+  chartReposicion = crearGraficoBarras(ctx, { etiquetas: franjas.map(f => f.label), valores: conteos, label: 'Repuestos', color });
+}
+
+// Tendencia de consumo real (unidades usadas en órdenes de Postventa) mes a
+// mes -- distinto de "Más usados" (que rankea repuestos puntuales en una
+// sola ventana de 30 días, sin eje de tiempo).
+function dibujarChartConsumo() {
+  const meses = ultimosNMeses(6);
+  const porMes = new Map(meses.map(m => [m, 0]));
+  postventaCache.forEach(o => {
+    if (!o.fecha) return;
+    const mes = String(o.fecha).slice(0, 7);
+    if (porMes.has(mes)) porMes.set(mes, porMes.get(mes) + (Number(o.cantidad_repuesto) || 0));
+  });
+
+  const wrap = document.getElementById('repChartConsumoWrap');
+  wrap.innerHTML = '<canvas id="repChartConsumo"></canvas>';
+  if (chartConsumo) { chartConsumo.destroy(); chartConsumo = null; }
+  const total = [...porMes.values()].reduce((s, n) => s + n, 0);
+  if (!total) { wrap.innerHTML = '<div class="chart-empty">Sin consumo registrado en los últimos 6 meses.</div>'; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim();
+  const ctx = document.getElementById('repChartConsumo').getContext('2d');
+  chartConsumo = crearGraficoLineaFecha(ctx, {
+    fechas: meses.map(etiquetaMes), valores: meses.map(m => porMes.get(m)), label: 'Unidades usadas', color, colorFondo: 'rgba(15,166,156,0.12)'
+  });
 }
