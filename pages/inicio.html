@@ -107,6 +107,7 @@ import { listarRegistros } from '../js/api.js';
 import { fmtNum, escapeHtml } from '../js/utils.js';
 import { crearGraficoLineasComparativo } from '../js/charts.js';
 import { kpiCard, calcularDeltaMensual } from '../js/kpiCard.js';
+import { nivelRiesgoStock } from '../js/stockRisk.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
@@ -139,18 +140,6 @@ function agregarPorClave(filas, clave, valorClave) {
 
 function filaRank(nombre, valor, i) {
   return `<div class="rank-row"><span class="rank-num">${i + 1}</span><span class="rank-name">${escapeHtml(nombre)}</span><span class="rank-val">${fmtNum(valor)}</span></div>`;
-}
-
-// Nivel de riesgo de un producto según su stock vs. stock mínimo. Devuelve
-// null si no aplica (sin stock_minimo configurado) -- no se dibuja un
-// badge sin una base real de comparación.
-function nivelRiesgoStock(stock, stockMinimo) {
-  const s = Number(stock) || 0;
-  const min = Number(stockMinimo) || 0;
-  if (min <= 0) return null;
-  if (s <= min * 0.5) return { nivel: 'critico', etiqueta: 'Crítico', icono: '🔴' };
-  if (s <= min) return { nivel: 'bajo', etiqueta: 'Bajo', icono: '🟠' };
-  return null;
 }
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];

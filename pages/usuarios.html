@@ -26,17 +26,30 @@
       <div id="sesionWidget" class="sesion-widget"></div>
     </header>
 
-    <main style="max-width:1116px;">
-      <section class="panel captura-panel" id="capturaSection" style="margin:24px 0 0;">
-        <div class="captura-header">
-          <h3>Cuentas</h3>
-          <div class="captura-header-acciones">
-            <button type="button" class="btn btn-ochre" id="btnNuevoUsuario" style="display:none;">+ Nuevo usuario</button>
+    <main>
+      <div class="kpis" id="usrKpis"></div>
+
+      <div class="inicio-columnas">
+        <div class="inicio-col">
+          <section class="panel captura-panel" id="capturaSection">
+            <div class="captura-header">
+              <h3>Cuentas</h3>
+              <div class="captura-header-acciones">
+                <button type="button" class="btn btn-ochre" id="btnNuevoUsuario" style="display:none;">+ Nuevo usuario</button>
+              </div>
+            </div>
+            <span id="formStatus" class="form-status"></span>
+            <div id="tablaUsuarios">Cargando…</div>
+          </section>
+        </div>
+        <div class="inicio-col inicio-col-angosta">
+          <div class="panel" style="padding:20px;">
+            <h3 style="margin-bottom:4px;">Roles y permisos</h3>
+            <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">Clic en un rol para ver qué puede hacer.</div>
+            <div id="rolesLista"></div>
           </div>
         </div>
-        <span id="formStatus" class="form-status"></span>
-        <div id="tablaUsuarios">Cargando…</div>
-      </section>
+      </div>
     </main>
 
     <footer></footer>
@@ -53,7 +66,8 @@ import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { listarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, ultimoErrorAPI } from '../js/api.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
-import { escapeHtml } from '../js/utils.js';
+import { escapeHtml, fmtNum } from '../js/utils.js';
+import { kpiCard } from '../js/kpiCard.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
@@ -78,15 +92,35 @@ function badgeEstado(activo) {
     : `<span class="role-badge role-fecha">Inactivo</span>`;
 }
 
+// "Último acceso" no se muestra a propósito: no existe ningún dato real
+// detrás -- usuarios no tiene columna de último login, y auth.js no
+// registra el login en audit_log (solo se auditan creaciones/ediciones/
+// borrados de registros, no inicios de sesión). Mostrarlo sería inventar
+// un dato, así que se deja fuera hasta que exista de verdad.
+function dibujarKpis(usuarios) {
+  const activos = usuarios.filter(u => u.activo).length;
+  const admins = usuarios.filter(u => u.rol === 'administrador').length;
+  const rolesEnUso = new Set(usuarios.map(u => u.rol)).size;
+
+  document.getElementById('usrKpis').innerHTML = [
+    kpiCard({ acento: 'blue', icono: '👥', label: 'Usuarios', value: fmtNum(usuarios.length), sub: `${rolesEnUso} rol(es) en uso` }),
+    kpiCard({ acento: 'teal', icono: '🟢', label: 'Activos', value: fmtNum(activos), sub: `${usuarios.length - activos} inactivo(s)` }),
+    kpiCard({ acento: 'purple', icono: '🛡️', label: 'Administradores', value: fmtNum(admins), sub: 'con acceso total' }),
+    kpiCard({ acento: 'orange', icono: '🔐', label: 'Roles configurados', value: fmtNum(roles.length), sub: 'ver detalle a la derecha' })
+  ].join('');
+}
+
 async function cargarTabla() {
   const cont = document.getElementById('tablaUsuarios');
   const usuarios = await listarRegistros(config.apiBaseUrl, 'usuarios');
   if (!usuarios) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+  dibujarKpis(usuarios);
   if (!usuarios.length) { cont.innerHTML = '<p class="tabla-vacia">No hay usuarios registrados todavía.</p>'; return; }
 
   const puedeEditar = tienePermiso('usuarios.editar');
   const puedeEliminar = tienePermiso('usuarios.eliminar');
-  const puedeAlgo = puedeEditar || puedeEliminar;
+  const puedeVerActividad = tienePermiso('auditoria.ver');
+  const puedeAlgo = puedeEditar || puedeEliminar || puedeVerActividad;
   const miId = obtenerSesion()?.usuario?.id;
 
   cont.innerHTML = `
@@ -101,6 +135,7 @@ async function cargarTabla() {
             const esUnoMismo = String(u.id) === String(miId);
             const botones = [
               puedeEditar ? `<button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button>` : '',
+              puedeVerActividad ? `<button type="button" class="icon-btn" data-accion="actividad" title="Ver actividad">📋</button>` : '',
               (puedeEliminar && !esUnoMismo) ? `<button type="button" class="icon-btn peligro" data-accion="eliminar" title="Quitar acceso">🗑️</button>` : ''
             ].join('');
             return `
@@ -125,6 +160,14 @@ async function cargarTabla() {
     });
   });
 
+  cont.querySelectorAll('[data-accion="actividad"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.closest('tr').dataset.id;
+      const usuario = usuarios.find(u => String(u.id) === id);
+      abrirActividadUsuario(usuario);
+    });
+  });
+
   cont.querySelectorAll('[data-accion="eliminar"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.closest('tr').dataset.id;
@@ -135,6 +178,87 @@ async function cargarTabla() {
       if (res) { cargarTabla(); return; }
       btn.disabled = false;
       alert(ultimoErrorAPI() || 'No se pudo eliminar el usuario.');
+    });
+  });
+}
+
+// Actividad reciente de un usuario puntual: reusa GET /auditoria (ya
+// existía) con el filtro ?usuario_id= que se agregó junto con este
+// rediseño -- antes solo se podía filtrar por módulo/fecha, no por quién.
+async function abrirActividadUsuario(usuario) {
+  abrirPanelLateral({
+    titulo: `Actividad de ${usuario.nombre}`,
+    icono: '📋',
+    montar: async (body) => {
+      body.innerHTML = '<div class="rank-row">Cargando…</div>';
+      const sesion = obtenerSesion();
+      let filas = [];
+      try {
+        const res = await fetch(`${config.apiBaseUrl}/auditoria?usuario_id=${usuario.id}&limite=15`, { headers: { Authorization: `Bearer ${sesion.token}` } });
+        if (res.ok) filas = await res.json();
+      } catch { /* sin conexión: se deja la lista vacía */ }
+
+      const ETIQUETA_ACCION = { crear: 'Creó', editar: 'Editó', eliminar: 'Eliminó', importar: 'Importó' };
+      body.innerHTML = filas.length ? filas.map(f => {
+        const fecha = new Date(f.creado_el).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return `<div class="timeline-item">
+          <span class="timeline-icono">📝</span>
+          <div class="timeline-info">
+            <div class="timeline-texto">${escapeHtml(ETIQUETA_ACCION[f.accion] || f.accion)} en ${escapeHtml(f.modulo || '')}</div>
+            <div class="timeline-fecha">${escapeHtml(fecha)}</div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="rank-row">Sin actividad registrada todavía.</div>';
+    }
+  });
+}
+
+// Agrupa "ventas.ver", "ventas.crear", ... bajo "ventas" -- los nombres de
+// permiso ya siguen esa convención en toda la base (ver backend/migrations/
+// 005_roles_permisos.sql), no hace falta un mapeo aparte.
+function agruparPermisos(permisos) {
+  const grupos = new Map();
+  (permisos || []).forEach(p => {
+    const [modulo, accion] = p.split('.');
+    if (!grupos.has(modulo)) grupos.set(modulo, []);
+    grupos.get(modulo).push(accion || p);
+  });
+  return grupos;
+}
+
+function abrirPermisosRol(rol) {
+  const grupos = agruparPermisos(rol.permisos);
+  abrirPanelLateral({
+    titulo: `Rol: ${rol.nombre}`,
+    icono: '🔐',
+    montar: (body) => {
+      body.innerHTML = grupos.size
+        ? [...grupos.entries()].map(([modulo, acciones]) => `
+          <div class="rank-row">
+            <span class="rank-name">${escapeHtml(modulo)}</span>
+            <span class="rank-val" style="font-weight:400; font-size:12px; text-align:right;">${acciones.map(a => escapeHtml(a)).join(', ')}</span>
+          </div>`).join('')
+        : '<div class="rank-row">Este rol no tiene permisos asignados.</div>';
+    }
+  });
+}
+
+function dibujarRoles() {
+  const cont = document.getElementById('rolesLista');
+  if (!cont) return;
+  cont.innerHTML = roles.length ? roles.map(r => `
+    <div class="cliente-row" data-rol="${escapeHtml(r.nombre)}">
+      <div class="cliente-row-info">
+        <div class="cliente-row-nombre">${escapeHtml(r.nombre)}</div>
+        <div class="cliente-row-contacto">${r.permisos.length} permiso(s)</div>
+      </div>
+    </div>
+  `).join('') : '<div class="rank-row">Sin roles configurados.</div>';
+
+  cont.querySelectorAll('.cliente-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const rol = roles.find(r => r.nombre === el.dataset.rol);
+      if (rol) abrirPermisosRol(rol);
     });
   });
 }
@@ -215,6 +339,7 @@ function abrirNuevoUsuario() {
   }
 
   roles = await pedirRoles();
+  dibujarRoles();
 
   const btnNuevo = document.getElementById('btnNuevoUsuario');
   if (tienePermiso('usuarios.crear')) {

@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="../css/cards.css">
 <link rel="stylesheet" href="../css/forms.css">
 <link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
 </head>
 <body data-modulo="auditoria">
 
@@ -33,7 +34,17 @@
           <option value="inventario">Inventario</option>
           <option value="clientes">Clientes</option>
           <option value="finanzas">Finanzas</option>
+          <option value="postventa">Postventa</option>
+          <option value="vehiculos">Vehículos</option>
+          <option value="repuestos">Repuestos</option>
           <option value="usuarios">Usuarios</option>
+        </select>
+        <select class="period" id="filtroAccion">
+          <option value="">Todas las acciones</option>
+          <option value="crear">Creó</option>
+          <option value="editar">Editó</option>
+          <option value="eliminar">Eliminó</option>
+          <option value="importar">Importó</option>
         </select>
       </div>
       <div class="toolbar-right">
@@ -46,11 +57,18 @@
       </div>
     </div>
 
-    <main style="max-width:1116px;">
-      <section class="panel" style="margin-top:24px;">
-        <h3 style="font-family:'Inter', sans-serif; font-size:15px; font-weight:700; margin:0 0 4px 0;">Registro de actividad</h3>
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Últimos 200 movimientos, del más reciente al más antiguo.</div>
-        <div id="tablaAuditoria">Cargando…</div>
+    <main>
+      <div class="panel buscador-panel">
+        <div class="buscador-grande">
+          <span class="buscador-icono">🔍</span>
+          <input type="text" id="auditoriaBuscador" placeholder="Buscar por usuario, módulo o qué pasó…">
+        </div>
+      </div>
+
+      <section class="panel">
+        <h3 style="margin-bottom:4px;">Registro de actividad <span class="tag" id="auditoriaCount">—</span></h3>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">Del más reciente al más antiguo. Clic en un evento para ver el detalle completo.</div>
+        <div id="auditoriaLista">Cargando…</div>
       </section>
     </main>
 
@@ -66,14 +84,28 @@ import { renderTopbar } from '../components/topbar.js';
 import { renderFooter } from '../components/footer.js';
 import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
 import { escapeHtml } from '../js/utils.js';
+import { abrirPanelLateral } from '../components/panelLateral.js';
 
 if (!haySesionActiva()) location.replace('login.html');
 
 let config;
+let eventosCache = [];
 
 const ETIQUETA_MODULO = {
   ventas: 'una venta', inventario: 'un producto', clientes: 'un cliente',
-  finanzas: 'un movimiento', usuarios: 'un usuario'
+  finanzas: 'un movimiento', usuarios: 'un usuario',
+  postventa: 'una orden de servicio', vehiculos: 'un vehículo', repuestos: 'un repuesto'
+};
+
+// Color del marcador/badge de cada acción -- reutiliza los mismos tokens
+// semánticos que ya usa el resto del rediseño (verde=positivo/crear,
+// rojo=peligro/eliminar), así "eliminar" se lee como lo más delicado sin
+// depender solo del texto.
+const ETIQUETA_ACCION = {
+  crear: { texto: 'Creó', color: 'teal' },
+  editar: { texto: 'Editó', color: 'blue' },
+  eliminar: { texto: 'Eliminó', color: 'danger' },
+  importar: { texto: 'Importó', color: 'purple' }
 };
 
 function formatoFechaHora(iso) {
@@ -125,8 +157,103 @@ function generarDescripcion(f) {
   return detalle ? `${f.accion} en ${f.modulo}.` : `${f.accion} en ${f.modulo} (sin más detalle disponible).`;
 }
 
+// El "detalle" que arma el backend no tiene una sola forma -- es un dump
+// crudo de campos reales (ver registroAuditoria.js y sus call sites), no
+// prosa escrita a mano. Esta función cubre las formas que existen hoy:
+// diff por campo ({campo:{antes,despues}}), objeto completo antes/después
+// (postventa.js), un "eliminado" anidado, o texto plano -- con un volcado
+// genérico de respaldo para lo que no encaje en ninguna.
+function renderDetalle(detalle) {
+  if (detalle === null || detalle === undefined) return '<div class="rank-row">Sin información adicional.</div>';
+  if (typeof detalle === 'string') return `<div class="rank-row">${escapeHtml(detalle)}</div>`;
+  if (typeof detalle !== 'object') return `<div class="rank-row">${escapeHtml(String(detalle))}</div>`;
+
+  const base = (detalle.eliminado && typeof detalle.eliminado === 'object') ? detalle.eliminado : detalle;
+
+  if (base.antes && base.despues && typeof base.antes === 'object' && typeof base.despues === 'object') {
+    const campos = [...new Set([...Object.keys(base.antes), ...Object.keys(base.despues)])]
+      .filter(c => JSON.stringify(base.antes[c]) !== JSON.stringify(base.despues[c]));
+    return campos.length
+      ? campos.map(c => `<div class="rank-row"><span class="rank-name">${escapeHtml(c)}</span><span class="rank-val" style="font-weight:400; font-size:12px;">${escapeHtml(String(base.antes[c] ?? '—'))} → ${escapeHtml(String(base.despues[c] ?? '—'))}</span></div>`).join('')
+      : '<div class="rank-row">Sin cambios detectables.</div>';
+  }
+
+  const entradasDiff = Object.entries(base).filter(([, v]) => v && typeof v === 'object' && 'antes' in v && 'despues' in v);
+  if (entradasDiff.length) {
+    return entradasDiff.map(([campo, v]) => `<div class="rank-row"><span class="rank-name">${escapeHtml(campo)}</span><span class="rank-val" style="font-weight:400; font-size:12px;">${escapeHtml(String(v.antes ?? '—'))} → ${escapeHtml(String(v.despues ?? '—'))}</span></div>`).join('');
+  }
+
+  const entradas = Object.entries(base);
+  return entradas.length
+    ? entradas.map(([k, v]) => `<div class="rank-row"><span class="rank-name">${escapeHtml(k)}</span><span class="rank-val" style="font-weight:400; font-size:12px;">${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</span></div>`).join('')
+    : '<div class="rank-row">Sin información adicional.</div>';
+}
+
+function abrirDetalleEvento(f) {
+  abrirPanelLateral({
+    titulo: 'Detalle del evento',
+    icono: '🔍',
+    montar: (body) => {
+      body.innerHTML = `
+        <div class="perfil-cliente-contacto">
+          <div>👤 ${escapeHtml(f.usuario_nombre || 'Desconocido')}</div>
+          <div>🕒 ${escapeHtml(formatoFechaHora(f.creado_el))}</div>
+          <div>${escapeHtml(ETIQUETA_MODULO[f.modulo] || f.modulo)}${f.registro_id ? ` · Registro #${escapeHtml(String(f.registro_id))}` : ''}</div>
+        </div>
+        <div class="rank-row" style="border-bottom:2px solid var(--paper-line); margin-bottom:10px; padding-bottom:12px;">
+          <span class="rank-name" style="font-weight:600;">${escapeHtml(generarDescripcion(f))}</span>
+        </div>
+        <h4 class="perfil-cliente-subtitulo">Qué cambió</h4>
+        ${renderDetalle(f.detalle)}
+      `;
+    }
+  });
+}
+
+function dibujarEventos(filas) {
+  const cont = document.getElementById('auditoriaLista');
+  document.getElementById('auditoriaCount').textContent = `${filas.length} evento(s)`;
+
+  cont.innerHTML = filas.length ? filas.map(f => {
+    const accion = ETIQUETA_ACCION[f.accion] || { texto: f.accion, color: 'muted' };
+    return `<div class="evento-fila" data-id="${f.id}">
+      <span class="evento-marca evento-marca-${accion.color}"></span>
+      <div class="evento-info">
+        <div class="evento-desc">${escapeHtml(generarDescripcion(f))}</div>
+        <div class="evento-meta">${escapeHtml(f.usuario_nombre || 'Desconocido')} · ${escapeHtml(ETIQUETA_MODULO[f.modulo] || f.modulo)}</div>
+      </div>
+      <span class="evento-badge evento-badge-${accion.color}">${escapeHtml(accion.texto)}</span>
+      <span class="evento-fecha">${escapeHtml(formatoFechaHora(f.creado_el))}</span>
+    </div>`;
+  }).join('') : '<div class="rank-row">Sin eventos para estos filtros.</div>';
+
+  cont.querySelectorAll('.evento-fila').forEach(el => {
+    el.addEventListener('click', () => {
+      const f = filas.find(x => String(x.id) === el.dataset.id);
+      if (f) abrirDetalleEvento(f);
+    });
+  });
+}
+
+// Acción y texto libre filtran client-side sobre lo ya traído del backend
+// (que ya filtró por módulo/fecha) -- evita un viaje al servidor por cada
+// letra que se escribe en el buscador.
+function aplicarFiltrosClientSide() {
+  const accion = document.getElementById('filtroAccion').value;
+  const texto = document.getElementById('auditoriaBuscador').value.trim().toLowerCase();
+  const filtrados = eventosCache.filter(f => {
+    if (accion && f.accion !== accion) return false;
+    if (texto) {
+      const compuesto = `${f.usuario_nombre || ''} ${ETIQUETA_MODULO[f.modulo] || f.modulo} ${generarDescripcion(f)}`.toLowerCase();
+      if (!compuesto.includes(texto)) return false;
+    }
+    return true;
+  });
+  dibujarEventos(filtrados);
+}
+
 async function cargarAuditoria() {
-  const cont = document.getElementById('tablaAuditoria');
+  const cont = document.getElementById('auditoriaLista');
   cont.innerHTML = 'Cargando…';
 
   const sesion = obtenerSesion();
@@ -138,34 +265,16 @@ async function cargarAuditoria() {
   if (desde) qs.set('desde', desde);
   if (hasta) qs.set('hasta', hasta);
 
-  let filas;
   try {
     const res = await fetch(`${config.apiBaseUrl}/auditoria?${qs}`, { headers: { Authorization: `Bearer ${sesion.token}` } });
     if (!res.ok) { cont.innerHTML = '<p class="tabla-vacia">No se pudo leer el registro de actividad (¿tienes permiso?).</p>'; return; }
-    filas = await res.json();
+    eventosCache = await res.json();
   } catch {
     cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>';
     return;
   }
 
-  if (!filas.length) { cont.innerHTML = '<p class="tabla-vacia">No hay actividad registrada con estos filtros.</p>'; return; }
-
-  cont.innerHTML = `
-    <div class="tabla-registros-wrap" style="margin-top:14px;">
-      <table class="tabla-registros">
-        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Módulo</th><th>Qué pasó</th></tr></thead>
-        <tbody>
-          ${filas.map(f => `
-            <tr>
-              <td>${formatoFechaHora(f.creado_el)}</td>
-              <td>${escapeHtml(f.usuario_nombre || '—')}</td>
-              <td><span class="role-badge role-categoria">${escapeHtml(f.modulo)}</span></td>
-              <td>${escapeHtml(generarDescripcion(f))}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
+  aplicarFiltrosClientSide();
 }
 
 (async function iniciar() {
@@ -176,11 +285,13 @@ async function cargarAuditoria() {
   renderFooter();
 
   if (!tienePermiso('auditoria.ver')) {
-    document.getElementById('tablaAuditoria').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
+    document.getElementById('auditoriaLista').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
     return;
   }
 
   document.getElementById('btnBuscarAuditoria').addEventListener('click', cargarAuditoria);
+  document.getElementById('filtroAccion').addEventListener('change', aplicarFiltrosClientSide);
+  document.getElementById('auditoriaBuscador').addEventListener('input', aplicarFiltrosClientSide);
   cargarAuditoria();
 })();
 </script>

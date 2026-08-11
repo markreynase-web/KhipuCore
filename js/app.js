@@ -18,14 +18,27 @@ import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLatera
 import { tienePermiso, haySesionActiva } from './sesion.js';
 import { ESQUEMAS } from './esquemas.js';
 import { crearRegistro } from './api.js';
-import { crearGraficoLineasComparativo } from './charts.js';
 import { renderVentasDashboard } from './ventasDashboard.js';
+import { renderClientesDashboard } from './clientesDashboard.js';
+import { renderFinanzasDashboard } from './finanzasDashboard.js';
+import { renderInventarioDashboard } from './inventarioDashboard.js';
+import { renderPostventaDashboard } from './postventaDashboard.js';
+import { renderVehiculosDashboard } from './vehiculosDashboard.js';
+import { renderRepuestosDashboard } from './repuestosDashboard.js';
 
 // Rediseño v3: algunos módulos reemplazan por completo el motor genérico de
 // dashboard.js con su propia "Vista Ejecutiva" (KPIs/gráficos pensados para
 // lo que ese módulo necesita, no columnas auto-detectadas de un CSV). Un
 // módulo sin entrada acá sigue usando renderTodo() tal cual, sin cambios.
-const RENDERERS_BESPOKE = { ventas: renderVentasDashboard };
+// La firma es (filasCrudas, backendActivo) -- el segundo parámetro es solo
+// para los que necesitan datos de OTRO módulo (ej. Clientes trae su propio
+// historial de ventas/postventa); los que no lo usan simplemente lo ignoran.
+const RENDERERS_BESPOKE = {
+  ventas: renderVentasDashboard, clientes: renderClientesDashboard,
+  finanzas: renderFinanzasDashboard, inventario: renderInventarioDashboard,
+  postventa: renderPostventaDashboard, vehiculos: renderVehiculosDashboard,
+  repuestos: renderRepuestosDashboard
+};
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,
 // inventario.html, clientes.html, ...) declara el suyo en <body data-modulo="...">,
@@ -91,36 +104,6 @@ function refrescar() {
   renderTodo(obtenerFuenteActual());
 }
 
-// Ingresos vs. egresos por fecha, en vez del gráfico de una sola línea que
-// arma dashboard.js automáticamente (que sumaría ingresos y egresos como si
-// fueran lo mismo). El esquema de finanzas mapea colCat1:'tipo', así que
-// r._cat1 ya viene siendo 'ingreso'/'egreso' -- no hace falta pedir filas
-// crudas aparte, alcanza con "actual" (mismo dato ya filtrado por rango de
-// fechas que usa el resto del dashboard).
-function dibujarGraficoFinanzas(ctx, actual) {
-  const porDiaIngreso = {}, porDiaEgreso = {};
-  actual.forEach(r => {
-    if (!r._fecha) return;
-    const mapa = r._cat1 === 'ingreso' ? porDiaIngreso : porDiaEgreso;
-    mapa[r._fecha] = (mapa[r._fecha] || 0) + (isNaN(r._numero) ? 0 : r._numero);
-  });
-  const fechas = [...new Set([...Object.keys(porDiaIngreso), ...Object.keys(porDiaEgreso)])].sort();
-  if (!fechas.length) return null;
-  return crearGraficoLineasComparativo(ctx, {
-    etiquetas: fechas,
-    serieA: fechas.map(f => porDiaIngreso[f] || 0), serieB: fechas.map(f => porDiaEgreso[f] || 0),
-    labelA: 'Ingresos', labelB: 'Egresos', colorA: '#00B3CD', colorB: '#006CA1'
-  });
-}
-
-function opcionesGraficoPrincipal() {
-  if (NAMESPACE !== 'finanzas') return {};
-  return {
-    tituloGraficoPrincipal: 'Ingresos vs. egresos <span class="tag" id="chartTag">por fecha</span>',
-    dibujarGraficoPrincipal: dibujarGraficoFinanzas
-  };
-}
-
 async function refrescarDesdeBackend() {
   if (!backendActivo) return;
 
@@ -133,7 +116,7 @@ async function refrescarDesdeBackend() {
     // cada dashboard bespoke trae su propio selector de período y filtra
     // client-side (mismo patrón ya usado en Inicio).
     const filas = await backendActivo.listarCrudo({});
-    renderBespoke(filas);
+    renderBespoke(filas, backendActivo);
     return;
   }
 
@@ -141,7 +124,7 @@ async function refrescarDesdeBackend() {
     desde: document.getElementById('fechaDesde').value || undefined,
     hasta: document.getElementById('fechaHasta').value || undefined
   });
-  if (fuente) renderTodo(fuente, opcionesGraficoPrincipal());
+  if (fuente) renderTodo(fuente);
 }
 
 function mostrarEstado(msg, tipo) {
