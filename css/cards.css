@@ -123,6 +123,12 @@
 .movimiento-monto.ingreso{ color:var(--teal-deep); }
 .movimiento-monto.egreso{ color:var(--danger); }
 
+/* Con hasta 12 movimientos (dibujarMovimientos() en finanzasDashboard.js)
+   la lista puede ser mucho más alta que el panel de al lado ("Gastos por
+   categoría"), dejando un hueco en blanco enorme en la columna corta -- se
+   acota con scroll interno en vez de dejar que crezca sin límite. */
+#finMovimientos{ max-height:420px; overflow-y:auto; }
+
 .kpis{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:18px; margin-bottom:36px; }
 .kpi-card{ background:#fff; border-radius:14px; padding:18px 20px; box-shadow:var(--card-shadow); }
 .kpi-card .label{ font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:600; }
@@ -296,8 +302,8 @@
 .timeline-texto{ font-size:13px; color:var(--ink); }
 .timeline-fecha{ font-size:11.5px; color:var(--muted); margin-top:2px; }
 
-.secundarios-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
-.sec-chart-panel{ border:1px solid var(--paper-line); border-radius:8px; padding:14px; }
+.secundarios-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; align-items:stretch; }
+.sec-chart-panel{ background:#fff; border:1px solid var(--paper-line); border-radius:14px; padding:16px; box-shadow:var(--card-shadow); }
 .sec-chart-panel h4{ font-family:var(--font-display); font-size:14px; font-weight:700; margin:0 0 10px 0; display:flex; align-items:center; justify-content:space-between; }
 .sec-chart-panel .tag{ font-family:var(--font-mono); font-size:10px; font-weight:600; color:var(--muted); background:var(--paper); padding:2px 7px; border-radius:20px; border:1px solid var(--paper-line); }
 
