@@ -227,5 +227,84 @@ export const ESQUEMAS = {
       { key: 'vehiculo_descripcion', label: 'Vehículo', soloLectura: true }, { key: 'estado', label: 'Estado' }
     ],
     mapa: { colFecha: 'fecha', colCat1: 'estado', colCat2: 'motivo', otrasCat: ['cliente_nombre'] }
+  },
+
+  // --- Vertical Dentista: reutiliza clientes como pacientes ---
+
+  tratamientos: {
+    etiqueta: 'tratamiento',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'cliente_id', label: 'Paciente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un paciente…', accionExtra: { texto: '+ Nuevo paciente', evento: 'nuevoCliente' } },
+      { id: 'procedimiento', label: 'Procedimiento', type: 'text', required: true, ancho: 2, placeholder: 'Ej. Limpieza dental, extracción, resina…' },
+      { id: 'pieza_dental', label: 'Pieza dental (opcional)', type: 'text', placeholder: 'Ej. 16, muela superior derecha…' },
+      { id: 'codigo_procedimiento', label: 'Código (opcional)', type: 'text', placeholder: 'Ej. D1110' },
+      { id: 'diagnostico', label: 'Diagnóstico', type: 'text', ancho: 2, placeholder: 'Opcional' },
+      { id: 'costo', label: 'Costo', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'planificado',
+        opciones: [
+          { value: 'planificado', label: 'Planificado' }, { value: 'en_progreso', label: 'En progreso' },
+          { value: 'completado', label: 'Completado' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'cliente_nombre', label: 'Paciente', soloLectura: true },
+      { key: 'procedimiento', label: 'Procedimiento' }, { key: 'pieza_dental', label: 'Pieza' },
+      { key: 'costo', label: 'Costo' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'costo', colCat1: 'procedimiento', colCat2: 'estado', otrasCat: ['cliente_nombre'] }
+  },
+
+  planes_tratamiento: {
+    etiqueta: 'plan de tratamiento',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'cliente_id', label: 'Paciente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un paciente…', accionExtra: { texto: '+ Nuevo paciente', evento: 'nuevoCliente' } },
+      { id: 'descripcion', label: 'Descripción del plan (fases)', type: 'text', required: true, ancho: 2, placeholder: 'Ej. Fase 1: extracciones. Fase 2: brackets…' },
+      { id: 'presupuesto_total', label: 'Presupuesto total', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'propuesto',
+        opciones: [
+          { value: 'propuesto', label: 'Propuesto' }, { value: 'aprobado', label: 'Aprobado' },
+          { value: 'rechazado', label: 'Rechazado' }, { value: 'en_progreso', label: 'En progreso' },
+          { value: 'completado', label: 'Completado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'cliente_nombre', label: 'Paciente', soloLectura: true },
+      { key: 'descripcion', label: 'Descripción' }, { key: 'presupuesto_total', label: 'Presupuesto' },
+      { key: 'estado', label: 'Estado' }, { key: 'fecha_aprobacion', label: 'Aprobado el', soloLectura: true }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'presupuesto_total', colCat1: 'estado', otrasCat: ['cliente_nombre'] }
+  },
+
+  seguros_dentales: {
+    etiqueta: 'reclamo',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'cliente_id', label: 'Paciente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un paciente…', accionExtra: { texto: '+ Nuevo paciente', evento: 'nuevoCliente' } },
+      { id: 'aseguradora', label: 'Aseguradora', type: 'text', required: true },
+      { id: 'numero_poliza', label: 'N° de póliza', type: 'text', placeholder: 'Opcional' },
+      { id: 'tratamiento_id', label: 'Tratamiento asociado (opcional)', type: 'select', fuente: 'tratamientos', vacio: 'Ninguno' },
+      { id: 'monto_reclamado', label: 'Monto reclamado', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'monto_cubierto', label: 'Monto cubierto', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'enviado',
+        opciones: [
+          { value: 'enviado', label: 'Enviado' }, { value: 'en_revision', label: 'En revisión' },
+          { value: 'aprobado', label: 'Aprobado' }, { value: 'rechazado', label: 'Rechazado' },
+          { value: 'pagado', label: 'Pagado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'cliente_nombre', label: 'Paciente', soloLectura: true },
+      { key: 'aseguradora', label: 'Aseguradora' }, { key: 'monto_reclamado', label: 'Reclamado' },
+      { key: 'monto_cubierto', label: 'Cubierto' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'monto_reclamado', otrosNum: ['monto_cubierto'], colCat1: 'estado', colCat2: 'aseguradora', otrasCat: ['cliente_nombre'] }
   }
 };

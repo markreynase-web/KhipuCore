@@ -17,6 +17,9 @@ import vehiculosRouter from './routes/vehiculos.js';
 import repuestosRouter from './routes/repuestos.js';
 import postventaRouter from './routes/postventa.js';
 import agendaRouter from './routes/agenda.js';
+import tratamientosRouter from './routes/tratamientos.js';
+import planesTratamientoRouter from './routes/planesTratamiento.js';
+import segurosDentalesRouter from './routes/segurosDentales.js';
 import superadminRouter from './routes/superadmin.js';
 import khipuAiRouter from './routes/khipuAi.js';
 
@@ -62,6 +65,9 @@ app.use('/api/vehiculos', vehiculosRouter);
 app.use('/api/repuestos', repuestosRouter);
 app.use('/api/postventa', postventaRouter);
 app.use('/api/agenda', agendaRouter);
+app.use('/api/tratamientos', tratamientosRouter);
+app.use('/api/planes_tratamiento', planesTratamientoRouter);
+app.use('/api/seguros_dentales', segurosDentalesRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/khipu-ai', khipuAiRouter);
 

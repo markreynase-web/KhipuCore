@@ -26,6 +26,9 @@ import { renderPostventaDashboard } from './postventaDashboard.js';
 import { renderVehiculosDashboard } from './vehiculosDashboard.js';
 import { renderRepuestosDashboard } from './repuestosDashboard.js';
 import { renderAgendaDashboard } from './agendaDashboard.js';
+import { renderTratamientosDashboard } from './tratamientosDashboard.js';
+import { renderPlanesTratamientoDashboard } from './planesTratamientoDashboard.js';
+import { renderSegurosDentalesDashboard } from './segurosDentalesDashboard.js';
 
 // Rediseño v3: algunos módulos reemplazan por completo el motor genérico de
 // dashboard.js con su propia "Vista Ejecutiva" (KPIs/gráficos pensados para
@@ -38,7 +41,9 @@ const RENDERERS_BESPOKE = {
   ventas: renderVentasDashboard, clientes: renderClientesDashboard,
   finanzas: renderFinanzasDashboard, inventario: renderInventarioDashboard,
   postventa: renderPostventaDashboard, vehiculos: renderVehiculosDashboard,
-  repuestos: renderRepuestosDashboard, agenda: renderAgendaDashboard
+  repuestos: renderRepuestosDashboard, agenda: renderAgendaDashboard,
+  tratamientos: renderTratamientosDashboard, planes_tratamiento: renderPlanesTratamientoDashboard,
+  seguros_dentales: renderSegurosDentalesDashboard
 };
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,
@@ -374,7 +379,8 @@ async function activarCapturaSiCorresponde(config) {
     repuestos: r => ({
       value: r.id, label: `${r.nombre} - ${r.stock} disponible(s)`,
       extra: { stock: Number(r.stock), precioSugerido: Number(r.precio_unitario) || 0 }
-    })
+    }),
+    tratamientos: t => ({ value: t.id, label: `${t.procedimiento}${t.pieza_dental ? ' (pieza ' + t.pieza_dental + ')' : ''} · ${t.cliente_nombre}` })
   };
 
   async function esquemaConOpcionesFrescas() {

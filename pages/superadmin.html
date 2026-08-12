@@ -58,6 +58,24 @@
 
   renderFooter();
 
+  // Paquetes de módulos por perfil de negocio: activar uno de un clic en vez
+  // de tildar checkbox por checkbox. Solo ACTIVAN (nunca desactivan) -- si
+  // la empresa ya tenía otros módulos prendidos, se quedan como están.
+  const PAQUETES = {
+    taller: {
+      icono: '🔧', label: 'Taller Mecánico',
+      modulos: ['clientes', 'finanzas', 'vehiculos', 'repuestos', 'postventa', 'agenda']
+    },
+    concesionaria: {
+      icono: '🚗', label: 'Concesionaria',
+      modulos: ['clientes', 'finanzas', 'ventas', 'inventario', 'vehiculos', 'repuestos', 'postventa', 'agenda']
+    },
+    dental: {
+      icono: '🦷', label: 'Clínica Dental',
+      modulos: ['clientes', 'finanzas', 'tratamientos', 'planes_tratamiento', 'seguros_dentales', 'agenda']
+    }
+  };
+
   if (!haySesionActiva()) location.replace('login.html');
 
   const contenido = document.getElementById('contenido');
@@ -200,6 +218,12 @@
           </div>
 
           <div class="sa-subtitulo">Módulos habilitados</div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+            ${Object.entries(PAQUETES).map(([id, p]) => `
+              <button type="button" class="btn btn-ghost" data-paquete="${id}" style="padding:6px 12px; font-size:12px;" title="Activa de una sola vez los módulos de este paquete (no desactiva nada que ya esté prendido)">
+                ${p.icono} ${p.label}
+              </button>`).join('')}
+          </div>
           <div class="sa-modulos-lista" id="listaModulos">
             ${modulos.map(m => `
               <label class="sa-modulo-item">
@@ -309,6 +333,23 @@
             chk.disabled = false;
             if (res === null) chk.checked = !habilitar; // revertir si falló
             await cargarEmpresas(); // refresca el conteo de módulos en la tabla de fondo
+          });
+        });
+
+        // Un paquete = tildar (y disparar el 'change' de arriba, que ya
+        // hace el POST real) cada checkbox del paquete que todavía no
+        // estaba activo -- no se toca ninguno que ya estuviera prendido ni
+        // ninguno fuera del paquete.
+        body.querySelectorAll('[data-paquete]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const paquete = PAQUETES[btn.dataset.paquete];
+            paquete.modulos.forEach(moduloId => {
+              const chk = body.querySelector(`[data-modulo="${moduloId}"]`);
+              if (chk && !chk.checked) {
+                chk.checked = true;
+                chk.dispatchEvent(new Event('change'));
+              }
+            });
           });
         });
 
