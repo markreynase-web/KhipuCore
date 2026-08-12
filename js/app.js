@@ -25,6 +25,7 @@ import { renderInventarioDashboard } from './inventarioDashboard.js';
 import { renderPostventaDashboard } from './postventaDashboard.js';
 import { renderVehiculosDashboard } from './vehiculosDashboard.js';
 import { renderRepuestosDashboard } from './repuestosDashboard.js';
+import { renderAgendaDashboard } from './agendaDashboard.js';
 
 // Rediseño v3: algunos módulos reemplazan por completo el motor genérico de
 // dashboard.js con su propia "Vista Ejecutiva" (KPIs/gráficos pensados para
@@ -37,7 +38,7 @@ const RENDERERS_BESPOKE = {
   ventas: renderVentasDashboard, clientes: renderClientesDashboard,
   finanzas: renderFinanzasDashboard, inventario: renderInventarioDashboard,
   postventa: renderPostventaDashboard, vehiculos: renderVehiculosDashboard,
-  repuestos: renderRepuestosDashboard
+  repuestos: renderRepuestosDashboard, agenda: renderAgendaDashboard
 };
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,

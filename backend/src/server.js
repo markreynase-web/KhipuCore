@@ -16,6 +16,7 @@ import empresaRouter from './routes/empresa.js';
 import vehiculosRouter from './routes/vehiculos.js';
 import repuestosRouter from './routes/repuestos.js';
 import postventaRouter from './routes/postventa.js';
+import agendaRouter from './routes/agenda.js';
 import superadminRouter from './routes/superadmin.js';
 import khipuAiRouter from './routes/khipuAi.js';
 
@@ -60,6 +61,7 @@ app.use('/api/empresa', empresaRouter);
 app.use('/api/vehiculos', vehiculosRouter);
 app.use('/api/repuestos', repuestosRouter);
 app.use('/api/postventa', postventaRouter);
+app.use('/api/agenda', agendaRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/khipu-ai', khipuAiRouter);
 

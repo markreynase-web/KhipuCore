@@ -197,5 +197,35 @@ export const ESQUEMAS = {
     // postventa, y el desglose por categoría muestra cuánto hay en cada
     // estado (pendiente/en_proceso/completado) en vez de solo un conteo.
     mapa: { colFecha: 'fecha', colNum: 'total', otrosNum: ['mano_obra', 'costo_repuestos'], colCat1: 'estado', colCat2: 'tipo', otrasCat: ['cliente_nombre'] }
+  },
+
+  // --- Agenda/Citas: capacidad transversal, no atada a un vertical ---
+
+  agenda: {
+    etiqueta: 'cita',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'hora', label: 'Hora', type: 'time', required: true },
+      { id: 'duracion_minutos', label: 'Duración (minutos)', type: 'number', defecto: 30, min: 5, step: '5' },
+      { id: 'cliente_id', label: 'Cliente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un cliente…', accionExtra: { texto: '+ Nuevo cliente', evento: 'nuevoCliente' } },
+      { id: 'motivo', label: 'Motivo de la cita', type: 'text', required: true, ancho: 2, placeholder: 'Ej. Limpieza dental, cambio de aceite…' },
+      // Opcional a propósito -- solo aplica si la empresa tiene el vertical
+      // Automotriz habilitado. En cualquier otro rubro se deja vacío.
+      { id: 'vehiculo_id', label: 'Vehículo (opcional)', type: 'select', fuente: 'vehiculos', vacio: 'No aplica / ninguno' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'pendiente',
+        opciones: [
+          { value: 'pendiente', label: 'Pendiente' }, { value: 'confirmada', label: 'Confirmada' },
+          { value: 'completada', label: 'Completada' }, { value: 'cancelada', label: 'Cancelada' },
+          { value: 'no_asistio', label: 'No asistió' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'hora', label: 'Hora' },
+      { key: 'cliente_nombre', label: 'Cliente', soloLectura: true }, { key: 'motivo', label: 'Motivo' },
+      { key: 'vehiculo_descripcion', label: 'Vehículo', soloLectura: true }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colCat1: 'estado', colCat2: 'motivo', otrasCat: ['cliente_nombre'] }
   }
 };

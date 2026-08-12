@@ -23,6 +23,7 @@ import { ICONO_SPARK } from './khipuAiWidget.js';
 const GRUPO_POR_MODULO = {
   ventas: 'gestion', compras: 'gestion', inventario: 'gestion', clientes: 'gestion',
   finanzas: 'gestion', postventa: 'gestion', produccion: 'gestion', repuestos: 'gestion',
+  agenda: 'gestion',
   rrhh: 'recursos', vehiculos: 'recursos'
 };
 const GRUPOS_ORDEN = [
