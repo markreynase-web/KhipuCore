@@ -20,6 +20,9 @@ import agendaRouter from './routes/agenda.js';
 import tratamientosRouter from './routes/tratamientos.js';
 import planesTratamientoRouter from './routes/planesTratamiento.js';
 import segurosDentalesRouter from './routes/segurosDentales.js';
+import recetasOpticasRouter from './routes/recetasOpticas.js';
+import ordenesLaboratorioRouter from './routes/ordenesLaboratorio.js';
+import segurosVisionRouter from './routes/segurosVision.js';
 import superadminRouter from './routes/superadmin.js';
 import khipuAiRouter from './routes/khipuAi.js';
 
@@ -68,6 +71,9 @@ app.use('/api/agenda', agendaRouter);
 app.use('/api/tratamientos', tratamientosRouter);
 app.use('/api/planes_tratamiento', planesTratamientoRouter);
 app.use('/api/seguros_dentales', segurosDentalesRouter);
+app.use('/api/recetas_opticas', recetasOpticasRouter);
+app.use('/api/ordenes_laboratorio', ordenesLaboratorioRouter);
+app.use('/api/seguros_vision', segurosVisionRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/khipu-ai', khipuAiRouter);
 

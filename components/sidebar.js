@@ -24,6 +24,7 @@ const GRUPO_POR_MODULO = {
   ventas: 'gestion', compras: 'gestion', inventario: 'gestion', clientes: 'gestion',
   finanzas: 'gestion', postventa: 'gestion', produccion: 'gestion', repuestos: 'gestion',
   agenda: 'gestion', tratamientos: 'gestion', planes_tratamiento: 'gestion', seguros_dentales: 'gestion',
+  recetas_opticas: 'gestion', ordenes_laboratorio: 'gestion', seguros_vision: 'gestion',
   rrhh: 'recursos', vehiculos: 'recursos'
 };
 const GRUPOS_ORDEN = [

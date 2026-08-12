@@ -306,5 +306,91 @@ export const ESQUEMAS = {
       { key: 'monto_cubierto', label: 'Cubierto' }, { key: 'estado', label: 'Estado' }
     ],
     mapa: { colFecha: 'fecha', colNum: 'monto_reclamado', otrosNum: ['monto_cubierto'], colCat1: 'estado', colCat2: 'aseguradora', otrasCat: ['cliente_nombre'] }
+  },
+
+  // --- Vertical Oculista: reutiliza clientes como pacientes ---
+
+  recetas_opticas: {
+    etiqueta: 'receta',
+    campos: [
+      { id: 'fecha', label: 'Fecha del examen', type: 'date', required: true },
+      { id: 'cliente_id', label: 'Paciente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un paciente…', accionExtra: { texto: '+ Nuevo paciente', evento: 'nuevoCliente' } },
+      { id: 'esfera_od', label: 'Esfera OD', type: 'number', step: '0.25', placeholder: 'Ej. -2.50' },
+      { id: 'cilindro_od', label: 'Cilindro OD', type: 'number', step: '0.25', placeholder: 'Opcional' },
+      { id: 'eje_od', label: 'Eje OD (0-180°)', type: 'number', min: 0, step: '1', placeholder: 'Opcional' },
+      { id: 'esfera_oi', label: 'Esfera OI', type: 'number', step: '0.25', placeholder: 'Ej. -2.25' },
+      { id: 'cilindro_oi', label: 'Cilindro OI', type: 'number', step: '0.25', placeholder: 'Opcional' },
+      { id: 'eje_oi', label: 'Eje OI (0-180°)', type: 'number', min: 0, step: '1', placeholder: 'Opcional' },
+      { id: 'adicion', label: 'Adición', type: 'number', min: 0, step: '0.25', placeholder: 'Opcional (bifocal/progresivo)' },
+      { id: 'distancia_pupilar', label: 'Distancia pupilar (mm)', type: 'number', min: 0, step: '0.5', placeholder: 'Opcional' },
+      { id: 'diagnostico', label: 'Diagnóstico', type: 'text', ancho: 2, placeholder: 'Opcional' },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'cliente_nombre', label: 'Paciente', soloLectura: true },
+      { key: 'esfera_od', label: 'Esf. OD' }, { key: 'cilindro_od', label: 'Cil. OD' }, { key: 'eje_od', label: 'Eje OD' },
+      { key: 'esfera_oi', label: 'Esf. OI' }, { key: 'cilindro_oi', label: 'Cil. OI' }, { key: 'eje_oi', label: 'Eje OI' }
+    ],
+    mapa: { colFecha: 'fecha', otrasCat: ['cliente_nombre'] }
+  },
+
+  ordenes_laboratorio: {
+    etiqueta: 'orden',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'cliente_id', label: 'Paciente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un paciente…', accionExtra: { texto: '+ Nuevo paciente', evento: 'nuevoCliente' } },
+      { id: 'receta_id', label: 'Receta asociada (opcional)', type: 'select', fuente: 'recetas_opticas', vacio: 'Ninguna' },
+      { id: 'armazon', label: 'Armazón', type: 'text', placeholder: 'Ej. Ray-Ban RB2140, negro' },
+      { id: 'tipo_lente', label: 'Tipo de lente', type: 'select',
+        opciones: [
+          { value: 'monofocal', label: 'Monofocal' }, { value: 'bifocal', label: 'Bifocal' },
+          { value: 'progresivo', label: 'Progresivo' }, { value: 'contacto', label: 'Lente de contacto' }
+        ], vacio: 'Selecciona…' },
+      { id: 'laboratorio', label: 'Laboratorio', type: 'text', placeholder: 'Opcional' },
+      { id: 'costo', label: 'Costo', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'pedido',
+        opciones: [
+          { value: 'pedido', label: 'Pedido' }, { value: 'en_laboratorio', label: 'En laboratorio' },
+          { value: 'listo', label: 'Listo' }, { value: 'entregado', label: 'Entregado' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'fecha_estimada_entrega', label: 'Entrega estimada', type: 'date', placeholder: 'Opcional' },
+      { id: 'garantia_hasta', label: 'Garantía hasta', type: 'date', placeholder: 'Opcional' },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'cliente_nombre', label: 'Paciente', soloLectura: true },
+      { key: 'armazon', label: 'Armazón' }, { key: 'tipo_lente', label: 'Lente' },
+      { key: 'costo', label: 'Costo' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'costo', colCat1: 'estado', colCat2: 'tipo_lente', otrasCat: ['cliente_nombre'] }
+  },
+
+  seguros_vision: {
+    etiqueta: 'reclamo',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'cliente_id', label: 'Paciente', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un paciente…', accionExtra: { texto: '+ Nuevo paciente', evento: 'nuevoCliente' } },
+      { id: 'aseguradora', label: 'Aseguradora', type: 'text', required: true },
+      { id: 'numero_poliza', label: 'N° de póliza', type: 'text', placeholder: 'Opcional' },
+      { id: 'orden_id', label: 'Orden asociada (opcional)', type: 'select', fuente: 'ordenes_laboratorio', vacio: 'Ninguna' },
+      { id: 'monto_reclamado', label: 'Monto reclamado', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'monto_cubierto', label: 'Monto cubierto', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'enviado',
+        opciones: [
+          { value: 'enviado', label: 'Enviado' }, { value: 'en_revision', label: 'En revisión' },
+          { value: 'aprobado', label: 'Aprobado' }, { value: 'rechazado', label: 'Rechazado' },
+          { value: 'pagado', label: 'Pagado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'cliente_nombre', label: 'Paciente', soloLectura: true },
+      { key: 'aseguradora', label: 'Aseguradora' }, { key: 'monto_reclamado', label: 'Reclamado' },
+      { key: 'monto_cubierto', label: 'Cubierto' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'monto_reclamado', otrosNum: ['monto_cubierto'], colCat1: 'estado', colCat2: 'aseguradora', otrasCat: ['cliente_nombre'] }
   }
 };

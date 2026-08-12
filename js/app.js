@@ -29,6 +29,9 @@ import { renderAgendaDashboard } from './agendaDashboard.js';
 import { renderTratamientosDashboard } from './tratamientosDashboard.js';
 import { renderPlanesTratamientoDashboard } from './planesTratamientoDashboard.js';
 import { renderSegurosDentalesDashboard } from './segurosDentalesDashboard.js';
+import { renderRecetasOpticasDashboard } from './recetasOpticasDashboard.js';
+import { renderOrdenesLaboratorioDashboard } from './ordenesLaboratorioDashboard.js';
+import { renderSegurosVisionDashboard } from './segurosVisionDashboard.js';
 
 // Rediseño v3: algunos módulos reemplazan por completo el motor genérico de
 // dashboard.js con su propia "Vista Ejecutiva" (KPIs/gráficos pensados para
@@ -43,7 +46,8 @@ const RENDERERS_BESPOKE = {
   postventa: renderPostventaDashboard, vehiculos: renderVehiculosDashboard,
   repuestos: renderRepuestosDashboard, agenda: renderAgendaDashboard,
   tratamientos: renderTratamientosDashboard, planes_tratamiento: renderPlanesTratamientoDashboard,
-  seguros_dentales: renderSegurosDentalesDashboard
+  seguros_dentales: renderSegurosDentalesDashboard, recetas_opticas: renderRecetasOpticasDashboard,
+  ordenes_laboratorio: renderOrdenesLaboratorioDashboard, seguros_vision: renderSegurosVisionDashboard
 };
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,
@@ -380,7 +384,9 @@ async function activarCapturaSiCorresponde(config) {
       value: r.id, label: `${r.nombre} - ${r.stock} disponible(s)`,
       extra: { stock: Number(r.stock), precioSugerido: Number(r.precio_unitario) || 0 }
     }),
-    tratamientos: t => ({ value: t.id, label: `${t.procedimiento}${t.pieza_dental ? ' (pieza ' + t.pieza_dental + ')' : ''} · ${t.cliente_nombre}` })
+    tratamientos: t => ({ value: t.id, label: `${t.procedimiento}${t.pieza_dental ? ' (pieza ' + t.pieza_dental + ')' : ''} · ${t.cliente_nombre}` }),
+    recetas_opticas: r => ({ value: r.id, label: `${String(r.fecha).slice(0, 10)} · ${r.cliente_nombre}` }),
+    ordenes_laboratorio: o => ({ value: o.id, label: `${o.armazon || 'Orden'}${o.tipo_lente ? ' (' + o.tipo_lente + ')' : ''} · ${o.cliente_nombre}` })
   };
 
   async function esquemaConOpcionesFrescas() {

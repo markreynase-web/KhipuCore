@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Seguros de Visión</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+
+<script src="../lib/chart.js"></script>
+<script src="../lib/papaparse.min.js"></script>
+<script src="../lib/jszip.min.js"></script>
+</head>
+<body data-modulo="seguros_vision">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Seguros de Visión</h1>
+        <div class="topbar-subtitle" id="topbarSubtitle"></div>
+      </div>
+      <div class="topbar-search" id="topbarSearch"></div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="vista-tabs" id="vistaTabs" style="display:none;">
+          <button type="button" class="vista-tab activo" data-vista="ejecutiva">📊 Vista Ejecutiva</button>
+          <button type="button" class="vista-tab" data-vista="operativa">🗂️ Vista Operativa</button>
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <div class="date-range" id="dateRangeWrap" style="display:none;">
+          <input type="date" class="period" id="fechaDesde" title="Desde">
+          <span>→</span>
+          <input type="date" class="period" id="fechaHasta" title="Hasta">
+          <button class="btn btn-ghost" id="resetRangoBtn" title="Ver todo el periodo">Todo</button>
+        </div>
+        <button class="btn btn-ghost" id="exportPdfBtn">Exportar PDF</button>
+        <button class="btn btn-ochre" id="uploadBtn">Cargar CSV o ZIP</button>
+        <button class="btn btn-ghost" id="clearStorageBtn" style="display:none;" title="Borra los datos guardados en este navegador">Borrar datos guardados</button>
+        <input type="file" id="fileInput" accept=".csv,.zip" />
+      </div>
+    </div>
+    <div id="uploadStatus" style="font-size:12px; color:var(--muted); padding:0 32px;"></div>
+
+    <div class="print-only" id="printHeader">
+      <h1 id="printBizName"></h1>
+      <div id="printMeta"></div>
+    </div>
+
+    <section class="panel captura-panel" id="capturaSection" style="display:none; margin:0 32px 20px;">
+      <div class="captura-header">
+        <h3>Registros</h3>
+        <div class="captura-header-acciones">
+          <button type="button" class="btn btn-ochre" id="btnNuevoRegistro">+ Nuevo</button>
+          <button type="button" class="btn btn-ghost" id="btnImportarCSVDB">Importar CSV</button>
+          <input type="file" id="fileInputImportDB" accept=".csv" style="display:none;">
+        </div>
+      </div>
+      <span id="importDBStatus" class="form-status"></span>
+      <div id="tablaCaptura"></div>
+    </section>
+
+    <main>
+      <div class="kpis" id="segVisKpis"></div>
+
+      <div class="panel">
+        <h3>Reclamos <span class="tag" id="segVisCount">—</span></h3>
+        <div id="segVisLista">Cargando…</div>
+      </div>
+    </main>
+
+    <footer>
+      <b>KhipuCore</b> · Seguros de Visión
+    </footer>
+  </div>
+</div>
+
+<script type="module" src="../js/app.js"></script>
+</body>
+</html>
