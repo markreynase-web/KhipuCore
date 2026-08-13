@@ -32,6 +32,9 @@ import { renderSegurosDentalesDashboard } from './segurosDentalesDashboard.js';
 import { renderRecetasOpticasDashboard } from './recetasOpticasDashboard.js';
 import { renderOrdenesLaboratorioDashboard } from './ordenesLaboratorioDashboard.js';
 import { renderSegurosVisionDashboard } from './segurosVisionDashboard.js';
+import { renderComprasDashboard } from './comprasDashboard.js';
+import { renderRrhhDashboard } from './rrhhDashboard.js';
+import { renderProduccionDashboard } from './produccionDashboard.js';
 
 // Rediseño v3: algunos módulos reemplazan por completo el motor genérico de
 // dashboard.js con su propia "Vista Ejecutiva" (KPIs/gráficos pensados para
@@ -47,7 +50,8 @@ const RENDERERS_BESPOKE = {
   repuestos: renderRepuestosDashboard, agenda: renderAgendaDashboard,
   tratamientos: renderTratamientosDashboard, planes_tratamiento: renderPlanesTratamientoDashboard,
   seguros_dentales: renderSegurosDentalesDashboard, recetas_opticas: renderRecetasOpticasDashboard,
-  ordenes_laboratorio: renderOrdenesLaboratorioDashboard, seguros_vision: renderSegurosVisionDashboard
+  ordenes_laboratorio: renderOrdenesLaboratorioDashboard, seguros_vision: renderSegurosVisionDashboard,
+  compras: renderComprasDashboard, rrhh: renderRrhhDashboard, produccion: renderProduccionDashboard
 };
 
 // Namespace de esta página dentro de localStorage. Cada página de módulo (ventas.html,

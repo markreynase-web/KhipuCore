@@ -392,5 +392,81 @@ export const ESQUEMAS = {
       { key: 'monto_cubierto', label: 'Cubierto' }, { key: 'estado', label: 'Estado' }
     ],
     mapa: { colFecha: 'fecha', colNum: 'monto_reclamado', otrosNum: ['monto_cubierto'], colCat1: 'estado', colCat2: 'aseguradora', otrasCat: ['cliente_nombre'] }
+  },
+
+  // --- Compras, RRHH, Producción: backend real (antes CSV-import-only) ---
+
+  compras: {
+    etiqueta: 'compra',
+    campos: [
+      { id: 'fecha', label: 'Fecha del pedido', type: 'date', required: true },
+      { id: 'proveedor', label: 'Proveedor', type: 'text', required: true },
+      { id: 'producto_id', label: 'Producto', type: 'select', required: true, fuente: 'inventario',
+        vacio: 'Selecciona un producto…' },
+      { id: 'cantidad', label: 'Cantidad', type: 'number', required: true, defecto: 1, min: 0.01, step: '0.01' },
+      { id: 'costo_unitario', label: 'Costo unitario', type: 'number', required: true, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'pedido',
+        opciones: [
+          { value: 'pedido', label: 'Pedido' }, { value: 'recibido', label: 'Recibido' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'proveedor', label: 'Proveedor' },
+      { key: 'producto_nombre', label: 'Producto', soloLectura: true }, { key: 'cantidad', label: 'Cant.' },
+      { key: 'costo_unitario', label: 'Costo unit.' }, { key: 'total', label: 'Total', soloLectura: true }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'total', colCat1: 'estado', colCat2: 'proveedor', otrasCat: ['producto_nombre'] }
+  },
+
+  rrhh: {
+    etiqueta: 'empleado',
+    campos: [
+      { id: 'fecha_contratacion', label: 'Fecha de contratación', type: 'date', required: true },
+      { id: 'nombre', label: 'Nombre completo', type: 'text', required: true },
+      { id: 'puesto', label: 'Puesto', type: 'text', placeholder: 'Opcional' },
+      { id: 'departamento', label: 'Departamento', type: 'text', placeholder: 'Opcional' },
+      { id: 'salario', label: 'Salario', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'email', label: 'Correo', type: 'email', placeholder: 'Opcional' },
+      { id: 'telefono', label: 'Teléfono', type: 'text', placeholder: 'Opcional' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'activo',
+        opciones: [
+          { value: 'activo', label: 'Activo' }, { value: 'inactivo', label: 'Inactivo' },
+          { value: 'vacaciones', label: 'Vacaciones' }, { value: 'licencia', label: 'Licencia' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha_contratacion', label: 'Contratado' }, { key: 'nombre', label: 'Nombre' },
+      { key: 'puesto', label: 'Puesto' }, { key: 'departamento', label: 'Departamento' },
+      { key: 'salario', label: 'Salario' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha_contratacion', colNum: 'salario', colCat1: 'departamento', colCat2: 'estado', otrasCat: ['puesto'] }
+  },
+
+  produccion: {
+    etiqueta: 'orden de producción',
+    campos: [
+      { id: 'fecha_inicio', label: 'Fecha de inicio', type: 'date', required: true },
+      { id: 'producto_id', label: 'Producto a fabricar', type: 'select', required: true, fuente: 'inventario',
+        vacio: 'Selecciona un producto…' },
+      { id: 'cantidad_planificada', label: 'Cantidad planificada', type: 'number', required: true, min: 0.01, step: '0.01' },
+      { id: 'cantidad_producida', label: 'Cantidad producida', type: 'number', defecto: 0, min: 0, step: '0.01', placeholder: 'Se completa al terminar la orden' },
+      { id: 'fecha_fin_estimada', label: 'Entrega estimada', type: 'date', placeholder: 'Opcional' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'planificada',
+        opciones: [
+          { value: 'planificada', label: 'Planificada' }, { value: 'en_proceso', label: 'En proceso' },
+          { value: 'completada', label: 'Completada' }, { value: 'cancelada', label: 'Cancelada' }
+        ] },
+      { id: 'costo_materiales', label: 'Costo de materiales', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'costo_mano_obra', label: 'Costo de mano de obra', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha_inicio', label: 'Inicio' }, { key: 'producto_nombre', label: 'Producto', soloLectura: true },
+      { key: 'cantidad_planificada', label: 'Planificado' }, { key: 'cantidad_producida', label: 'Producido' },
+      { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha_inicio', colNum: 'cantidad_planificada', otrosNum: ['cantidad_producida'], colCat1: 'estado', colCat2: 'producto_nombre', otrasCat: [] }
   }
 };

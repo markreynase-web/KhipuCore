@@ -4,12 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KhipuCore — RRHH</title>
+
 <link rel="stylesheet" href="../css/base.css">
 <link rel="stylesheet" href="../css/layout.css">
 <link rel="stylesheet" href="../css/cards.css">
 <link rel="stylesheet" href="../css/tables.css">
 <link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+
 <script src="../lib/chart.js"></script>
+<script src="../lib/papaparse.min.js"></script>
+<script src="../lib/jszip.min.js"></script>
 </head>
 <body data-modulo="rrhh">
 
@@ -20,185 +25,77 @@
     <header class="topbar">
       <div class="topbar-title">
         <h1 id="topbarTitle">RRHH</h1>
-        <div class="topbar-subtitle" id="topbarSubtitle">Ayllu · comunidad organizada de colaboradores</div>
+        <div class="topbar-subtitle" id="topbarSubtitle"></div>
       </div>
       <div class="topbar-search" id="topbarSearch"></div>
       <div id="sesionWidget" class="sesion-widget"></div>
     </header>
 
-    <main>
-      <div class="panel" style="margin-bottom:24px; display:flex; align-items:center; gap:10px; padding:14px 20px;">
-        <span class="tag" style="font-size:12px; padding:4px 10px;">👁️ Vista previa</span>
-        <span style="font-size:13px; color:var(--muted);">Así se vería el módulo de RRHH ya conectado al resto de KhipuCore — planilla generando egresos en Finanzas, contratos por vencer avisando en Auditoría, un colaborador que también es vendedor en Ventas. Los datos de esta pantalla son de ejemplo.</span>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="vista-tabs" id="vistaTabs" style="display:none;">
+          <button type="button" class="vista-tab activo" data-vista="ejecutiva">📊 Vista Ejecutiva</button>
+          <button type="button" class="vista-tab" data-vista="operativa">🗂️ Vista Operativa</button>
+        </div>
       </div>
+      <div class="toolbar-right">
+        <div class="date-range" id="dateRangeWrap" style="display:none;">
+          <input type="date" class="period" id="fechaDesde" title="Desde">
+          <span>→</span>
+          <input type="date" class="period" id="fechaHasta" title="Hasta">
+          <button class="btn btn-ghost" id="resetRangoBtn" title="Ver todo el periodo">Todo</button>
+        </div>
+        <button class="btn btn-ghost" id="exportPdfBtn">Exportar PDF</button>
+        <button class="btn btn-ochre" id="uploadBtn">Cargar CSV o ZIP</button>
+        <button class="btn btn-ghost" id="clearStorageBtn" style="display:none;" title="Borra los datos guardados en este navegador">Borrar datos guardados</button>
+        <input type="file" id="fileInput" accept=".csv,.zip" />
+      </div>
+    </div>
+    <div id="uploadStatus" style="font-size:12px; color:var(--muted); padding:0 32px;"></div>
 
-      <div class="kpis" id="kpisResumen">
-        <div class="kpi-card" data-acento="blue">
-          <div class="kpi-card-icon">👥</div>
-          <div class="label">Empleados activos</div>
-          <div class="value num">126</div>
-          <div class="sub">8 nuevos este mes</div>
-          <div class="kpi-card-bar"><div class="kpi-card-bar-fill" style="width:92%; background:var(--blue);"></div></div>
-        </div>
-        <div class="kpi-card" data-acento="orange">
-          <div class="kpi-card-icon">⏰</div>
-          <div class="label">Asistencias hoy</div>
-          <div class="value num">118/126</div>
-          <div class="sub">93% de asistencia</div>
-          <div class="kpi-card-bar"><div class="kpi-card-bar-fill" style="width:93%; background:var(--orange);"></div></div>
-        </div>
-        <div class="kpi-card" data-acento="purple">
-          <div class="kpi-card-icon">🏖</div>
-          <div class="label">De vacaciones</div>
-          <div class="value num">12</div>
-          <div class="sub">colaboradores esta semana</div>
-          <div class="kpi-card-bar"><div class="kpi-card-bar-fill" style="width:40%; background:var(--purple);"></div></div>
-        </div>
-        <div class="kpi-card" data-acento="red">
-          <div class="kpi-card-icon">📄</div>
-          <div class="label">Contratos por vencer</div>
-          <div class="value num">4</div>
-          <div class="sub">en los próximos 30 días</div>
-          <div class="kpi-card-bar"><div class="kpi-card-bar-fill" style="width:30%; background:var(--coral);"></div></div>
-        </div>
-        <div class="kpi-card" data-acento="green">
-          <div class="kpi-card-icon">🎂</div>
-          <div class="label">Cumpleaños hoy</div>
-          <div class="value num">2</div>
-          <div class="sub">Ana Quispe, Jose Torres</div>
-          <div class="kpi-card-bar"><div class="kpi-card-bar-fill" style="width:20%; background:var(--green);"></div></div>
+    <div class="print-only" id="printHeader">
+      <h1 id="printBizName"></h1>
+      <div id="printMeta"></div>
+    </div>
+
+    <section class="panel captura-panel" id="capturaSection" style="display:none; margin:0 32px 20px;">
+      <div class="captura-header">
+        <h3>Registros</h3>
+        <div class="captura-header-acciones">
+          <button type="button" class="btn btn-ochre" id="btnNuevoRegistro">+ Nuevo</button>
+          <button type="button" class="btn btn-ghost" id="btnImportarCSVDB">Importar CSV</button>
+          <input type="file" id="fileInputImportDB" accept=".csv" style="display:none;">
         </div>
       </div>
+      <span id="importDBStatus" class="form-status"></span>
+      <div id="tablaCaptura"></div>
+    </section>
+
+    <main>
+      <div class="kpis" id="rrhhKpis"></div>
 
       <div class="inicio-columnas">
         <div class="inicio-col">
           <div class="panel">
-            <h3>Asistencia mensual <span class="tag">últimos 6 meses</span></h3>
-            <div class="chart-wrap"><canvas id="chartAsistencia"></canvas></div>
-          </div>
-          <div class="panel">
-            <h3>Distribución por área <span class="tag">Empleados</span></h3>
-            <div class="chart-wrap" style="height:240px;"><canvas id="chartAreas"></canvas></div>
-          </div>
-          <div class="panel">
-            <h3>Últimas solicitudes</h3>
-            <div>
-              <div class="rank-row"><span class="rank-name">María Pérez — Vacaciones (5 días)</span><span class="rank-val"><span class="role-badge role-categoria">Pendiente</span></span></div>
-              <div class="rank-row"><span class="rank-name">Juan Díaz — Permiso médico</span><span class="rank-val"><span class="role-badge role-numerico">Aprobado</span></span></div>
-              <div class="rank-row"><span class="rank-name">Ana Quispe — Cambio de horario</span><span class="rank-val"><span class="role-badge role-categoria">Pendiente</span></span></div>
-              <div class="rank-row"><span class="rank-name">Carlos Mendoza — Vacaciones (10 días)</span><span class="rank-val"><span class="role-badge role-numerico">Aprobado</span></span></div>
-            </div>
+            <h3>Empleados <span class="tag" id="rrhhCount">—</span></h3>
+            <div id="rrhhLista">Cargando…</div>
           </div>
         </div>
-
         <div class="inicio-col inicio-col-angosta">
-          <div class="panel" style="border:1px solid var(--purple-soft);">
-            <h3>🤖 Khipu IA <span class="tag">Insights</span></h3>
-            <div>
-              <div class="rank-row" style="align-items:flex-start;"><span style="font-size:15px;">🤖</span><span class="rank-name">La asistencia disminuyó 8% durante las últimas dos semanas.</span></div>
-              <div class="rank-row" style="align-items:flex-start;"><span style="font-size:15px;">🤖</span><span class="rank-name">El área Comercial registra la mayor cantidad de horas extra este mes.</span></div>
-              <div class="rank-row" style="align-items:flex-start;"><span style="font-size:15px;">🤖</span><span class="rank-name">Existen 3 colaboradores con contratos próximos a vencer.</span></div>
-              <div class="rank-row" style="align-items:flex-start;"><span style="font-size:15px;">🤖</span><span class="rank-name">Se detectó un incremento del ausentismo en Logística.</span></div>
-            </div>
-          </div>
           <div class="panel" style="padding:20px;">
-            <h3 style="margin-bottom:10px;">🚨 Alertas RRHH</h3>
-            <div class="rank-row"><span class="rank-name">3 contratos vencen en 15 días</span></div>
-            <div class="rank-row"><span class="rank-name">Ausentismo en Logística +6% esta semana</span></div>
-            <div class="rank-row"><span class="rank-name">2 evaluaciones de desempeño pendientes</span></div>
-          </div>
-          <div class="panel">
-            <h3>Pulso organizacional</h3>
-            <div class="cat-row"><div class="top"><span>😊 Satisfacción del equipo</span><span>82%</span></div><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:82%;"></div></div></div>
-            <div class="cat-row"><div class="top"><span>📉 Rotación de personal</span><span>4.2% mensual</span></div><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:42%; background:var(--coral);"></div></div></div>
-            <div class="cat-row"><div class="top"><span>🎯 Cumplimiento de objetivos</span><span>91%</span></div><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:91%; background:var(--green);"></div></div></div>
-            <div class="cat-row"><div class="top"><span>📚 Horas de capacitación (mes)</span><span>340 h</span></div><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:68%; background:var(--blue);"></div></div></div>
-            <div style="font-size:12px; color:var(--muted); margin-top:8px;">⏳ Antigüedad promedio: 2.3 años · 🚨 Riesgo de sobrecarga: <b style="color:var(--orange);">Medio</b> (Logística)</div>
+            <h3 style="margin-bottom:10px;">Por departamento</h3>
+            <div id="rrhhPorDepartamento"></div>
           </div>
         </div>
-      </div>
-
-      <div class="panel" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:14px;">Empleados <span class="tag">126 registros de ejemplo</span></h3>
-        <div class="tabla-registros-wrap">
-          <table class="tabla-registros">
-            <thead><tr><th>Foto</th><th>Nombre</th><th>Cargo</th><th>Área</th><th>Estado</th><th class="col-acciones"></th></tr></thead>
-            <tbody id="tablaEmpleadosPreview"></tbody>
-          </table>
-        </div>
-        <div style="font-size:12px; color:var(--muted); margin-top:12px;">Vista previa — próximamente con datos reales, conectados a Ventas, Finanzas y Auditoría igual que el resto de KhipuCore.</div>
       </div>
     </main>
 
-    <footer></footer>
+    <footer>
+      <b>KhipuCore</b> · RRHH
+    </footer>
   </div>
 </div>
 
-<script type="module">
-import { cargarConfigEmpresa } from '../js/config.js';
-import { renderSidebar } from '../components/sidebar.js';
-import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
-import { renderTopbar } from '../components/topbar.js';
-import { renderFooter } from '../components/footer.js';
-import { haySesionActiva } from '../js/sesion.js';
-import { crearGraficoBarras, crearGraficoDona } from '../js/charts.js';
-
-if (!haySesionActiva()) location.replace('login.html');
-
-const EMPLEADOS_EJEMPLO = [
-  { nombre: 'María Pérez', cargo: 'Analista de Ventas', area: 'Ventas', estado: 'Activo' },
-  { nombre: 'Juan Díaz', cargo: 'Supervisor de Logística', area: 'Logística', estado: 'Activo' },
-  { nombre: 'Ana Quispe', cargo: 'Asistente Administrativo', area: 'Administración', estado: 'Activo' },
-  { nombre: 'Carlos Mendoza', cargo: 'Jefe de Producción', area: 'Producción', estado: 'Vacaciones' },
-  { nombre: 'Diana Rojas', cargo: 'Ejecutiva de Atención al Cliente', area: 'Atención al Cliente', estado: 'Activo' },
-  { nombre: 'Jose Torres', cargo: 'Analista Comercial', area: 'Ventas', estado: 'Contrato por vencer' }
-];
-
-const BADGE_ESTADO = { 'Activo': 'role-numerico', 'Vacaciones': 'role-categoria', 'Contrato por vencer': 'role-fecha' };
-
-function pintarEmpleadosPreview() {
-  document.getElementById('tablaEmpleadosPreview').innerHTML = EMPLEADOS_EJEMPLO.map(e => `
-    <tr>
-      <td>👤</td>
-      <td>${e.nombre}</td>
-      <td>${e.cargo}</td>
-      <td>${e.area}</td>
-      <td><span class="role-badge ${BADGE_ESTADO[e.estado]}">${e.estado}</span></td>
-      <td class="col-acciones">
-        <div class="acciones-icono">
-          <button type="button" class="icon-btn" title="Vista previa" disabled>👁️</button>
-          <button type="button" class="icon-btn" title="Vista previa" disabled>✏️</button>
-          <button type="button" class="icon-btn" title="Vista previa" disabled>🗑️</button>
-        </div>
-      </td>
-    </tr>`).join('');
-}
-
-function dibujarCharts() {
-  const ctxAsistencia = document.getElementById('chartAsistencia').getContext('2d');
-  crearGraficoBarras(ctxAsistencia, {
-    etiquetas: ['Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
-    valores: [91, 89, 94, 90, 96, 93],
-    label: 'Asistencia %',
-    color: '#1A4FBF'
-  });
-
-  const ctxAreas = document.getElementById('chartAreas').getContext('2d');
-  crearGraficoDona(ctxAreas, {
-    etiquetas: ['Ventas', 'Logística', 'Producción', 'Atención al Cliente', 'Administración'],
-    valores: [34, 28, 25, 21, 18]
-  });
-}
-
-(async function iniciar() {
-  const config = await cargarConfigEmpresa();
-  renderSidebar(config, 'rrhh');
-  renderKhipuAiWidget(config);
-  await renderTopbar(config);
-  renderFooter();
-  pintarEmpleadosPreview();
-  dibujarCharts();
-})();
-</script>
+<script type="module" src="../js/app.js"></script>
 </body>
 </html>

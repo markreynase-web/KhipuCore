@@ -22,7 +22,7 @@ import { ICONO_SPARK } from './khipuAiWidget.js';
 // aparezca acá cae en 'gestion' por defecto (ver el reduce más abajo).
 const GRUPO_POR_MODULO = {
   ventas: 'gestion', compras: 'gestion', inventario: 'gestion', clientes: 'gestion',
-  finanzas: 'gestion', postventa: 'gestion', produccion: 'gestion', repuestos: 'gestion',
+  finanzas: 'gestion', postventa: 'gestion', produccion: 'gestion', repuestos: 'gestion', marketing: 'gestion',
   agenda: 'gestion', tratamientos: 'gestion', planes_tratamiento: 'gestion', seguros_dentales: 'gestion',
   recetas_opticas: 'gestion', ordenes_laboratorio: 'gestion', seguros_vision: 'gestion',
   rrhh: 'recursos', vehiculos: 'recursos'

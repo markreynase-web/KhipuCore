@@ -23,6 +23,9 @@ import segurosDentalesRouter from './routes/segurosDentales.js';
 import recetasOpticasRouter from './routes/recetasOpticas.js';
 import ordenesLaboratorioRouter from './routes/ordenesLaboratorio.js';
 import segurosVisionRouter from './routes/segurosVision.js';
+import comprasRouter from './routes/compras.js';
+import rrhhRouter from './routes/rrhh.js';
+import produccionRouter from './routes/produccion.js';
 import superadminRouter from './routes/superadmin.js';
 import khipuAiRouter from './routes/khipuAi.js';
 
@@ -74,6 +77,9 @@ app.use('/api/seguros_dentales', segurosDentalesRouter);
 app.use('/api/recetas_opticas', recetasOpticasRouter);
 app.use('/api/ordenes_laboratorio', ordenesLaboratorioRouter);
 app.use('/api/seguros_vision', segurosVisionRouter);
+app.use('/api/compras', comprasRouter);
+app.use('/api/rrhh', rrhhRouter);
+app.use('/api/produccion', produccionRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/khipu-ai', khipuAiRouter);
 
