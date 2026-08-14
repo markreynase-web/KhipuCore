@@ -40,7 +40,12 @@ function formatoFechaLarga(fechaISO) {
 }
 
 export function renderAgendaDashboard(filasCrudas, backend) {
-  citasCache = filasCrudas || [];
+  // El backend devuelve `fecha` como datetime ISO completo (ej.
+  // "2026-09-01T05:00:00.000Z", porque la columna DATE de Postgres se
+  // serializa así) -- comparar eso con una fecha "YYYY-MM-DD" con === nunca
+  // da igual. Se normaliza una sola vez acá a _fecha, mismo patrón ya
+  // usado en ventasDashboard.js/finanzasDashboard.js.
+  citasCache = (filasCrudas || []).map(c => ({ ...c, _fecha: c.fecha ? String(c.fecha).slice(0, 10) : null }));
   backendRef = backend;
   asegurarEventos();
   dibujar();
@@ -77,10 +82,10 @@ function dibujarKpis() {
   const hoy = hoyISO();
   const en7dias = sumarDias(hoy, 6);
 
-  const citasHoy = citasCache.filter(c => c.fecha === hoy);
+  const citasHoy = citasCache.filter(c => c._fecha === hoy);
   const confirmadasHoy = citasHoy.filter(c => c.estado === 'confirmada').length;
-  const pendientes = citasCache.filter(c => c.estado === 'pendiente' && c.fecha >= hoy).length;
-  const proximos7 = citasCache.filter(c => c.fecha >= hoy && c.fecha <= en7dias && !['cancelada', 'no_asistio'].includes(c.estado)).length;
+  const pendientes = citasCache.filter(c => c.estado === 'pendiente' && c._fecha >= hoy).length;
+  const proximos7 = citasCache.filter(c => c._fecha >= hoy && c._fecha <= en7dias && !['cancelada', 'no_asistio'].includes(c.estado)).length;
 
   document.getElementById('agendaKpis').innerHTML = [
     kpiCard({ acento: 'blue', icono: '📅', label: 'Citas hoy', value: fmtNum(citasHoy.length), sub: `${confirmadasHoy} confirmada(s)` }),
@@ -107,7 +112,7 @@ function botonesAccion(cita) {
 }
 
 function dibujarDia() {
-  const delDia = citasCache.filter(c => c.fecha === fechaSeleccionada).sort((a, b) => String(a.hora).localeCompare(String(b.hora)));
+  const delDia = citasCache.filter(c => c._fecha === fechaSeleccionada).sort((a, b) => String(a.hora).localeCompare(String(b.hora)));
   document.getElementById('agendaDiaCount').textContent = delDia.length ? `${delDia.length} cita(s)` : 'sin citas';
 
   document.getElementById('agendaDia').innerHTML = delDia.length ? delDia.map(c => {
@@ -128,14 +133,14 @@ function dibujarDia() {
 function dibujarProximas() {
   const hoy = hoyISO();
   const proximas = citasCache
-    .filter(c => c.fecha >= hoy && !['cancelada', 'completada', 'no_asistio'].includes(c.estado))
-    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)) || String(a.hora).localeCompare(String(b.hora)))
+    .filter(c => c._fecha >= hoy && !['cancelada', 'completada', 'no_asistio'].includes(c.estado))
+    .sort((a, b) => String(a._fecha).localeCompare(String(b._fecha)) || String(a.hora).localeCompare(String(b.hora)))
     .slice(0, 8);
 
   document.getElementById('agendaProximas').innerHTML = proximas.length ? proximas.map(c => `
     <div class="rank-row">
       <span class="rank-name">${escapeHtml(c.cliente_nombre)}<div class="rank-sub">${escapeHtml(c.motivo)}</div></span>
-      <span class="rank-val" style="font-size:12px; text-align:right;">${escapeHtml(String(c.fecha).slice(5))}<br>${escapeHtml(String(c.hora).slice(0, 5))}</span>
+      <span class="rank-val" style="font-size:12px; text-align:right;">${escapeHtml(c._fecha.slice(5))}<br>${escapeHtml(String(c.hora).slice(0, 5))}</span>
     </div>`).join('') : '<div class="rank-row">Sin próximas citas agendadas.</div>';
 }
 

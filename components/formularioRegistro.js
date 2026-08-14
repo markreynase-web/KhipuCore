@@ -172,7 +172,10 @@ export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear 
       statusEl.style.color = 'var(--coral)';
       return;
     }
-    statusEl.textContent = `${esquema.etiqueta[0].toUpperCase()}${esquema.etiqueta.slice(1)} guardado.`;
+    // "Se guardó: X" en vez de "X guardado/guardada" -- evita tener que
+    // saber el género gramatical de cada etiqueta ('cita', 'compra',
+    // 'receta' son femeninas; 'cliente', 'vehículo' son masculinas).
+    statusEl.textContent = `Se guardó: ${esquema.etiqueta}.`;
     statusEl.style.color = 'var(--teal)';
     esquema.campos.forEach(c => {
       const input = document.getElementById(idInput(c));
