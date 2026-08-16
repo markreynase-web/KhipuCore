@@ -144,6 +144,21 @@
 
 .main-area{ flex:1; min-width:0; }
 
+/* Impersonación (components/topbar.js): sticky top:0 dentro de .main-area,
+   no de .app-shell -- .sidebar ya usa sticky top:0 en su propia columna, así
+   que este banner tiene el suyo aparte y no compiten por la misma posición. */
+.banner-impersonacion{
+  position:sticky; top:0; z-index:40; display:flex; align-items:center; justify-content:center; gap:14px;
+  background:#3D1F00; color:#fff; padding:8px 20px; font-family:'Inter', sans-serif; font-size:12.5px; font-weight:600;
+  text-align:center;
+}
+.banner-impersonacion b{ font-weight:800; }
+.banner-impersonacion button{
+  font-family:'Inter', sans-serif; font-size:11.5px; font-weight:700; color:#3D1F00; background:#fff;
+  border:none; border-radius:20px; padding:4px 14px; cursor:pointer; flex-shrink:0;
+}
+.banner-impersonacion button:hover{ background:#F4E7D8; }
+
 .topbar{
   background:#fff; color:var(--ink); padding:10px 32px; border-bottom:1px solid var(--paper-line);
   display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;

@@ -32,13 +32,53 @@ window.addEventListener('khipu-ai:abrir', () => setVentana(true));
 // Preguntas de ejemplo mostradas como chips cuando el chat todavía no tiene
 // historial -- clic llena el input y envía, reutilizando el mismo flujo de
 // onEnviar (sin duplicar lógica de fetch/render).
-const PREGUNTAS_SUGERIDAS = [
+//
+// Contextuales solo en los módulos donde khipuAiTools.js YA tiene una
+// herramienta real (ventas, inventario/repuestos, finanzas, clientes) --
+// el resto de los ~25 módulos (Mascotas, Membresías, Flota, Tratamientos...)
+// no tiene ninguna herramienta propia todavía, así que un chip prometiendo
+// una respuesta sobre "mascotas con seguimiento pendiente" chocaría contra
+// un asistente que no tiene con qué contestar eso. Se quedan con las
+// genéricas de siempre hasta que existan esas herramientas (backlog aparte).
+const SUGERENCIAS_POR_MODULO = {
+  ventas: [
+    '¿Cómo van las ventas este mes?',
+    '¿Cuál es mi ticket promedio?',
+    'Compara este mes con el anterior.',
+    '¿Cuáles son mis productos más vendidos?'
+  ],
+  inventario: [
+    '¿Qué productos tienen stock bajo?',
+    '¿Qué productos casi no se venden?',
+    '¿Qué debería reponer pronto?'
+  ],
+  repuestos: [
+    '¿Qué repuestos tienen stock bajo?',
+    '¿Qué repuestos casi no se venden?',
+    '¿Qué debería reponer pronto?'
+  ],
+  finanzas: [
+    'Dame un resumen financiero.',
+    '¿Cuál es mi saldo neto este mes?',
+    '¿En qué estoy gastando más?'
+  ],
+  clientes: [
+    '¿Cuál fue mi mejor cliente este mes?',
+    '¿Quiénes son mis clientes más frecuentes?'
+  ]
+};
+
+const PREGUNTAS_SUGERIDAS_GENERICAS = [
   '¿Cómo están las ventas este mes?',
   '¿Qué productos tienen stock bajo?',
   '¿Cuál fue mi mejor cliente?',
   'Genera un resumen financiero.',
   '¿Qué áreas necesitan atención?'
 ];
+
+function sugerenciasActuales() {
+  return SUGERENCIAS_POR_MODULO[document.body.dataset.modulo] || PREGUNTAS_SUGERIDAS_GENERICAS;
+}
 
 export function renderKhipuAiWidget(config) {
   const habilitado = !!buscarModulo(config, 'khipu_ai') && tienePermiso('khipu_ai.ver');
@@ -117,7 +157,7 @@ function renderMensajes() {
   if (!cont) return;
 
   if (!historial.length) {
-    const chips = `<div class="khipu-ai-sugerencias">${PREGUNTAS_SUGERIDAS.map(p => `<button type="button" class="khipu-ai-chip">${escaparHtml(p)}</button>`).join('')}</div>`;
+    const chips = `<div class="khipu-ai-sugerencias">${sugerenciasActuales().map(p => `<button type="button" class="khipu-ai-chip">${escaparHtml(p)}</button>`).join('')}</div>`;
     cont.innerHTML = `<div class="khipu-ai-msg khipu-ai-msg-asistente">Hola, soy Khipu AI 👋 Pregúntame sobre tus ventas, inventario, finanzas o clientes.</div>${chips}`;
   } else {
     cont.innerHTML = historial.map(m => {

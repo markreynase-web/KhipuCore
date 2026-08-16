@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, usuario_id, usuario_nombre, accion, modulo, registro_id, detalle, creado_el
+      `SELECT id, usuario_id, usuario_nombre, accion, modulo, registro_id, detalle, creado_el, via_impersonacion
        FROM audit_log ${where}
        ORDER BY creado_el DESC
        LIMIT ${limite}`,

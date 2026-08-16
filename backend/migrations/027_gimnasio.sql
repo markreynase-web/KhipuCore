@@ -107,14 +107,17 @@ DECLARE
   r_gerente    INTEGER := (SELECT id FROM roles WHERE nombre = 'gerente');
   r_supervisor INTEGER := (SELECT id FROM roles WHERE nombre = 'supervisor');
 BEGIN
-  -- pagos_membresia.editar queda fuera a propósito: no existe un PUT
-  -- /pagos_membresia/:id (un pago no se edita, se deshace -- ver
-  -- routes/pagosMembresia.js), así que otorgarlo solo mostraría un botón
-  -- "Editar" que rompe al usarlo.
+  -- pagos_membresia.editar SÍ queda entre los permisos de administrador,
+  -- igual que en el resto de los verticales -- migrations/005_roles_permisos.sql
+  -- ya establece "Administrador: todo" como regla de base (sin filtro,
+  -- re-sincroniza en cada corrida de `npm run migrate`), así que cualquier
+  -- intento de recortarlo acá quedaría deshecho en la próxima corrida de
+  -- todos modos. No hay riesgo real: pages/pagos-membresia.html es de solo
+  -- lectura (no usa el motor genérico ni pinta un botón de editar), así que
+  -- el permiso queda sin uso en el frontend, no roto.
   INSERT INTO rol_permiso (rol_id, permiso_id)
   SELECT r_admin, id FROM permisos
-  WHERE nombre LIKE 'planes_membresia.%' OR nombre LIKE 'membresias.%'
-     OR nombre IN ('pagos_membresia.ver','pagos_membresia.crear','pagos_membresia.eliminar')
+  WHERE nombre LIKE 'planes_membresia.%' OR nombre LIKE 'membresias.%' OR nombre LIKE 'pagos_membresia.%'
   ON CONFLICT DO NOTHING;
 
   INSERT INTO rol_permiso (rol_id, permiso_id)

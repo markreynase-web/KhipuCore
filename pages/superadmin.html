@@ -50,7 +50,7 @@
 </div>
 
 <script type="module">
-  import { haySesionActiva, obtenerSesion, cerrarSesion, esSuperAdmin } from '../js/sesion.js';
+  import { haySesionActiva, obtenerSesion, cerrarSesion, esSuperAdmin, guardarSesion, respaldarSesionSuperAdmin } from '../js/sesion.js';
   import { API_BASE_URL } from '../js/apiConfig.js';
   import { abrirPanelLateral } from '../components/panelLateral.js';
   import { renderFooter } from '../components/footer.js';
@@ -369,6 +369,17 @@
           </label>
           <div class="form-status" id="activoStatus" style="margin-bottom:20px;"></div>
 
+          <div class="sa-subtitulo">Soporte</div>
+          <div style="margin-bottom:20px;">
+            <textarea id="impersonarMotivo" rows="2" placeholder="Motivo (obligatorio, ej. &quot;Cliente reporta error al guardar una venta&quot;)"
+              style="width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:9px 11px; border:1px solid var(--paper-line); border-radius:8px; background:#fff; color:var(--ink); resize:vertical; box-sizing:border-box;"></textarea>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:8px;">
+              <button type="button" class="btn btn-ghost" id="btnImpersonar" style="border:1px solid var(--paper-line);">🔒 Entrar como soporte técnico</button>
+              <span class="form-status" id="impersonarStatus"></span>
+            </div>
+            <div style="font-size:11.5px; color:var(--muted); margin-top:6px;">Queda registrado en la Auditoría de esta empresa: quién, cuándo y por qué. Sesión de 30 minutos.</div>
+          </div>
+
           <div class="sa-subtitulo">Color de marca</div>
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
             <input type="color" id="colorPrimario" value="${empresa.color_primario || '#E3B23C'}" style="width:44px; height:34px; padding:2px; border:1px solid var(--paper-line); border-radius:8px; cursor:pointer;">
@@ -450,6 +461,26 @@
           } else {
             e.target.checked = !activo; // revertir si falló
             statusEl.textContent = 'No se pudo guardar el cambio.';
+            statusEl.style.color = 'var(--coral)';
+          }
+        });
+
+        document.getElementById('btnImpersonar').addEventListener('click', async () => {
+          const statusEl = document.getElementById('impersonarStatus');
+          const motivo = document.getElementById('impersonarMotivo').value.trim();
+          if (!motivo) {
+            statusEl.textContent = 'Escribe un motivo antes de entrar.';
+            statusEl.style.color = 'var(--coral)';
+            return;
+          }
+          if (!confirm(`¿Entrar a "${empresa.nombre}" como soporte técnico? Va a quedar registrado en su Auditoría.`)) return;
+          const res = await api(`/superadmin/empresas/${empresa.id}/impersonar`, { method: 'POST', body: JSON.stringify({ motivo }) });
+          if (res) {
+            respaldarSesionSuperAdmin();
+            guardarSesion(res);
+            location.href = '../index.html';
+          } else {
+            statusEl.textContent = 'No se pudo entrar.';
             statusEl.style.color = 'var(--coral)';
           }
         });

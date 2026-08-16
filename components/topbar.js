@@ -13,7 +13,7 @@
 //     nueva en la base de datos, se arma al vuelo desde endpoints que ya
 //     existen) + el chip de usuario con dropdown (nombre/rol/cerrar sesión).
 
-import { obtenerSesion, tienePermiso, haySesionActiva, cerrarSesion } from '../js/sesion.js';
+import { obtenerSesion, tienePermiso, haySesionActiva, cerrarSesion, estaImpersonando, restaurarSesionSuperAdmin } from '../js/sesion.js';
 import { listarRegistros } from '../js/api.js';
 import { escapeHtml, fmtNum } from '../js/utils.js';
 
@@ -240,7 +240,42 @@ async function renderUsuarioYNotificaciones(config) {
   });
 }
 
+// Banner mientras el super admin está impersonando una empresa (ver POST
+// /superadmin/empresas/:id/impersonar). Se pinta acá -- no en cada página --
+// porque renderTopbar() ya corre en TODAS ellas (tanto desde js/app.js como
+// desde las páginas bespoke), así ninguna página nueva tiene que acordarse
+// de agregarlo. Va primero dentro de .main-area (no de document.body):
+// .sidebar ya es sticky top:0 dentro de .app-shell, y este banner sticky
+// top:0 tendría que competir por esa misma posición si viviera afuera; dentro
+// de .main-area (la columna derecha, .topbar no es sticky) no hay ese
+// choque. "Salir" restaura la sesión de super admin que quedó respaldada al
+// entrar (ver respaldarSesionSuperAdmin() en js/sesion.js) en vez de
+// simplemente cerrar sesión, para no pedir contraseña de nuevo.
+function renderBannerImpersonacion() {
+  const existente = document.getElementById('bannerImpersonacion');
+  if (!estaImpersonando()) { existente?.remove(); return; }
+  if (existente) return;
+
+  const mainArea = document.querySelector('.main-area');
+  if (!mainArea) return;
+
+  const sesion = obtenerSesion();
+  const banner = document.createElement('div');
+  banner.id = 'bannerImpersonacion';
+  banner.className = 'banner-impersonacion';
+  banner.innerHTML = `
+    🔒 Estás viendo como soporte técnico — <b>${escapeHtml(sesion.usuario.empresa_nombre || 'esta empresa')}</b>
+    <button type="button" id="btnSalirImpersonacion">Salir</button>
+  `;
+  mainArea.prepend(banner);
+  document.getElementById('btnSalirImpersonacion').addEventListener('click', () => {
+    const restaurada = restaurarSesionSuperAdmin();
+    location.href = restaurada ? 'superadmin.html' : 'login.html';
+  });
+}
+
 export async function renderTopbar(config) {
+  renderBannerImpersonacion();
   renderBusqueda(config);
   await renderUsuarioYNotificaciones(config);
 }

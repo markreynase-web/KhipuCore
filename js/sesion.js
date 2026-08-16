@@ -51,6 +51,40 @@ export function esSuperAdmin() {
   return !!s?.usuario?.es_super_admin;
 }
 
+// Impersonación (ver POST /superadmin/empresas/:id/impersonar): una sesión
+// impersonada es, para el resto del frontend, una sesión normal de empresa
+// (mismo empresa_id/permisos que cualquier admin) -- lo único que la
+// distingue es este flag, usado solo para el banner de aviso (ver
+// components/topbar.js) y para decidir qué hace "Salir" en ese banner.
+export function estaImpersonando() {
+  const s = obtenerSesion();
+  return !!s?.usuario?.impersonando;
+}
+
+// Al impersonar, la sesión de super admin (que no lleva empresa_id/permisos,
+// ver arriba) se reemplaza por la sesión impersonada en la misma clave de
+// localStorage -- no pueden convivir las dos. Se guarda una copia aparte
+// antes de reemplazarla, así "Salir" (ver components/topbar.js) puede volver
+// directo a Super Admin sin pedir contraseña de nuevo.
+const CLAVE_BACKUP_SUPER_ADMIN = 'pd_sesion_super_admin_backup';
+
+export function respaldarSesionSuperAdmin() {
+  const actual = obtenerSesion();
+  if (actual) sessionStorage.setItem(CLAVE_BACKUP_SUPER_ADMIN, JSON.stringify(actual));
+}
+
+export function restaurarSesionSuperAdmin() {
+  const cruda = sessionStorage.getItem(CLAVE_BACKUP_SUPER_ADMIN);
+  sessionStorage.removeItem(CLAVE_BACKUP_SUPER_ADMIN);
+  if (!cruda) return false;
+  try {
+    localStorage.setItem(CLAVE, cruda);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Fase A (multi-tenant): cuando un usuario pertenece a más de una empresa,
 // el login no entrega sesión de una vez -- entrega un preAuthToken de 5
 // minutos + la lista de empresas para que el usuario elija. Eso NO es una

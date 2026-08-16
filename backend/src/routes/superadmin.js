@@ -8,8 +8,10 @@
 
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 import { auth, requireSuperAdmin } from '../middleware/auth.js';
+import { registrarAuditoria } from '../registroAuditoria.js';
 
 const router = Router();
 router.use(auth, requireSuperAdmin);
@@ -322,6 +324,72 @@ router.post('/empresas/:id/admin', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo crear el administrador de la empresa.' });
+  }
+});
+
+// Vida corta (30 min, contra las 8h de una sesión normal) porque esto es
+// acceso de soporte, no una sesión de trabajo -- si hace falta más tiempo,
+// se vuelve a pedir.
+const DURACION_IMPERSONACION = '30m';
+
+// "Entrar como soporte" a una empresa sin necesitar la contraseña de nadie
+// de ahí. Identidad propia (ver 028_impersonacion.sql, charla de diseño
+// aparte): el JWT lleva el id/nombre REALES del super admin -- nunca toma
+// prestada la identidad de un admin de la empresa -- más un rol de
+// administrador sintetizado para esa empresa puntual (no depende de que
+// exista una fila en usuario_empresa) y el flag impersonando:true. Ese flag
+// es lo único que hace falta para que registrarAuditoria() marque
+// automáticamente cada acción tomada durante esta sesión (ver
+// registroAuditoria.js) -- ninguna otra ruta de escritura necesita saber
+// que existe la impersonación.
+router.post('/empresas/:id/impersonar', async (req, res) => {
+  const motivo = (req.body?.motivo || '').trim();
+  if (!motivo) return res.status(400).json({ error: 'Escribe un motivo antes de entrar como soporte.' });
+
+  try {
+    const { rows: empresaRows } = await pool.query(`SELECT * FROM empresas WHERE id = $1`, [req.params.id]);
+    if (!empresaRows.length) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const empresa = empresaRows[0];
+    if (!empresa.activo) return res.status(400).json({ error: 'Esta empresa está desactivada.' });
+
+    const { rows: permisosRows } = await pool.query(
+      `SELECT COALESCE(array_agg(p.nombre) FILTER (WHERE p.nombre IS NOT NULL), '{}') AS permisos
+       FROM roles r
+       LEFT JOIN rol_permiso rp ON rp.rol_id = r.id
+       LEFT JOIN permisos p ON p.id = rp.permiso_id
+       WHERE r.nombre = 'administrador'
+       GROUP BY r.nombre`
+    );
+    const permisos = permisosRows[0]?.permisos || [];
+
+    const payload = {
+      id: req.usuario.id,
+      nombre: req.usuario.nombre,
+      email: req.usuario.email,
+      empresa_id: empresa.id,
+      empresa_nombre: empresa.nombre,
+      rol: 'administrador',
+      permisos,
+      impersonando: true
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: DURACION_IMPERSONACION });
+
+    // Se audita bajo la empresa impersonada (no bajo "superadmin") a
+    // propósito -- así aparece en la propia Auditoría de esa empresa, y sus
+    // usuarios pueden ver que soporte entró, cuándo y por qué. Transparencia
+    // hacia el cliente, no solo un log interno.
+    await registrarAuditoria(pool, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: empresa.id },
+      accion: 'impersonar',
+      modulo: 'superadmin',
+      registroId: empresa.id,
+      detalle: { empresa: empresa.nombre, motivo }
+    });
+
+    res.json({ token, usuario: payload });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo iniciar la sesión de soporte.' });
   }
 });
 

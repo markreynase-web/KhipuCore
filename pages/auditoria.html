@@ -45,6 +45,7 @@
           <option value="editar">Editó</option>
           <option value="eliminar">Eliminó</option>
           <option value="importar">Importó</option>
+          <option value="impersonar">Soporte</option>
         </select>
       </div>
       <div class="toolbar-right">
@@ -94,7 +95,8 @@ let eventosCache = [];
 const ETIQUETA_MODULO = {
   ventas: 'una venta', inventario: 'un producto', clientes: 'un cliente',
   finanzas: 'un movimiento', usuarios: 'un usuario',
-  postventa: 'una orden de servicio', vehiculos: 'un vehículo', repuestos: 'un repuesto'
+  postventa: 'una orden de servicio', vehiculos: 'un vehículo', repuestos: 'un repuesto',
+  superadmin: 'soporte técnico'
 };
 
 // Color del marcador/badge de cada acción -- reutiliza los mismos tokens
@@ -105,7 +107,8 @@ const ETIQUETA_ACCION = {
   crear: { texto: 'Creó', color: 'teal' },
   editar: { texto: 'Editó', color: 'blue' },
   eliminar: { texto: 'Eliminó', color: 'danger' },
-  importar: { texto: 'Importó', color: 'purple' }
+  importar: { texto: 'Importó', color: 'purple' },
+  impersonar: { texto: 'Soporte', color: 'purple' }
 };
 
 function formatoFechaHora(iso) {
@@ -153,6 +156,14 @@ function generarDescripcion(f) {
     const ins = detalle?.insertadas ?? '—';
     const err = detalle?.errores || 0;
     return `Importó ${ins} fila(s) a ${modulo}${err ? `, ${err} con error` : ''}.`;
+  }
+  // Inicio de una sesión de impersonación (ver POST
+  // /superadmin/empresas/:id/impersonar) -- se audita bajo esta misma
+  // empresa a propósito, para que sus usuarios vean cuándo entró soporte y
+  // por qué, no solo quede en un log interno.
+  if (f.accion === 'impersonar') {
+    const motivo = detalle?.motivo;
+    return `Un representante de soporte técnico entró a esta cuenta${motivo ? `: "${motivo}"` : '.'}`;
   }
   return detalle ? `${f.accion} en ${f.modulo}.` : `${f.accion} en ${f.modulo} (sin más detalle disponible).`;
 }
@@ -220,7 +231,7 @@ function dibujarEventos(filas) {
       <span class="evento-marca evento-marca-${accion.color}"></span>
       <div class="evento-info">
         <div class="evento-desc">${escapeHtml(generarDescripcion(f))}</div>
-        <div class="evento-meta">${escapeHtml(f.usuario_nombre || 'Desconocido')} · ${escapeHtml(ETIQUETA_MODULO[f.modulo] || f.modulo)}</div>
+        <div class="evento-meta">${escapeHtml(f.usuario_nombre || 'Desconocido')} · ${escapeHtml(ETIQUETA_MODULO[f.modulo] || f.modulo)}${f.via_impersonacion ? ' · <b style="color:#8A5A00;">🔒 vía soporte</b>' : ''}</div>
       </div>
       <span class="evento-badge evento-badge-${accion.color}">${escapeHtml(accion.texto)}</span>
       <span class="evento-fecha">${escapeHtml(formatoFechaHora(f.creado_el))}</span>
