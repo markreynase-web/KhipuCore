@@ -6,13 +6,13 @@
 
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { auth, requireEmpresa } from '../middleware/auth.js';
+import { auth, requireEmpresa, requireModulo } from '../middleware/auth.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { crearRouterCRUD } from '../crudFactory.js';
 import { registrarAuditoria } from '../registroAuditoria.js';
 
 const router = Router();
-router.use(auth, requireEmpresa);
+router.use(auth, requireEmpresa, requireModulo('ordenes_laboratorio'));
 
 const ESTADOS_VALIDOS = ['pedido', 'en_laboratorio', 'listo', 'entregado', 'cancelado'];
 const TIPOS_LENTE_VALIDOS = ['monofocal', 'bifocal', 'progresivo', 'contacto'];

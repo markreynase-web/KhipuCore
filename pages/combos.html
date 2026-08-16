@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Combos</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+<style>
+  .combo-items-editor{ display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
+  .combo-item-row{ display:grid; grid-template-columns:1fr 100px 34px; gap:8px; align-items:center; }
+  .combo-item-row select, .combo-item-row input{
+    font-family:'Inter', sans-serif; font-size:13px; padding:8px 10px;
+    border:1px solid var(--paper-line); border-radius:8px; background:#fff; color:var(--ink);
+  }
+  .combo-precio-sugerido{ font-size:12px; color:var(--muted); margin:-4px 0 10px; }
+</style>
+</head>
+<body data-modulo="combos">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Combos</h1>
+        <div class="topbar-subtitle">Arma un combo eligiendo qué productos de inventario lo componen y en qué cantidad.</div>
+      </div>
+      <div class="topbar-search" id="topbarSearch"></div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <main style="padding:24px 32px;">
+      <div class="panel">
+        <div class="captura-header">
+          <h3>Combos</h3>
+          <div class="captura-header-acciones">
+            <button type="button" class="btn btn-ochre" id="btnNuevoCombo">+ Nuevo combo</button>
+          </div>
+        </div>
+        <div id="tablaCombos">Cargando…</div>
+      </div>
+    </main>
+
+    <footer></footer>
+  </div>
+</div>
+<div id="khipuAiWidget"></div>
+
+<script type="module">
+  import { haySesionActiva, obtenerSesion } from '../js/sesion.js';
+  import { API_BASE_URL } from '../js/apiConfig.js';
+  import { cargarConfigEmpresa } from '../js/config.js';
+  import { renderSidebar } from '../components/sidebar.js';
+  import { renderTopbar } from '../components/topbar.js';
+  import { renderFooter } from '../components/footer.js';
+  import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
+  import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
+  import { escapeHtml } from '../js/utils.js';
+
+  if (!haySesionActiva()) location.replace('login.html');
+
+  function headerAuth() {
+    const token = obtenerSesion()?.token;
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  // alert() a propósito, mismo criterio que pages/superadmin.html -- este
+  // flujo (armar la receta de un combo) no justifica un sistema de
+  // notificaciones aparte.
+  async function api(path, opciones) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${path}`, { headers: headerAuth(), ...opciones });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => ({}));
+        throw new Error(cuerpo.error || `HTTP ${res.status}`);
+      }
+      if (res.status === 204) return true;
+      return await res.json();
+    } catch (err) {
+      alert(err.message);
+      return null;
+    }
+  }
+
+  const config = await cargarConfigEmpresa();
+  renderSidebar(config, 'combos');
+  await renderTopbar(config);
+  renderFooter();
+  renderKhipuAiWidget(config);
+
+  let productosDisponibles = [];
+
+  async function cargarProductos() {
+    const productos = await api('/inventario');
+    productosDisponibles = productos || [];
+  }
+
+  function filaItem(item) {
+    const opciones = productosDisponibles.map(p =>
+      `<option value="${p.id}" ${item && Number(item.producto_id) === p.id ? 'selected' : ''}>${escapeHtml(p.nombre)} (stock: ${p.stock})</option>`
+    ).join('');
+    return `
+      <div class="combo-item-row" data-fila-item>
+        <select data-campo="producto_id">
+          <option value="">Selecciona un producto…</option>
+          ${opciones}
+        </select>
+        <input type="number" data-campo="cantidad" min="0.01" step="0.01" value="${item ? item.cantidad : 1}" placeholder="Cant.">
+        <button type="button" class="icon-btn" data-quitar-item title="Quitar">🗑️</button>
+      </div>`;
+  }
+
+  function leerItemsDelFormulario(wrap) {
+    const filas = wrap.querySelectorAll('[data-fila-item]');
+    const items = [];
+    for (const fila of filas) {
+      const productoId = fila.querySelector('[data-campo="producto_id"]').value;
+      const cantidad = fila.querySelector('[data-campo="cantidad"]').value;
+      if (productoId && cantidad) items.push({ producto_id: Number(productoId), cantidad: Number(cantidad) });
+    }
+    return items;
+  }
+
+  async function cargarCombos() {
+    const cont = document.getElementById('tablaCombos');
+    const combos = await api('/combos');
+    if (!combos) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+    if (!combos.length) { cont.innerHTML = '<p class="tabla-vacia">Todavía no hay combos. Usa "+ Nuevo combo" para crear el primero.</p>'; return; }
+
+    cont.innerHTML = `
+      <div class="tabla-registros-wrap">
+        <table class="tabla-registros">
+          <thead><tr><th>Combo</th><th>Incluye</th><th>Precio</th><th>Estado</th><th class="col-acciones"></th></tr></thead>
+          <tbody>
+            ${combos.map(c => `
+              <tr data-id="${c.id}">
+                <td>${escapeHtml(c.nombre)}</td>
+                <td>${(c.items || []).map(i => `${i.cantidad}x ${escapeHtml(i.producto_nombre)}`).join(', ')}</td>
+                <td>S/ ${Number(c.precio).toFixed(2)}</td>
+                <td>${c.estado === 'activo' ? 'Activo' : 'Inactivo'}</td>
+                <td class="col-acciones">
+                  <button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button>
+                  <button type="button" class="icon-btn" data-accion="borrar" title="Borrar">🗑️</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    cont.querySelectorAll('[data-accion="editar"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('tr').dataset.id;
+        abrirFormularioCombo(combos.find(c => String(c.id) === id));
+      });
+    });
+    cont.querySelectorAll('[data-accion="borrar"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.closest('tr').dataset.id;
+        if (!confirm('¿Borrar este combo? Solo se puede si nunca se vendió.')) return;
+        const res = await api(`/combos/${id}`, { method: 'DELETE' });
+        if (res !== null) await cargarCombos();
+      });
+    });
+  }
+
+  function abrirFormularioCombo(comboExistente) {
+    const editando = !!comboExistente;
+    abrirPanelLateral({
+      titulo: editando ? `Editar: ${comboExistente.nombre}` : 'Nuevo combo',
+      icono: '🍱',
+      montar: async (body) => {
+        if (!productosDisponibles.length) await cargarProductos();
+        const c = comboExistente || { nombre: '', descripcion: '', precio: '', items: [{}], estado: 'activo', notas: '' };
+
+        body.innerHTML = `
+          <form class="form-registro" id="formCombo" style="grid-template-columns:1fr;">
+            <div class="campo"><label>Nombre</label><input type="text" id="comboNombre" value="${escapeHtml(c.nombre)}" required></div>
+            <div class="campo"><label>Descripción</label><input type="text" id="comboDescripcion" value="${escapeHtml(c.descripcion || '')}" placeholder="Opcional"></div>
+            <div class="campo"><label>Precio del combo</label><input type="number" id="comboPrecio" min="0.01" step="0.01" value="${c.precio}" required></div>
+            <div class="campo">
+              <label>Estado</label>
+              <select id="comboEstado">
+                <option value="activo" ${c.estado === 'activo' ? 'selected' : ''}>Activo</option>
+                <option value="inactivo" ${c.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Productos que incluye</label>
+              <div class="combo-items-editor" id="comboItemsEditor">
+                ${(c.items && c.items.length ? c.items : [{}]).map(filaItem).join('')}
+              </div>
+              <button type="button" class="btn btn-ghost" id="btnAgregarItem" style="padding:6px 12px; font-size:12px;">+ Agregar producto</button>
+            </div>
+            <div class="campo"><label>Notas</label><input type="text" id="comboNotas" value="${escapeHtml(c.notas || '')}" placeholder="Opcional"></div>
+            <div class="campo campo-accion">
+              <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">${editando ? 'Guardar cambios' : 'Crear combo'}</button>
+              <span class="form-status" id="comboFormStatus"></span>
+            </div>
+          </form>
+        `;
+
+        const editor = document.getElementById('comboItemsEditor');
+        function ligarQuitar() {
+          editor.querySelectorAll('[data-quitar-item]').forEach(btn => {
+            btn.onclick = () => { if (editor.querySelectorAll('[data-fila-item]').length > 1) btn.closest('[data-fila-item]').remove(); };
+          });
+        }
+        ligarQuitar();
+
+        document.getElementById('btnAgregarItem').addEventListener('click', () => {
+          editor.insertAdjacentHTML('beforeend', filaItem(null));
+          ligarQuitar();
+        });
+
+        document.getElementById('formCombo').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const statusEl = document.getElementById('comboFormStatus');
+          const items = leerItemsDelFormulario(editor);
+          if (!items.length) {
+            statusEl.textContent = 'Agrega al menos un producto con cantidad.';
+            statusEl.style.color = 'var(--coral)';
+            return;
+          }
+          const payload = {
+            nombre: document.getElementById('comboNombre').value.trim(),
+            descripcion: document.getElementById('comboDescripcion').value.trim(),
+            precio: document.getElementById('comboPrecio').value,
+            estado: document.getElementById('comboEstado').value,
+            notas: document.getElementById('comboNotas').value.trim(),
+            items
+          };
+          const res = editando
+            ? await api(`/combos/${c.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+            : await api('/combos', { method: 'POST', body: JSON.stringify(payload) });
+          if (res) {
+            cerrarPanelLateral();
+            await cargarCombos();
+          } else {
+            statusEl.textContent = 'No se pudo guardar.';
+            statusEl.style.color = 'var(--coral)';
+          }
+        });
+      }
+    });
+  }
+
+  document.getElementById('btnNuevoCombo').addEventListener('click', () => abrirFormularioCombo(null));
+  await cargarProductos();
+  await cargarCombos();
+</script>
+</body>
+</html>

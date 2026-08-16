@@ -5,6 +5,7 @@
 // va a decidir qué puede hacer ese usuario según su rol.
 
 import jwt from 'jsonwebtoken';
+import { pool } from '../db.js';
 
 export function auth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -31,6 +32,33 @@ export function requireEmpresa(req, res, next) {
     return res.status(401).json({ error: 'Tu sesión es de una versión anterior. Vuelve a iniciar sesión.' });
   }
   next();
+}
+
+// Hasta ahora, `empresa_modulos` solo se leía para armar el sidebar
+// (routes/empresa.js) -- un usuario con el permiso de rol correcto podía
+// pegarle igual a la API de un módulo que su empresa nunca contrató, solo
+// porque el módulo no aparecía en su menú. Este middleware es el candado
+// real: se consulta la base en cada request (a propósito, NO se congela en
+// el JWT como los permisos -- ver la nota de trade-off en permisos.js). Un
+// módulo puede pasar a estar desactivado en cualquier momento (por ejemplo,
+// si el super admin lo apaga por falta de pago) y eso debe bloquear la API
+// de inmediato, no recién cuando venza el token de 8h.
+export function requireModulo(moduloId) {
+  return async (req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        'SELECT 1 FROM empresa_modulos WHERE empresa_id = $1 AND modulo_id = $2',
+        [req.usuario.empresa_id, moduloId]
+      );
+      if (!rows.length) {
+        return res.status(403).json({ error: `Tu empresa no tiene el módulo "${moduloId}" habilitado.` });
+      }
+      next();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'No se pudo verificar el acceso al módulo.' });
+    }
+  };
 }
 
 // Panel de super administrador: rutas que cruzan empresas a propósito (dar

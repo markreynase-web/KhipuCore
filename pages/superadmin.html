@@ -77,6 +77,33 @@
     optica: {
       icono: '👓', label: 'Óptica',
       modulos: ['clientes', 'finanzas', 'recetas_opticas', 'ordenes_laboratorio', 'seguros_vision', 'agenda']
+    },
+    veterinaria: {
+      icono: '🐾', label: 'Veterinaria',
+      modulos: ['clientes', 'finanzas', 'mascotas', 'atenciones_veterinarias', 'planes_veterinarios', 'seguros_mascotas', 'agenda']
+    },
+    transporte: {
+      icono: '🚌', label: 'Transporte',
+      // Sin 'clientes'/'agenda' a propósito -- este vertical no administra
+      // pasajeros individuales, administra su propia flota (ver
+      // 025_transporte.sql). El orden importa: respeta las dependencias
+      // (flota/conductores/rutas antes que turnos/control_documentario).
+      modulos: ['finanzas', 'flota', 'conductores', 'rutas', 'turnos', 'control_documentario']
+    },
+    polleria: {
+      icono: '🍗', label: 'Pollería/Restaurante',
+      // El orden importa: 'inventario' antes que 'combos'/'comandas' (ambos
+      // dependen de él), y 'combos' antes que 'combo_ventas' (ver
+      // 026_polleria.sql).
+      modulos: ['inventario', 'finanzas', 'mesas', 'comandas', 'combos', 'combo_ventas']
+    },
+    gimnasio: {
+      icono: '🏋️', label: 'Gimnasio',
+      // El orden importa: 'clientes' y 'planes_membresia' antes que
+      // 'membresias' (depende de ambos), y 'membresias' antes que
+      // 'pagos_membresia' (ver 027_gimnasio.sql). Pagos manuales, sin
+      // pasarela real -- decisión de alcance de esta primera versión.
+      modulos: ['clientes', 'finanzas', 'planes_membresia', 'membresias', 'pagos_membresia']
     }
   };
 
@@ -131,9 +158,137 @@
         <div id="formNuevaEmpresaWrap"></div>
         <div id="tablaEmpresas">Cargando…</div>
       </div>
+      <div class="sa-panel">
+        <div class="sa-panel-header">
+          <h2>Catálogo de módulos</h2>
+          <button type="button" class="btn btn-ochre" id="btnNuevoModulo">+ Nuevo módulo</button>
+        </div>
+        <p style="font-size:12.5px; color:var(--muted); margin:2px 0 0;">
+          Esto solo da de alta el módulo en el catálogo (aparece como opción para habilitarlo por empresa).
+          Si el módulo necesita guardar datos propios, la tabla y las rutas del backend siguen siendo trabajo de código aparte.
+        </p>
+        <div id="formNuevoModuloWrap"></div>
+        <div id="tablaModulos">Cargando…</div>
+      </div>
     `;
     document.getElementById('btnNuevaEmpresa').addEventListener('click', toggleFormNuevaEmpresa);
+    document.getElementById('btnNuevoModulo').addEventListener('click', () => toggleFormModulo());
     await cargarEmpresas();
+    await cargarModulos();
+  }
+
+  async function cargarModulos() {
+    const cont = document.getElementById('tablaModulos');
+    const modulos = await api('/superadmin/modulos');
+    if (!modulos) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+
+    cont.innerHTML = `
+      <div class="tabla-registros-wrap">
+        <table class="tabla-registros">
+          <thead><tr><th>Módulo</th><th>id</th><th>Página</th><th>Datos propios</th><th>Depende de</th><th class="col-acciones"></th></tr></thead>
+          <tbody>
+            ${modulos.map(m => `
+              <tr data-id="${m.id}">
+                <td>${m.icon || ''} ${escapeHtml(m.label)}</td>
+                <td><code>${escapeHtml(m.id)}</code></td>
+                <td>${escapeHtml(m.page)}</td>
+                <td>${m.base_de_datos ? 'Sí' : 'No'}</td>
+                <td>${(m.dependencias || []).length ? escapeHtml(m.dependencias.join(', ')) : '—'}</td>
+                <td class="col-acciones">
+                  <button type="button" class="icon-btn" data-accion="editar-modulo" title="Editar">✏️</button>
+                  <button type="button" class="icon-btn" data-accion="borrar-modulo" title="Borrar del catálogo">🗑️</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    cont.querySelectorAll('[data-accion="editar-modulo"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('tr').dataset.id;
+        toggleFormModulo(modulos.find(m => m.id === id));
+      });
+    });
+    cont.querySelectorAll('[data-accion="borrar-modulo"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.closest('tr').dataset.id;
+        if (!confirm(`¿Borrar "${id}" del catálogo? Solo se puede si ninguna empresa lo tiene activo y ningún otro módulo depende de él.`)) return;
+        const res = await api(`/superadmin/modulos/${id}`, { method: 'DELETE' });
+        if (res !== null) await cargarModulos();
+      });
+    });
+
+    return modulos;
+  }
+
+  // moduloExistente presente = editar (id fijo, no se puede tocar);
+  // ausente = alta nueva. Mismo formulario para los dos casos.
+  function toggleFormModulo(moduloExistente) {
+    const wrap = document.getElementById('formNuevoModuloWrap');
+    if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+    const editando = !!moduloExistente;
+    const m = moduloExistente || { id: '', label: '', icon: '', page: '', base_de_datos: false, dependencias: [] };
+
+    wrap.innerHTML = `
+      <form class="form-registro" id="formModulo" style="margin:16px 0 20px; padding-bottom:20px; border-bottom:1px solid var(--paper-line);">
+        <div class="campo">
+          <label>id (minúsculas, sin espacios, ej. "mascotas")</label>
+          <input type="text" id="moduloId" value="${escapeHtml(m.id)}" ${editando ? 'disabled' : 'required pattern="[a-z][a-z0-9_]{1,39}"'}>
+        </div>
+        <div class="campo"><label>Nombre visible</label><input type="text" id="moduloLabel" value="${escapeHtml(m.label)}" required></div>
+        <div class="campo"><label>Ícono (un emoji, opcional)</label><input type="text" id="moduloIcon" value="${escapeHtml(m.icon || '')}" maxlength="4"></div>
+        <div class="campo"><label>Página (ej. "mascotas.html")</label><input type="text" id="moduloPage" value="${escapeHtml(m.page)}" required></div>
+        <div class="campo">
+          <label class="sa-modulo-item"><input type="checkbox" id="moduloBaseDeDatos" ${m.base_de_datos ? 'checked' : ''}> Guarda datos propios (tiene tabla y rutas de backend)</label>
+        </div>
+        <div class="campo">
+          <label>Depende de (mantén Ctrl/Cmd para elegir varios; opcional)</label>
+          <select id="moduloDependencias" multiple size="5"></select>
+        </div>
+        <div class="campo campo-accion">
+          <button type="submit" class="btn btn-ochre">${editando ? 'Guardar cambios' : 'Crear módulo'}</button>
+          <span class="form-status" id="moduloStatus"></span>
+        </div>
+      </form>
+    `;
+
+    // El <select> de dependencias se llena con el resto del catálogo (nunca
+    // consigo mismo, ver la validación de "no puede depender de sí mismo"
+    // en el backend).
+    api('/superadmin/modulos').then(catalogo => {
+      const select = document.getElementById('moduloDependencias');
+      if (!catalogo) return;
+      catalogo.filter(c => c.id !== m.id).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.icon || ''} ${c.label} (${c.id})`;
+        if ((m.dependencias || []).includes(c.id)) opt.selected = true;
+        select.appendChild(opt);
+      });
+    });
+
+    document.getElementById('formModulo').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('moduloStatus');
+      const dependencias = Array.from(document.getElementById('moduloDependencias').selectedOptions).map(o => o.value);
+      const payload = {
+        label: document.getElementById('moduloLabel').value.trim(),
+        icon: document.getElementById('moduloIcon').value.trim(),
+        page: document.getElementById('moduloPage').value.trim(),
+        base_de_datos: document.getElementById('moduloBaseDeDatos').checked,
+        dependencias
+      };
+      const res = editando
+        ? await api(`/superadmin/modulos/${m.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+        : await api('/superadmin/modulos', { method: 'POST', body: JSON.stringify({ id: document.getElementById('moduloId').value.trim(), ...payload }) });
+      if (res) {
+        wrap.innerHTML = '';
+        await cargarModulos();
+      } else {
+        statusEl.textContent = 'No se pudo guardar.';
+        statusEl.style.color = 'var(--coral)';
+      }
+    });
   }
 
   function toggleFormNuevaEmpresa() {
@@ -326,34 +481,52 @@
           }
         });
 
+        // Función compartida por el checkbox individual y por los paquetes
+        // de abajo -- centralizada a propósito: desde que activar/desactivar
+        // valida dependencias del lado del servidor (ver
+        // 023_dependencias_modulos.sql), el ORDEN y que cada llamada espere
+        // a la anterior importa. Antes cada checkbox disparaba su propio
+        // 'change' sin esperar (fire-and-forget) -- con dependencias reales
+        // eso es una condición de carrera: la petición de "postventa" podía
+        // llegar al backend antes de que "vehiculos" terminara de guardarse,
+        // y el backend la rechazaba (400, dependencia faltante) aunque el
+        // checkbox correcto ya estuviera tildado en pantalla.
+        async function activarModulo(chk) {
+          const moduloId = chk.dataset.modulo;
+          const habilitar = chk.checked;
+          chk.disabled = true;
+          const res = habilitar
+            ? await api(`/superadmin/empresas/${empresa.id}/modulos`, { method: 'POST', body: JSON.stringify({ modulo_id: moduloId }) })
+            : await api(`/superadmin/empresas/${empresa.id}/modulos/${moduloId}`, { method: 'DELETE' });
+          chk.disabled = false;
+          if (res === null) chk.checked = !habilitar; // revertir si falló
+          await cargarEmpresas(); // refresca el conteo de módulos en la tabla de fondo
+          return res !== null;
+        }
+
         document.getElementById('listaModulos').querySelectorAll('input[type="checkbox"]').forEach(chk => {
-          chk.addEventListener('change', async () => {
-            const moduloId = chk.dataset.modulo;
-            const habilitar = chk.checked;
-            chk.disabled = true;
-            const res = habilitar
-              ? await api(`/superadmin/empresas/${empresa.id}/modulos`, { method: 'POST', body: JSON.stringify({ modulo_id: moduloId }) })
-              : await api(`/superadmin/empresas/${empresa.id}/modulos/${moduloId}`, { method: 'DELETE' });
-            chk.disabled = false;
-            if (res === null) chk.checked = !habilitar; // revertir si falló
-            await cargarEmpresas(); // refresca el conteo de módulos en la tabla de fondo
-          });
+          chk.addEventListener('change', () => activarModulo(chk));
         });
 
-        // Un paquete = tildar (y disparar el 'change' de arriba, que ya
-        // hace el POST real) cada checkbox del paquete que todavía no
-        // estaba activo -- no se toca ninguno que ya estuviera prendido ni
-        // ninguno fuera del paquete.
+        // Un paquete = tildar, EN ORDEN Y UNO A LA VEZ (await secuencial),
+        // cada checkbox del paquete que todavía no estaba activo -- no se
+        // toca ninguno que ya estuviera prendido ni ninguno fuera del
+        // paquete. El orden en que cada PAQUETES.*.modulos lista sus ids
+        // importa: debe respetar las dependencias (ej. "clientes" antes que
+        // "mascotas", "vehiculos" antes que "postventa").
         body.querySelectorAll('[data-paquete]').forEach(btn => {
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
             const paquete = PAQUETES[btn.dataset.paquete];
-            paquete.modulos.forEach(moduloId => {
+            for (const moduloId of paquete.modulos) {
               const chk = body.querySelector(`[data-modulo="${moduloId}"]`);
               if (chk && !chk.checked) {
                 chk.checked = true;
-                chk.dispatchEvent(new Event('change'));
+                const ok = await activarModulo(chk);
+                if (!ok) break; // se detiene si algo falla, para no seguir activando fuera de orden
               }
-            });
+            }
+            btn.disabled = false;
           });
         });
 

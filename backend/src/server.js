@@ -28,6 +28,22 @@ import rrhhRouter from './routes/rrhh.js';
 import produccionRouter from './routes/produccion.js';
 import superadminRouter from './routes/superadmin.js';
 import khipuAiRouter from './routes/khipuAi.js';
+import mascotasRouter from './routes/mascotas.js';
+import atencionesVeterinariasRouter from './routes/atencionesVeterinarias.js';
+import planesVeterinariosRouter from './routes/planesVeterinarios.js';
+import segurosMascotasRouter from './routes/segurosMascotas.js';
+import flotaRouter from './routes/flota.js';
+import conductoresRouter from './routes/conductores.js';
+import rutasRouter from './routes/rutas.js';
+import turnosRouter from './routes/turnos.js';
+import controlDocumentarioRouter from './routes/controlDocumentario.js';
+import mesasRouter from './routes/mesas.js';
+import comandasRouter from './routes/comandas.js';
+import combosRouter from './routes/combos.js';
+import comboVentasRouter from './routes/comboVentas.js';
+import planesMembresiaRouter from './routes/planesMembresia.js';
+import membresiasRouter from './routes/membresias.js';
+import pagosMembresiaRouter from './routes/pagosMembresia.js';
 
 dotenv.config();
 
@@ -82,6 +98,22 @@ app.use('/api/rrhh', rrhhRouter);
 app.use('/api/produccion', produccionRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/khipu-ai', khipuAiRouter);
+app.use('/api/mascotas', mascotasRouter);
+app.use('/api/atenciones_veterinarias', atencionesVeterinariasRouter);
+app.use('/api/planes_veterinarios', planesVeterinariosRouter);
+app.use('/api/seguros_mascotas', segurosMascotasRouter);
+app.use('/api/flota', flotaRouter);
+app.use('/api/conductores', conductoresRouter);
+app.use('/api/rutas', rutasRouter);
+app.use('/api/turnos', turnosRouter);
+app.use('/api/control_documentario', controlDocumentarioRouter);
+app.use('/api/mesas', mesasRouter);
+app.use('/api/comandas', comandasRouter);
+app.use('/api/combos', combosRouter);
+app.use('/api/combo_ventas', comboVentasRouter);
+app.use('/api/planes_membresia', planesMembresiaRouter);
+app.use('/api/membresias', membresiasRouter);
+app.use('/api/pagos_membresia', pagosMembresiaRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 

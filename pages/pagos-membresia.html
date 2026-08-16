@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Pagos</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+</head>
+<body data-modulo="pagos_membresia">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Pagos</h1>
+        <div class="topbar-subtitle">Historial de pagos de membresía. Un pago siempre se registra desde "Socios".</div>
+      </div>
+      <div class="topbar-search" id="topbarSearch"></div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <div class="toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <div class="date-range">
+          <input type="date" class="period" id="fechaDesde" title="Desde">
+          <span>→</span>
+          <input type="date" class="period" id="fechaHasta" title="Hasta">
+        </div>
+        <button class="btn btn-ochre" id="btnFiltrarPagos">Filtrar</button>
+      </div>
+    </div>
+
+    <main style="padding:0 32px 24px;">
+      <div class="panel">
+        <div class="captura-header">
+          <h3>Pagos <span class="tag" id="pagosCount">—</span></h3>
+        </div>
+        <div id="tablaPagos">Cargando…</div>
+      </div>
+    </main>
+
+    <footer></footer>
+  </div>
+</div>
+<div id="khipuAiWidget"></div>
+
+<script type="module">
+  import { haySesionActiva, obtenerSesion, tienePermiso } from '../js/sesion.js';
+  import { API_BASE_URL } from '../js/apiConfig.js';
+  import { cargarConfigEmpresa } from '../js/config.js';
+  import { renderSidebar } from '../components/sidebar.js';
+  import { renderTopbar } from '../components/topbar.js';
+  import { renderFooter } from '../components/footer.js';
+  import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
+  import { escapeHtml } from '../js/utils.js';
+
+  if (!haySesionActiva()) location.replace('login.html');
+
+  function headerAuth() {
+    const token = obtenerSesion()?.token;
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  async function api(path, opciones) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${path}`, { headers: headerAuth(), ...opciones });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => ({}));
+        throw new Error(cuerpo.error || `HTTP ${res.status}`);
+      }
+      if (res.status === 204) return true;
+      return await res.json();
+    } catch (err) {
+      alert(err.message);
+      return null;
+    }
+  }
+
+  const config = await cargarConfigEmpresa();
+  renderSidebar(config, 'pagos_membresia');
+  await renderTopbar(config);
+  renderFooter();
+  renderKhipuAiWidget(config);
+
+  const METODO_LABEL = { efectivo: 'Efectivo', yape: 'Yape', plin: 'Plin', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+  const puedeBorrar = tienePermiso('pagos_membresia.eliminar');
+
+  async function cargarPagos() {
+    const cont = document.getElementById('tablaPagos');
+    const desde = document.getElementById('fechaDesde').value;
+    const hasta = document.getElementById('fechaHasta').value;
+    const qs = new URLSearchParams();
+    if (desde) qs.set('desde', desde);
+    if (hasta) qs.set('hasta', hasta);
+
+    const pagos = await api(`/pagos_membresia?${qs}`);
+    if (!pagos) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+    document.getElementById('pagosCount').textContent = `${pagos.length} pago(s)`;
+
+    if (!pagos.length) { cont.innerHTML = '<p class="tabla-vacia">Todavía no hay pagos registrados.</p>'; return; }
+
+    cont.innerHTML = `
+      <div class="tabla-registros-wrap">
+        <table class="tabla-registros">
+          <thead><tr><th>Fecha</th><th>Socio</th><th>Plan</th><th>Monto</th><th>Método</th><th>Nuevo vencimiento</th>${puedeBorrar ? '<th class="col-acciones"></th>' : ''}</tr></thead>
+          <tbody>
+            ${pagos.map(p => `
+              <tr data-id="${p.id}">
+                <td>${String(p.fecha).slice(0, 10)}</td>
+                <td>${escapeHtml(p.cliente_nombre)}</td>
+                <td>${escapeHtml(p.plan_nombre)}</td>
+                <td>S/ ${Number(p.monto).toFixed(2)}</td>
+                <td>${METODO_LABEL[p.metodo] || escapeHtml(p.metodo)}</td>
+                <td>${p.vencimiento_nuevo ? String(p.vencimiento_nuevo).slice(0, 10) : '—'}</td>
+                ${puedeBorrar ? `<td class="col-acciones"><button type="button" class="icon-btn peligro" data-accion="deshacer" title="Deshacer este pago">↩️</button></td>` : ''}
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    cont.querySelectorAll('[data-accion="deshacer"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.closest('tr').dataset.id;
+        if (!confirm('¿Deshacer este pago? Solo funciona si es el pago más reciente de ese socio, y revierte su vencimiento.')) return;
+        const res = await api(`/pagos_membresia/${id}`, { method: 'DELETE' });
+        if (res !== null) await cargarPagos();
+      });
+    });
+  }
+
+  document.getElementById('btnFiltrarPagos').addEventListener('click', cargarPagos);
+  await cargarPagos();
+</script>
+</body>
+</html>

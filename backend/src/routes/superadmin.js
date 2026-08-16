@@ -93,11 +93,119 @@ router.get('/modulos', async (req, res) => {
   }
 });
 
+// id: mismo formato que ya usa el catálogo (ver 012_empresas.sql) -- string
+// corto en snake_case, porque además de PK es el prefijo de permisos
+// ("<id>.ver", "<id>.crear"...) y el data-modulo del frontend.
+const ID_MODULO = /^[a-z][a-z0-9_]{1,39}$/;
+
+// Dar de alta un módulo NUEVO en el catálogo -- lo que antes solo se podía
+// hacer escribiendo una migración SQL (ver 012/014/019/020/021/022). Esto
+// resuelve la mitad "catálogo" del problema: el módulo ya aparece como
+// checkbox para habilitarlo por empresa. La otra mitad -- la tabla SQL real
+// y las rutas Express si el módulo necesita persistencia propia
+// (base_de_datos:true) -- sigue siendo trabajo de código; un módulo creado
+// acá sin esa implementación queda como una página sin backend real detrás
+// (mismo estado que Marketing hoy, que es deliberadamente CSV-only).
+router.post('/modulos', async (req, res) => {
+  const { id, label, icon, page, base_de_datos, dependencias } = req.body || {};
+  if (!id || !ID_MODULO.test(id)) {
+    return res.status(400).json({ error: 'id es requerido: minúsculas, números y guion bajo, 2-40 caracteres, debe empezar con letra.' });
+  }
+  if (!label || !String(label).trim()) return res.status(400).json({ error: 'label es requerido.' });
+  if (!page || !String(page).trim()) return res.status(400).json({ error: 'page es requerido (ej. "mascotas.html").' });
+
+  const deps = Array.isArray(dependencias) ? dependencias : [];
+  try {
+    if (deps.length) {
+      const { rows: existentes } = await pool.query(`SELECT id FROM modulos WHERE id = ANY($1::varchar[])`, [deps]);
+      const faltantes = deps.filter(d => !existentes.some(e => e.id === d));
+      if (faltantes.length) {
+        return res.status(400).json({ error: `Estas dependencias no existen en el catálogo: ${faltantes.join(', ')}.` });
+      }
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO modulos (id, label, icon, page, base_de_datos, dependencias)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, String(label).trim(), icon || null, String(page).trim(), !!base_de_datos, deps]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: `Ya existe un módulo con id "${id}".` });
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo crear el módulo.' });
+  }
+});
+
+// El id NO se puede editar acá a propósito: es la PK que ya referencian
+// empresa_modulos, permisos ("<id>.ver"...) y las dependencias de otros
+// módulos -- cambiarlo en caliente los dejaría a todos apuntando a un id
+// que ya no existe. Si un id quedó mal, se borra (si nadie lo usa todavía)
+// y se crea de nuevo.
+router.put('/modulos/:id', async (req, res) => {
+  const { label, icon, page, base_de_datos, dependencias } = req.body || {};
+  const deps = dependencias === undefined ? undefined : (Array.isArray(dependencias) ? dependencias : []);
+  try {
+    if (deps && deps.includes(req.params.id)) {
+      return res.status(400).json({ error: 'Un módulo no puede depender de sí mismo.' });
+    }
+    if (deps && deps.length) {
+      const { rows: existentes } = await pool.query(`SELECT id FROM modulos WHERE id = ANY($1::varchar[])`, [deps]);
+      const faltantes = deps.filter(d => !existentes.some(e => e.id === d));
+      if (faltantes.length) {
+        return res.status(400).json({ error: `Estas dependencias no existen en el catálogo: ${faltantes.join(', ')}.` });
+      }
+    }
+    const { rows } = await pool.query(
+      `UPDATE modulos SET
+         label = COALESCE($1, label),
+         icon = COALESCE($2, icon),
+         page = COALESCE($3, page),
+         base_de_datos = COALESCE($4, base_de_datos),
+         dependencias = COALESCE($5, dependencias)
+       WHERE id = $6
+       RETURNING *`,
+      [label ? String(label).trim() : null, icon || null, page ? String(page).trim() : null,
+       base_de_datos === undefined ? null : !!base_de_datos, deps, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Ese módulo no existe en el catálogo.' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo actualizar el módulo.' });
+  }
+});
+
+// Borrar del catálogo, no solo desactivar -- por eso las dos comprobaciones:
+// ninguna empresa debe quedarse con un módulo fantasma activo, y ningún
+// otro módulo debe quedar con una dependencia que ya no existe.
+router.delete('/modulos/:id', async (req, res) => {
+  try {
+    const { rows: enUso } = await pool.query(
+      `SELECT count(*)::int AS n FROM empresa_modulos WHERE modulo_id = $1`, [req.params.id]
+    );
+    if (enUso[0].n > 0) {
+      return res.status(400).json({ error: `No se puede borrar: ${enUso[0].n} empresa(s) todavía lo tienen activo.` });
+    }
+    const { rows: dependientes } = await pool.query(
+      `SELECT id FROM modulos WHERE $1 = ANY(dependencias)`, [req.params.id]
+    );
+    if (dependientes.length) {
+      return res.status(400).json({ error: `No se puede borrar: lo necesitan ${dependientes.map(d => d.id).join(', ')}.` });
+    }
+    const { rowCount } = await pool.query(`DELETE FROM modulos WHERE id = $1`, [req.params.id]);
+    if (!rowCount) return res.status(404).json({ error: 'Ese módulo no existe en el catálogo.' });
+    res.status(204).end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo borrar el módulo.' });
+  }
+});
+
 // Catálogo + qué está habilitado para ESA empresa puntual.
 router.get('/empresas/:id/modulos', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT m.id, m.label, m.icon, m.base_de_datos, (em.modulo_id IS NOT NULL) AS habilitado
+      `SELECT m.id, m.label, m.icon, m.base_de_datos, m.dependencias, (em.modulo_id IS NOT NULL) AS habilitado
        FROM modulos m
        LEFT JOIN empresa_modulos em ON em.modulo_id = m.id AND em.empresa_id = $1
        ORDER BY m.id`,
@@ -114,6 +222,26 @@ router.post('/empresas/:id/modulos', async (req, res) => {
   const { modulo_id } = req.body || {};
   if (!modulo_id) return res.status(400).json({ error: 'modulo_id es requerido.' });
   try {
+    // No se puede activar un módulo cuyas dependencias todavía no están
+    // activas para esta empresa (ej. Postventa sin Vehículos: el selector
+    // de vehículo del formulario saldría vacío). Ver 023_dependencias_modulos.sql
+    // -- solo las relaciones que son de verdad obligatorias en el esquema
+    // están listadas acá; el resto se dejó opcional a propósito.
+    const { rows: moduloRows } = await pool.query(`SELECT dependencias FROM modulos WHERE id = $1`, [modulo_id]);
+    if (!moduloRows.length) return res.status(404).json({ error: `El módulo "${modulo_id}" no existe.` });
+    const dependencias = moduloRows[0].dependencias || [];
+    if (dependencias.length) {
+      const { rows: activos } = await pool.query(
+        `SELECT modulo_id FROM empresa_modulos WHERE empresa_id = $1 AND modulo_id = ANY($2::varchar[])`,
+        [req.params.id, dependencias]
+      );
+      const faltantes = dependencias.filter(d => !activos.some(a => a.modulo_id === d));
+      if (faltantes.length) {
+        return res.status(400).json({
+          error: `Antes de activar "${modulo_id}" hay que activar: ${faltantes.join(', ')}.`
+        });
+      }
+    }
     await pool.query(
       `INSERT INTO empresa_modulos (empresa_id, modulo_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [req.params.id, modulo_id]
@@ -127,6 +255,20 @@ router.post('/empresas/:id/modulos', async (req, res) => {
 
 router.delete('/empresas/:id/modulos/:moduloId', async (req, res) => {
   try {
+    // Simétrico al POST: no se puede apagar un módulo mientras otro que
+    // depende de él siga activo para esta empresa (dejaría, por ejemplo,
+    // Postventa activo sin Vehículos).
+    const { rows: dependientes } = await pool.query(
+      `SELECT m.id FROM modulos m
+       JOIN empresa_modulos em ON em.modulo_id = m.id AND em.empresa_id = $1
+       WHERE $2 = ANY(m.dependencias)`,
+      [req.params.id, req.params.moduloId]
+    );
+    if (dependientes.length) {
+      return res.status(400).json({
+        error: `No se puede desactivar "${req.params.moduloId}": lo necesitan ${dependientes.map(d => d.id).join(', ')}.`
+      });
+    }
     await pool.query(
       `DELETE FROM empresa_modulos WHERE empresa_id = $1 AND modulo_id = $2`,
       [req.params.id, req.params.moduloId]

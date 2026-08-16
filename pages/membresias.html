@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Socios</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+<style>
+  .evento-badge-amber{ color:#8A5A00; background:#FCEBC7; }
+  .socios-kpis{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px; }
+  @media (max-width:900px){ .socios-kpis{ grid-template-columns:repeat(2, 1fr); } }
+  .pago-form-resumen{ font-size:12px; color:var(--muted); margin:-4px 0 12px; }
+</style>
+</head>
+<body data-modulo="membresias">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Socios</h1>
+        <div class="topbar-subtitle">Membresías, vencimientos y pagos del gimnasio.</div>
+      </div>
+      <div class="topbar-search" id="topbarSearch"></div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <main style="padding:24px 32px;">
+      <div class="socios-kpis">
+        <div class="kpi-card">
+          <div class="label">Socios activos</div>
+          <div class="value num" id="kpiActivos">—</div>
+          <div class="sub">al día con su vencimiento</div>
+        </div>
+        <div class="kpi-card">
+          <div class="label">Por vencer</div>
+          <div class="value num" id="kpiPorVencer">—</div>
+          <div class="sub">en los próximos 7 días</div>
+        </div>
+        <div class="kpi-card">
+          <div class="label">Vencidos</div>
+          <div class="value num" id="kpiVencidos">—</div>
+          <div class="sub">con el pago atrasado</div>
+        </div>
+        <div class="kpi-card">
+          <div class="label">Ingresos este mes</div>
+          <div class="value num" id="kpiIngresos">—</div>
+          <div class="sub">pagos registrados</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="captura-header">
+          <h3>Socios</h3>
+          <div class="captura-header-acciones">
+            <button type="button" class="btn btn-ochre" id="btnNuevoSocio">+ Nuevo socio</button>
+          </div>
+        </div>
+        <div id="tablaSocios">Cargando…</div>
+      </div>
+    </main>
+
+    <footer></footer>
+  </div>
+</div>
+<div id="khipuAiWidget"></div>
+
+<script type="module">
+  import { haySesionActiva, obtenerSesion } from '../js/sesion.js';
+  import { API_BASE_URL } from '../js/apiConfig.js';
+  import { cargarConfigEmpresa } from '../js/config.js';
+  import { renderSidebar } from '../components/sidebar.js';
+  import { renderTopbar } from '../components/topbar.js';
+  import { renderFooter } from '../components/footer.js';
+  import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
+  import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
+  import { escapeHtml } from '../js/utils.js';
+
+  if (!haySesionActiva()) location.replace('login.html');
+
+  function headerAuth() {
+    const token = obtenerSesion()?.token;
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  // alert() a propósito, mismo criterio que pages/combos.html.
+  async function api(path, opciones) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${path}`, { headers: headerAuth(), ...opciones });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => ({}));
+        throw new Error(cuerpo.error || `HTTP ${res.status}`);
+      }
+      if (res.status === 204) return true;
+      return await res.json();
+    } catch (err) {
+      alert(err.message);
+      return null;
+    }
+  }
+
+  const config = await cargarConfigEmpresa();
+  renderSidebar(config, 'membresias');
+  await renderTopbar(config);
+  renderFooter();
+  renderKhipuAiWidget(config);
+
+  let clientesDisponibles = [];
+  let planesDisponibles = [];
+  let pagosDelMes = [];
+
+  function aFechaLocal(v) {
+    return new Date(`${String(v).slice(0, 10)}T00:00:00`);
+  }
+
+  // Semáforo calculado al vuelo (nunca guardado) -- mismo criterio que
+  // alertaStock en Inventario. "estado" del backend solo distingue
+  // activa/cancelada (cancelación manual); vencida/por vencer/al día se
+  // derivan comparando fecha_vencimiento contra hoy en cada render.
+  function estadoVisual(m) {
+    if (m.estado === 'cancelada') return { emoji: '⚪', texto: 'Cancelada', color: 'muted' };
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const dias = Math.round((aFechaLocal(m.fecha_vencimiento) - hoy) / 86400000);
+    if (dias < 0) return { emoji: '🔴', texto: 'Vencida', color: 'danger' };
+    if (dias <= 7) return { emoji: '🟠', texto: 'Por vencer', color: 'amber' };
+    return { emoji: '🟢', texto: 'Activa', color: 'teal' };
+  }
+
+  async function cargarListasBase() {
+    const [clientes, planes] = await Promise.all([api('/clientes'), api('/planes_membresia')]);
+    clientesDisponibles = clientes || [];
+    planesDisponibles = planes || [];
+  }
+
+  function calcularKpis(socios) {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    let activos = 0, porVencer = 0, vencidos = 0;
+    socios.forEach(m => {
+      if (m.estado === 'cancelada') return;
+      const dias = Math.round((aFechaLocal(m.fecha_vencimiento) - hoy) / 86400000);
+      if (dias < 0) vencidos++;
+      else if (dias <= 7) porVencer++;
+      else activos++;
+    });
+    document.getElementById('kpiActivos').textContent = activos;
+    document.getElementById('kpiPorVencer').textContent = porVencer;
+    document.getElementById('kpiVencidos').textContent = vencidos;
+
+    const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
+    const total = pagosDelMes
+      .filter(p => aFechaLocal(p.fecha) >= inicioMes)
+      .reduce((suma, p) => suma + Number(p.monto), 0);
+    document.getElementById('kpiIngresos').textContent = `S/ ${total.toFixed(2)}`;
+  }
+
+  async function cargarSocios() {
+    const cont = document.getElementById('tablaSocios');
+    const [socios, pagos] = await Promise.all([api('/membresias'), api('/pagos_membresia')]);
+    if (!socios) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+    pagosDelMes = pagos || [];
+    calcularKpis(socios);
+
+    if (!socios.length) { cont.innerHTML = '<p class="tabla-vacia">Todavía no hay socios. Usa "+ Nuevo socio" para registrar el primero.</p>'; return; }
+
+    cont.innerHTML = `
+      <div class="tabla-registros-wrap">
+        <table class="tabla-registros">
+          <thead><tr><th>Socio</th><th>Plan</th><th>Vence</th><th>Estado</th><th class="col-acciones"></th></tr></thead>
+          <tbody>
+            ${socios.map(m => {
+              const ev = estadoVisual(m);
+              return `
+              <tr data-id="${m.id}">
+                <td>${escapeHtml(m.cliente_nombre)}</td>
+                <td>${escapeHtml(m.plan_nombre)}</td>
+                <td>${String(m.fecha_vencimiento).slice(0, 10)}</td>
+                <td><span class="evento-badge evento-badge-${ev.color}">${ev.emoji} ${ev.texto}</span></td>
+                <td class="col-acciones">
+                  <button type="button" class="icon-btn" data-accion="pago" title="Registrar pago">💳</button>
+                  <button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button>
+                  <button type="button" class="icon-btn" data-accion="borrar" title="Borrar">🗑️</button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    cont.querySelectorAll('[data-accion="pago"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('tr').dataset.id;
+        abrirFormularioPago(socios.find(m => String(m.id) === id));
+      });
+    });
+    cont.querySelectorAll('[data-accion="editar"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('tr').dataset.id;
+        abrirFormularioSocio(socios.find(m => String(m.id) === id));
+      });
+    });
+    cont.querySelectorAll('[data-accion="borrar"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.closest('tr').dataset.id;
+        if (!confirm('¿Borrar este socio? Solo se puede si nunca tuvo pagos registrados.')) return;
+        const res = await api(`/membresias/${id}`, { method: 'DELETE' });
+        if (res !== null) await cargarSocios();
+      });
+    });
+  }
+
+  function abrirFormularioPago(socio) {
+    abrirPanelLateral({
+      titulo: `Registrar pago: ${socio.cliente_nombre}`,
+      icono: '💳',
+      montar: (body) => {
+        body.innerHTML = `
+          <div class="pago-form-resumen">Plan ${escapeHtml(socio.plan_nombre)} · vence actualmente el ${String(socio.fecha_vencimiento).slice(0, 10)}.</div>
+          <form class="form-registro" id="formPago" style="grid-template-columns:1fr;">
+            <div class="campo"><label>Monto</label><input type="number" id="pagoMonto" min="0.01" step="0.01" required></div>
+            <div class="campo">
+              <label>Método</label>
+              <select id="pagoMetodo">
+                <option value="efectivo">Efectivo</option>
+                <option value="yape">Yape</option>
+                <option value="plin">Plin</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="tarjeta">Tarjeta</option>
+              </select>
+            </div>
+            <div class="campo"><label>Notas</label><input type="text" id="pagoNotas" placeholder="Opcional"></div>
+            <div class="campo campo-accion">
+              <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">Registrar pago</button>
+              <span class="form-status" id="pagoFormStatus"></span>
+            </div>
+          </form>
+        `;
+        document.getElementById('formPago').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const payload = {
+            monto: document.getElementById('pagoMonto').value,
+            metodo: document.getElementById('pagoMetodo').value,
+            notas: document.getElementById('pagoNotas').value.trim()
+          };
+          const res = await api(`/membresias/${socio.id}/pagos`, { method: 'POST', body: JSON.stringify(payload) });
+          if (res) { cerrarPanelLateral(); await cargarSocios(); }
+          else document.getElementById('pagoFormStatus').textContent = 'No se pudo registrar el pago.';
+        });
+      }
+    });
+  }
+
+  function abrirFormularioSocio(socioExistente) {
+    const editando = !!socioExistente;
+    abrirPanelLateral({
+      titulo: editando ? `Editar: ${socioExistente.cliente_nombre}` : 'Nuevo socio',
+      icono: '🏋️',
+      montar: async (body) => {
+        if (!clientesDisponibles.length || !planesDisponibles.length) await cargarListasBase();
+        const m = socioExistente || { cliente_id: '', plan_id: '', fecha_inicio: new Date().toISOString().slice(0, 10), estado: 'activa', notas: '' };
+
+        const opcionesClientes = clientesDisponibles.map(cl =>
+          `<option value="${cl.id}" ${m.cliente_id === cl.id ? 'selected' : ''}>${escapeHtml(cl.nombre)}</option>`
+        ).join('');
+        const opcionesPlanes = planesDisponibles.map(p =>
+          `<option value="${p.id}" ${m.plan_id === p.id ? 'selected' : ''}>${escapeHtml(p.nombre)} · ${p.duracion_meses} mes(es) · S/ ${Number(p.precio).toFixed(2)}</option>`
+        ).join('');
+
+        body.innerHTML = `
+          <form class="form-registro" id="formSocio" style="grid-template-columns:1fr;">
+            ${editando ? `
+              <div class="campo"><label>Socio</label><input type="text" value="${escapeHtml(m.cliente_nombre)}" disabled></div>
+              <div class="campo"><label>Plan</label><input type="text" value="${escapeHtml(m.plan_nombre)}" disabled></div>
+            ` : `
+              <div class="campo"><label>Socio</label><select id="socioCliente" required><option value="">Selecciona un cliente…</option>${opcionesClientes}</select></div>
+              <div class="campo"><label>Plan</label><select id="socioPlan" required><option value="">Selecciona un plan…</option>${opcionesPlanes}</select></div>
+            `}
+            <div class="campo"><label>Fecha de inicio</label><input type="date" id="socioFechaInicio" value="${String(m.fecha_inicio).slice(0, 10)}" required></div>
+            ${editando ? `
+              <div class="campo">
+                <label>Estado</label>
+                <select id="socioEstado">
+                  <option value="activa" ${m.estado === 'activa' ? 'selected' : ''}>Activa</option>
+                  <option value="cancelada" ${m.estado === 'cancelada' ? 'selected' : ''}>Cancelada</option>
+                </select>
+              </div>
+            ` : `
+              <div class="campo">
+                <label style="flex-direction:row; text-transform:none; letter-spacing:normal; font-size:13px; gap:8px; justify-content:flex-start;">
+                  <input type="checkbox" id="socioPrimerPago" style="width:auto;"> Marcar primer pago como recibido
+                </label>
+              </div>
+              <div id="socioPrimerPagoCampos" style="display:none;">
+                <div class="campo"><label>Monto del primer pago</label><input type="number" id="socioPagoMonto" min="0.01" step="0.01"></div>
+                <div class="campo">
+                  <label>Método</label>
+                  <select id="socioPagoMetodo">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="yape">Yape</option>
+                    <option value="plin">Plin</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta">Tarjeta</option>
+                  </select>
+                </div>
+              </div>
+            `}
+            <div class="campo"><label>Notas</label><input type="text" id="socioNotas" value="${escapeHtml(m.notas || '')}" placeholder="Opcional"></div>
+            <div class="campo campo-accion">
+              <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">${editando ? 'Guardar cambios' : 'Crear socio'}</button>
+              <span class="form-status" id="socioFormStatus"></span>
+            </div>
+          </form>
+        `;
+
+        if (!editando) {
+          const chk = document.getElementById('socioPrimerPago');
+          chk.addEventListener('change', () => {
+            document.getElementById('socioPrimerPagoCampos').style.display = chk.checked ? 'block' : 'none';
+          });
+        }
+
+        document.getElementById('formSocio').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const statusEl = document.getElementById('socioFormStatus');
+          const fechaInicio = document.getElementById('socioFechaInicio').value;
+          const notas = document.getElementById('socioNotas').value.trim();
+
+          let res;
+          if (editando) {
+            const payload = { fecha_inicio: fechaInicio, estado: document.getElementById('socioEstado').value, notas };
+            res = await api(`/membresias/${m.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+          } else {
+            const clienteId = document.getElementById('socioCliente').value;
+            const planId = document.getElementById('socioPlan').value;
+            if (!clienteId || !planId) { statusEl.textContent = 'Selecciona un socio y un plan.'; statusEl.style.color = 'var(--coral)'; return; }
+            const payload = { cliente_id: Number(clienteId), plan_id: Number(planId), fecha_inicio: fechaInicio, notas };
+            if (document.getElementById('socioPrimerPago').checked) {
+              const monto = document.getElementById('socioPagoMonto').value;
+              if (!monto) { statusEl.textContent = 'Ingresa el monto del primer pago.'; statusEl.style.color = 'var(--coral)'; return; }
+              payload.primer_pago = { monto, metodo: document.getElementById('socioPagoMetodo').value };
+            }
+            res = await api('/membresias', { method: 'POST', body: JSON.stringify(payload) });
+          }
+          if (res) { cerrarPanelLateral(); await cargarSocios(); }
+          else { statusEl.textContent = 'No se pudo guardar.'; statusEl.style.color = 'var(--coral)'; }
+        });
+      }
+    });
+  }
+
+  document.getElementById('btnNuevoSocio').addEventListener('click', () => abrirFormularioSocio(null));
+  await cargarListasBase();
+  await cargarSocios();
+</script>
+</body>
+</html>

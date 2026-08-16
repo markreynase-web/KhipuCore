@@ -394,6 +394,317 @@ export const ESQUEMAS = {
     mapa: { colFecha: 'fecha', colNum: 'monto_reclamado', otrosNum: ['monto_cubierto'], colCat1: 'estado', colCat2: 'aseguradora', otrasCat: ['cliente_nombre'] }
   },
 
+  // --- Vertical Veterinaria: reutiliza clientes como dueños; a diferencia
+  // de Dentista/Óptica, el paciente real es la mascota, así que el resto
+  // del vertical selecciona mascota_id, no cliente_id directo. ---
+
+  mascotas: {
+    etiqueta: 'mascota',
+    campos: [
+      { id: 'cliente_id', label: 'Dueño', type: 'select', required: true, fuente: 'clientes',
+        vacio: 'Selecciona un dueño…', accionExtra: { texto: '+ Nuevo cliente', evento: 'nuevoCliente' } },
+      { id: 'nombre', label: 'Nombre de la mascota', type: 'text', required: true },
+      { id: 'especie', label: 'Especie', type: 'text', required: true, placeholder: 'Ej. Perro, Gato, Ave…' },
+      { id: 'raza', label: 'Raza', type: 'text', placeholder: 'Opcional' },
+      { id: 'sexo', label: 'Sexo', type: 'select',
+        opciones: [{ value: 'macho', label: 'Macho' }, { value: 'hembra', label: 'Hembra' }], vacio: 'Selecciona…' },
+      { id: 'fecha_nacimiento', label: 'Fecha de nacimiento', type: 'date', placeholder: 'Opcional' },
+      { id: 'peso_kg', label: 'Peso (kg)', type: 'number', min: 0, step: '0.1', placeholder: 'Opcional' },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'nombre', label: 'Mascota' }, { key: 'cliente_nombre', label: 'Dueño', soloLectura: true },
+      { key: 'especie', label: 'Especie' }, { key: 'raza', label: 'Raza' }, { key: 'peso_kg', label: 'Peso (kg)' }
+    ],
+    mapa: { colFecha: 'creado_el', colCat1: 'especie', colCat2: 'raza', otrasCat: ['cliente_nombre'] }
+  },
+
+  atenciones_veterinarias: {
+    etiqueta: 'atención',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'mascota_id', label: 'Mascota', type: 'select', required: true, fuente: 'mascotas', vacio: 'Selecciona una mascota…' },
+      { id: 'procedimiento', label: 'Procedimiento', type: 'text', required: true, ancho: 2, placeholder: 'Ej. Consulta general, vacuna, cirugía…' },
+      { id: 'diagnostico', label: 'Diagnóstico', type: 'text', ancho: 2, placeholder: 'Opcional' },
+      { id: 'costo', label: 'Costo', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'planificado',
+        opciones: [
+          { value: 'planificado', label: 'Planificado' }, { value: 'en_progreso', label: 'En progreso' },
+          { value: 'completado', label: 'Completado' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'mascota_nombre', label: 'Mascota', soloLectura: true },
+      { key: 'procedimiento', label: 'Procedimiento' }, { key: 'costo', label: 'Costo' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'costo', colCat1: 'procedimiento', colCat2: 'estado', otrasCat: ['mascota_nombre'] }
+  },
+
+  planes_veterinarios: {
+    etiqueta: 'plan',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'mascota_id', label: 'Mascota', type: 'select', required: true, fuente: 'mascotas', vacio: 'Selecciona una mascota…' },
+      { id: 'descripcion', label: 'Descripción del plan', type: 'text', required: true, ancho: 2, placeholder: 'Ej. Cirugía de esterilización, tratamiento prolongado…' },
+      { id: 'presupuesto_total', label: 'Presupuesto total', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'propuesto',
+        opciones: [
+          { value: 'propuesto', label: 'Propuesto' }, { value: 'aprobado', label: 'Aprobado' },
+          { value: 'rechazado', label: 'Rechazado' }, { value: 'en_progreso', label: 'En progreso' },
+          { value: 'completado', label: 'Completado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'mascota_nombre', label: 'Mascota', soloLectura: true },
+      { key: 'descripcion', label: 'Descripción' }, { key: 'presupuesto_total', label: 'Presupuesto' },
+      { key: 'estado', label: 'Estado' }, { key: 'fecha_aprobacion', label: 'Aprobado el', soloLectura: true }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'presupuesto_total', colCat1: 'estado', otrasCat: ['mascota_nombre'] }
+  },
+
+  seguros_mascotas: {
+    etiqueta: 'reclamo',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'mascota_id', label: 'Mascota', type: 'select', required: true, fuente: 'mascotas', vacio: 'Selecciona una mascota…' },
+      { id: 'aseguradora', label: 'Aseguradora', type: 'text', required: true },
+      { id: 'numero_poliza', label: 'N° de póliza', type: 'text', placeholder: 'Opcional' },
+      { id: 'atencion_id', label: 'Atención asociada (opcional)', type: 'select', fuente: 'atenciones_veterinarias', vacio: 'Ninguna' },
+      { id: 'monto_reclamado', label: 'Monto reclamado', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'monto_cubierto', label: 'Monto cubierto', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'enviado',
+        opciones: [
+          { value: 'enviado', label: 'Enviado' }, { value: 'en_revision', label: 'En revisión' },
+          { value: 'aprobado', label: 'Aprobado' }, { value: 'rechazado', label: 'Rechazado' },
+          { value: 'pagado', label: 'Pagado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'mascota_nombre', label: 'Mascota', soloLectura: true },
+      { key: 'aseguradora', label: 'Aseguradora' }, { key: 'monto_reclamado', label: 'Reclamado' },
+      { key: 'monto_cubierto', label: 'Cubierto' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'monto_reclamado', otrosNum: ['monto_cubierto'], colCat1: 'estado', colCat2: 'aseguradora', otrasCat: ['mascota_nombre'] }
+  },
+
+  // --- Vertical Transporte de colectivos: NO reutiliza clientes/agenda --
+  // esta empresa administra su propia flota, no pacientes/dueños. ---
+
+  flota: {
+    etiqueta: 'unidad',
+    campos: [
+      { id: 'placa', label: 'Placa', type: 'text', required: true },
+      { id: 'marca', label: 'Marca', type: 'text', required: true },
+      { id: 'modelo', label: 'Modelo', type: 'text', required: true },
+      { id: 'anio', label: 'Año', type: 'number', min: 1980, step: '1', placeholder: 'Opcional' },
+      { id: 'tipo_vehiculo', label: 'Tipo', type: 'select',
+        opciones: [
+          { value: 'bus', label: 'Bus' }, { value: 'minibus', label: 'Minibús' },
+          { value: 'combi', label: 'Combi' }, { value: 'van', label: 'Van' }
+        ], vacio: 'Selecciona…' },
+      { id: 'capacidad_pasajeros', label: 'Capacidad (pasajeros)', type: 'number', min: 1, step: '1', placeholder: 'Opcional' },
+      { id: 'kilometraje_actual', label: 'Kilometraje actual', type: 'number', defecto: 0, min: 0, step: '1' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'operativo',
+        opciones: [
+          { value: 'operativo', label: 'Operativo' }, { value: 'mantenimiento', label: 'En mantenimiento' },
+          { value: 'fuera_de_servicio', label: 'Fuera de servicio' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'placa', label: 'Placa' }, { key: 'marca', label: 'Marca' }, { key: 'modelo', label: 'Modelo' },
+      { key: 'tipo_vehiculo', label: 'Tipo' }, { key: 'kilometraje_actual', label: 'Kilometraje' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'creado_el', colCat1: 'tipo_vehiculo', colCat2: 'estado', otrasCat: ['marca'] }
+  },
+
+  conductores: {
+    etiqueta: 'conductor',
+    campos: [
+      { id: 'nombre', label: 'Nombre', type: 'text', required: true },
+      { id: 'documento_identidad', label: 'DNI', type: 'text', placeholder: 'Opcional' },
+      { id: 'telefono', label: 'Teléfono', type: 'text', placeholder: 'Opcional' },
+      { id: 'licencia_categoria', label: 'Categoría de licencia', type: 'text', placeholder: 'Ej. A-IIIb' },
+      { id: 'licencia_numero', label: 'N° de licencia', type: 'text', placeholder: 'Opcional' },
+      { id: 'licencia_vencimiento', label: 'Licencia vence el', type: 'date', placeholder: 'Opcional' },
+      { id: 'fecha_ingreso', label: 'Fecha de ingreso', type: 'date', placeholder: 'Opcional' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'activo',
+        opciones: [
+          { value: 'activo', label: 'Activo' }, { value: 'inactivo', label: 'Inactivo' }, { value: 'de_baja', label: 'De baja' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'nombre', label: 'Conductor' }, { key: 'licencia_categoria', label: 'Categoría' },
+      { key: 'licencia_vencimiento', label: 'Licencia vence' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'creado_el', colCat1: 'estado', otrasCat: ['licencia_categoria'] }
+  },
+
+  rutas: {
+    etiqueta: 'ruta',
+    campos: [
+      { id: 'nombre', label: 'Nombre de la ruta', type: 'text', required: true, placeholder: 'Ej. Ruta 12' },
+      { id: 'origen', label: 'Origen', type: 'text', placeholder: 'Opcional' },
+      { id: 'destino', label: 'Destino', type: 'text', placeholder: 'Opcional' },
+      { id: 'distancia_km', label: 'Distancia (km)', type: 'number', min: 0, step: '0.1', placeholder: 'Opcional' },
+      { id: 'tarifa', label: 'Tarifa', type: 'number', defecto: 0, min: 0, step: '0.1' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'activa',
+        opciones: [{ value: 'activa', label: 'Activa' }, { value: 'inactiva', label: 'Inactiva' }] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'nombre', label: 'Ruta' }, { key: 'origen', label: 'Origen' }, { key: 'destino', label: 'Destino' },
+      { key: 'tarifa', label: 'Tarifa' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'creado_el', colNum: 'tarifa', colCat1: 'estado', otrasCat: ['origen', 'destino'] }
+  },
+
+  turnos: {
+    etiqueta: 'turno',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'conductor_id', label: 'Conductor', type: 'select', required: true, fuente: 'conductores', vacio: 'Selecciona un conductor…' },
+      { id: 'flota_id', label: 'Unidad', type: 'select', required: true, fuente: 'flota', vacio: 'Selecciona una unidad…' },
+      { id: 'ruta_id', label: 'Ruta', type: 'select', required: true, fuente: 'rutas', vacio: 'Selecciona una ruta…' },
+      { id: 'hora_salida', label: 'Hora de salida', type: 'time', required: true },
+      { id: 'hora_llegada_estimada', label: 'Hora de llegada estimada', type: 'time', placeholder: 'Opcional' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'programado',
+        opciones: [
+          { value: 'programado', label: 'Programado' }, { value: 'en_curso', label: 'En curso' },
+          { value: 'completado', label: 'Completado' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'hora_salida', label: 'Salida' },
+      { key: 'conductor_nombre', label: 'Conductor', soloLectura: true }, { key: 'flota_descripcion', label: 'Unidad', soloLectura: true },
+      { key: 'ruta_nombre', label: 'Ruta', soloLectura: true }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colCat1: 'estado', colCat2: 'ruta_nombre', otrasCat: ['conductor_nombre'] }
+  },
+
+  control_documentario: {
+    etiqueta: 'documento',
+    campos: [
+      { id: 'entidad_tipo', label: 'Documento de…', type: 'select', required: true,
+        opciones: [{ value: 'vehiculo', label: 'Un vehículo' }, { value: 'conductor', label: 'Un conductor' }], vacio: 'Selecciona…' },
+      { id: 'flota_id', label: 'Unidad (si es documento de vehículo)', type: 'select', fuente: 'flota', vacio: 'No aplica' },
+      { id: 'conductor_id', label: 'Conductor (si es documento de conductor)', type: 'select', fuente: 'conductores', vacio: 'No aplica' },
+      { id: 'tipo_documento', label: 'Tipo de documento', type: 'text', required: true, placeholder: 'Ej. SOAT, Revisión técnica, Licencia de conducir…' },
+      { id: 'numero_documento', label: 'N° de documento', type: 'text', placeholder: 'Opcional' },
+      { id: 'fecha_emision', label: 'Fecha de emisión', type: 'date', placeholder: 'Opcional' },
+      { id: 'fecha_vencimiento', label: 'Fecha de vencimiento', type: 'date', required: true },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'vigente',
+        opciones: [{ value: 'vigente', label: 'Vigente' }, { value: 'vencido', label: 'Vencido' }] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'tipo_documento', label: 'Documento' }, { key: 'entidad_descripcion', label: 'De', soloLectura: true },
+      { key: 'fecha_vencimiento', label: 'Vence' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha_vencimiento', colCat1: 'estado', colCat2: 'tipo_documento', otrasCat: ['entidad_descripcion'] }
+  },
+
+  // --- Vertical Pollería/Restaurante: reutiliza `inventario` como el
+  // catálogo de platos/productos (mismo criterio que ventas.producto_id).
+  // "combos" no tiene entrada acá -- su formulario (elegir varios productos
+  // y cantidades) no encaja en este motor genérico de un campo por fila;
+  // tiene su propia página bespoke (ver pages/combos.html). ---
+
+  mesas: {
+    etiqueta: 'mesa',
+    campos: [
+      { id: 'numero', label: 'N° de mesa', type: 'number', required: true, min: 1, step: '1' },
+      { id: 'zona', label: 'Zona', type: 'text', placeholder: 'Ej. Salón, Terraza…' },
+      { id: 'capacidad', label: 'Capacidad', type: 'number', min: 1, step: '1', placeholder: 'Opcional' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'libre',
+        opciones: [
+          { value: 'libre', label: 'Libre' }, { value: 'ocupada', label: 'Ocupada' },
+          { value: 'reservada', label: 'Reservada' }, { value: 'en_limpieza', label: 'En limpieza' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'numero', label: 'Mesa' }, { key: 'zona', label: 'Zona' },
+      { key: 'capacidad', label: 'Capacidad' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'creado_el', colCat1: 'estado', colCat2: 'zona' }
+  },
+
+  comandas: {
+    etiqueta: 'comanda',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'mesa_id', label: 'Mesa', type: 'select', required: true, fuente: 'mesas', vacio: 'Selecciona una mesa…' },
+      { id: 'producto_id', label: 'Producto', type: 'select', required: true, fuente: 'inventario',
+        vacio: 'Selecciona un producto…', ayudaStock: true },
+      { id: 'cantidad', label: 'Cantidad', type: 'number', required: true, defecto: 1, min: 0.01, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'pendiente',
+        opciones: [
+          { value: 'pendiente', label: 'Pendiente' }, { value: 'en_preparacion', label: 'En preparación' },
+          { value: 'listo', label: 'Listo' }, { value: 'entregado', label: 'Entregado' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Ej. Sin cebolla' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'mesa_numero', label: 'Mesa', soloLectura: true },
+      { key: 'producto_nombre', label: 'Producto', soloLectura: true }, { key: 'cantidad', label: 'Cant.' },
+      { key: 'monto', label: 'Monto', soloLectura: true }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'monto', otrosNum: ['cantidad'], colCat1: 'estado', colCat2: 'producto_nombre', otrasCat: [] }
+  },
+
+  combo_ventas: {
+    etiqueta: 'venta de combo',
+    campos: [
+      { id: 'fecha', label: 'Fecha', type: 'date', required: true },
+      { id: 'combo_id', label: 'Combo', type: 'select', required: true, fuente: 'combos', vacio: 'Selecciona un combo…' },
+      { id: 'mesa_id', label: 'Mesa (opcional, para llevar si se deja vacío)', type: 'select', fuente: 'mesas', vacio: 'Para llevar / ninguna' },
+      { id: 'cantidad', label: 'Cantidad de combos', type: 'number', required: true, defecto: 1, min: 1, step: '1' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'pendiente',
+        opciones: [
+          { value: 'pendiente', label: 'Pendiente' }, { value: 'en_preparacion', label: 'En preparación' },
+          { value: 'listo', label: 'Listo' }, { value: 'entregado', label: 'Entregado' }, { value: 'cancelado', label: 'Cancelado' }
+        ] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'fecha', label: 'Fecha' }, { key: 'combo_nombre', label: 'Combo', soloLectura: true },
+      { key: 'mesa_numero', label: 'Mesa', soloLectura: true }, { key: 'cantidad', label: 'Cant.' },
+      { key: 'monto', label: 'Monto', soloLectura: true }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'fecha', colNum: 'monto', otrosNum: ['cantidad'], colCat1: 'estado', colCat2: 'combo_nombre', otrasCat: [] }
+  },
+
+  // --- Vertical Gimnasio: pagos manuales, sin pasarela real (ver
+  // migrations/027_gimnasio.sql). Ni "membresias" ni "pagos_membresia" tienen
+  // entrada acá -- el semáforo de vencimiento, la acción "Registrar pago" y
+  // el hecho de que un pago solo se crea anidado (nunca con un POST suelto,
+  // y sin ruta de importación CSV) no encajan en este motor genérico, que
+  // asume que todo módulo puede crear/importar libremente. Ambas tienen su
+  // propia página bespoke (ver pages/membresias.html). ---
+
+  planes_membresia: {
+    etiqueta: 'plan',
+    campos: [
+      { id: 'nombre', label: 'Nombre del plan', type: 'text', required: true, placeholder: 'Ej. Mensual, Trimestral…' },
+      { id: 'duracion_meses', label: 'Duración (meses)', type: 'number', required: true, min: 1, step: '1' },
+      { id: 'precio', label: 'Precio', type: 'number', defecto: 0, min: 0, step: '0.01' },
+      { id: 'estado', label: 'Estado', type: 'select', defecto: 'activo',
+        opciones: [{ value: 'activo', label: 'Activo' }, { value: 'inactivo', label: 'Inactivo' }] },
+      { id: 'notas', label: 'Notas', type: 'text', ancho: 2, placeholder: 'Opcional' }
+    ],
+    columnasTabla: [
+      { key: 'nombre', label: 'Plan' }, { key: 'duracion_meses', label: 'Duración (meses)' },
+      { key: 'precio', label: 'Precio' }, { key: 'estado', label: 'Estado' }
+    ],
+    mapa: { colFecha: 'creado_el', colNum: 'precio', colCat1: 'estado' }
+  },
+
   // --- Compras, RRHH, Producción: backend real (antes CSV-import-only) ---
 
   compras: {

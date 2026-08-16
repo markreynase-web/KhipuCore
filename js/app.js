@@ -390,7 +390,15 @@ async function activarCapturaSiCorresponde(config) {
     }),
     tratamientos: t => ({ value: t.id, label: `${t.procedimiento}${t.pieza_dental ? ' (pieza ' + t.pieza_dental + ')' : ''} · ${t.cliente_nombre}` }),
     recetas_opticas: r => ({ value: r.id, label: `${String(r.fecha).slice(0, 10)} · ${r.cliente_nombre}` }),
-    ordenes_laboratorio: o => ({ value: o.id, label: `${o.armazon || 'Orden'}${o.tipo_lente ? ' (' + o.tipo_lente + ')' : ''} · ${o.cliente_nombre}` })
+    ordenes_laboratorio: o => ({ value: o.id, label: `${o.armazon || 'Orden'}${o.tipo_lente ? ' (' + o.tipo_lente + ')' : ''} · ${o.cliente_nombre}` }),
+    mascotas: m => ({ value: m.id, label: `${m.nombre} (${m.especie}) · ${m.cliente_nombre}` }),
+    atenciones_veterinarias: a => ({ value: a.id, label: `${a.procedimiento} · ${a.mascota_nombre}` }),
+    flota: f => ({ value: f.id, label: `${f.placa} · ${f.marca} ${f.modelo}` }),
+    conductores: c => ({ value: c.id, label: c.nombre }),
+    rutas: r => ({ value: r.id, label: r.nombre }),
+    mesas: m => ({ value: m.id, label: `Mesa ${m.numero}${m.zona ? ' · ' + m.zona : ''}` }),
+    combos: c => ({ value: c.id, label: `${c.nombre} - S/ ${Number(c.precio).toFixed(2)}` }),
+    planes_membresia: p => ({ value: p.id, label: `${p.nombre} · ${p.duracion_meses} mes(es) · S/ ${Number(p.precio).toFixed(2)}` })
   };
 
   async function esquemaConOpcionesFrescas() {

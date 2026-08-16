@@ -13,12 +13,12 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { pool } from '../db.js';
-import { auth, requireEmpresa } from '../middleware/auth.js';
+import { auth, requireEmpresa, requireModulo } from '../middleware/auth.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { construirHerramientas } from '../khipuAiTools.js';
 
 const router = Router();
-router.use(auth, requireEmpresa);
+router.use(auth, requireEmpresa, requireModulo('khipu_ai'));
 
 // Si falta la API key, el cliente queda null a propósito -- así el resto del
 // backend arranca normal y esta ruta sola responde 500 con un mensaje claro,

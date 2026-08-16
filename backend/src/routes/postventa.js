@@ -20,12 +20,12 @@
 
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { auth, requireEmpresa } from '../middleware/auth.js';
+import { auth, requireEmpresa, requireModulo } from '../middleware/auth.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { registrarAuditoria } from '../registroAuditoria.js';
 
 const router = Router();
-router.use(auth, requireEmpresa);
+router.use(auth, requireEmpresa, requireModulo('postventa'));
 
 function numeroOCero(v) {
   const n = Number(v);

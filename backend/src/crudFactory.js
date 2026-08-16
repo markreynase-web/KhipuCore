@@ -19,7 +19,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import Papa from 'papaparse';
 import { pool } from './db.js';
-import { auth, requireEmpresa } from './middleware/auth.js';
+import { auth, requireEmpresa, requireModulo } from './middleware/auth.js';
 import { verificarPermiso } from './middleware/permisos.js';
 import { registrarAuditoria } from './registroAuditoria.js';
 
@@ -109,9 +109,10 @@ export function crearRouterCRUD(config) {
     return { errores, datos };
   }
 
-  // Todo lo de este router requiere sesión válida CON empresa resuelta;
-  // cada ruta abajo agrega, encima, el permiso específico de esa acción.
-  router.use(auth, requireEmpresa);
+  // Todo lo de este router requiere sesión válida CON empresa resuelta Y esa
+  // empresa con el módulo contratado; cada ruta abajo agrega, encima, el
+  // permiso específico de esa acción.
+  router.use(auth, requireEmpresa, requireModulo(modulo));
 
   // GET /?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
   router.get('/', verificarPermiso(permiso('ver')), async (req, res) => {
