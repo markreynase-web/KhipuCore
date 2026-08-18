@@ -9,14 +9,32 @@
 // por escapeHtml() antes de insertarse con innerHTML -- son texto libre que
 // cualquier usuario con permiso de crear pudo escribir, incluido HTML/JS.
 
-import { escapeHtml } from '../js/utils.js';
+import { escapeHtml, formatearTelefonoWhatsapp } from '../js/utils.js';
 
 const FILAS_POR_PAGINA = 10;
+
+// Ícono de WhatsApp inline (sin depender de ninguna librería de íconos --
+// el resto de la app usa emoji, pero un emoji de teléfono/globo no se lee
+// como "WhatsApp" a primera vista; este SVG sí es reconocible, y hereda
+// color con currentColor igual que cualquier otro ícono de .icon-btn).
+const ICONO_WHATSAPP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1s-.5-.1-.7.1-.8 1-.9 1.2-.3.2-.6.1a7.7 7.7 0 0 1-2.3-1.4 8.4 8.4 0 0 1-1.6-2c-.2-.3 0-.5.1-.6l.4-.5.3-.4a.5.5 0 0 0 0-.5c-.1-.1-.7-1.6-.9-2.2s-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.8.4 3.5 3.5 0 0 0-1.1 2.6c0 1.5 1.1 3 1.3 3.2s2.2 3.4 5.3 4.7a17.9 17.9 0 0 0 1.8.7 4.3 4.3 0 0 0 2 .1 3.2 3.2 0 0 0 2.1-1.5 2.7 2.7 0 0 0 .2-1.5c-.1-.1-.3-.2-.6-.3z"/><path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2zm0 18.2a8.1 8.1 0 0 1-4.2-1.1l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>`;
 
 function formatoCelda(valor) {
   if (valor === null || valor === undefined) return '';
   if (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}/.test(valor)) return escapeHtml(valor.slice(0, 10));
   return escapeHtml(valor);
+}
+
+// esquema.whatsapp = { campoTelefono } (ver ESQUEMAS.clientes en esquemas.js).
+// <a> cuando el número sirve (abre wa.me en pestaña nueva, sin mandar nada
+// solo); <button disabled> con tooltip cuando no hay teléfono usable -- así
+// nunca se arma un enlace roto.
+function renderBotonWhatsapp(fila, whatsappCfg) {
+  const numero = formatearTelefonoWhatsapp(fila[whatsappCfg.campoTelefono]);
+  if (!numero) {
+    return `<button type="button" class="icon-btn" disabled title="Este cliente no tiene número registrado.">${ICONO_WHATSAPP}</button>`;
+  }
+  return `<a class="icon-btn whatsapp" href="https://wa.me/${numero}" target="_blank" rel="noopener noreferrer" title="Abrir conversación de WhatsApp">${ICONO_WHATSAPP}</a>`;
 }
 
 export function renderTabla(contenedorId, filasOriginales, esquema, { onGuardarEdicion, onBorrar, puedeEditar = true, puedeBorrar = true, terminoInicial = '' }) {
@@ -84,6 +102,7 @@ export function renderTabla(contenedorId, filasOriginales, esquema, { onGuardarE
                   <div class="acciones-icono">
                     <button type="button" class="icon-btn" data-accion="ver" title="Ver detalle">👁️</button>
                     ${puedeEditar ? '<button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button>' : ''}
+                    ${esquema.whatsapp ? renderBotonWhatsapp(f, esquema.whatsapp) : ''}
                     ${puedeBorrar ? '<button type="button" class="icon-btn peligro" data-accion="borrar" title="Borrar">🗑️</button>' : ''}
                   </div>
                 </td>`}

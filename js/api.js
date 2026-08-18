@@ -56,6 +56,16 @@ export function listarRegistros(baseUrl, modulo, { desde, hasta } = {}) {
   return pedirJSON(baseUrl, `/${modulo}${query}`);
 }
 
+// Buscar-mientras-escribís (ver componentes/comboboxBusqueda.js): a
+// diferencia de listarRegistros(), que trae todo el módulo, esto pide al
+// backend solo lo que coincide con `termino` (ver ?buscar= en
+// crudFactory.js) -- pensado para módulos con cientos/miles de filas donde
+// cargar todo al frontend para filtrar en JS ya no escala.
+export function buscarRegistros(baseUrl, modulo, termino, limite = 20) {
+  const qs = new URLSearchParams({ buscar: termino, limite: String(limite) });
+  return pedirJSON(baseUrl, `/${modulo}?${qs}`);
+}
+
 export function crearRegistro(baseUrl, modulo, datos) {
   return pedirJSON(baseUrl, `/${modulo}`, { method: 'POST', body: JSON.stringify(datos) });
 }

@@ -22,6 +22,7 @@
 // insertarse con innerHTML, igual que el resto de datos "de usuario" en la app.
 
 import { escapeHtml } from '../js/utils.js';
+import { renderComboboxBusqueda } from './comboboxBusqueda.js';
 
 function valorInicial(campo) {
   return campo.defecto !== undefined ? campo.defecto : '';
@@ -50,6 +51,32 @@ function renderCampoSelect(c, idInput) {
   </select>`;
 }
 
+// campo.buscar:true (ver js/esquemas.js): en vez de <select>, un mount point
+// vacío -- comboboxBusqueda.js lo llena después de que este HTML ya está en
+// el DOM (necesita nodos reales para adjuntar sus eventos).
+function renderCampoBusqueda(c, idInput) {
+  return `<div id="mount_${idInput}"></div>`;
+}
+
+// Tarjeta de resultado para fuentes con forma de inventario (nombre,
+// categoria, precio_unitario, stock, stock_minimo) -- hoy solo la usa
+// ventas.producto_id, pero cualquier otro campo con buscar:true y esa misma
+// forma de fila (ej. repuestos, más adelante) la reutiliza tal cual.
+function renderResultadoProducto(row) {
+  const stock = Number(row.stock ?? 0);
+  const stockMinimo = Number(row.stock_minimo ?? 0);
+  const precio = Number(row.precio_unitario ?? 0);
+  let stockHtml;
+  if (stock <= 0) stockHtml = `<span class="combobox-stock combobox-stock-sin">Sin stock</span>`;
+  else if (stockMinimo > 0 && stock <= stockMinimo) stockHtml = `<span class="combobox-stock combobox-stock-bajo">⚠ Stock: ${stock}</span>`;
+  else stockHtml = `<span class="combobox-stock">Stock: ${stock}</span>`;
+  const partes = [row.categoria, precio ? `S/ ${precio.toFixed(2)}` : null].filter(Boolean).map(escapeHtml);
+  return `
+    <span class="combobox-resultado-nombre">${escapeHtml(row.nombre || '')}</span>
+    <span class="combobox-resultado-sub">${partes.length ? partes.join(' · ') + ' · ' : ''}${stockHtml}</span>
+  `;
+}
+
 export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear = true, onAccionExtra, obtenerUltimoError } = {}) {
   const cont = document.getElementById(contenedorId);
   if (!cont) return null;
@@ -65,11 +92,11 @@ export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear 
     <form class="form-registro">
       ${esquema.campos.map(c => `
         <div class="campo${c.ancho ? ` campo-ancho-${c.ancho}` : ''}">
-          <label for="${idInput(c)}">
+          <label for="${c.buscar ? idInput(c) + '_texto' : idInput(c)}">
             ${c.label}
             ${c.accionExtra ? `<button type="button" class="campo-accion-extra" data-evento="${c.accionExtra.evento}">${c.accionExtra.texto}</button>` : ''}
           </label>
-          ${c.type === 'select' ? renderCampoSelect(c, idInput(c)) : renderCampoInput(c, idInput(c))}
+          ${c.buscar ? renderCampoBusqueda(c, idInput(c)) : (c.type === 'select' ? renderCampoSelect(c, idInput(c)) : renderCampoInput(c, idInput(c)))}
           ${c.ayudaStock ? `<span class="campo-ayuda" data-rol="ayuda-${c.id}"></span>` : ''}
         </div>
       `).join('')}
@@ -96,38 +123,66 @@ export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear 
   // Campo con ayudaStock:true (hoy, el producto en Ventas): al elegir un
   // producto, muestra cuánto stock queda y limita el máximo del campo
   // 'cantidad' para que el usuario vea la alerta antes de intentar guardar.
-  esquema.campos.forEach(c => {
-    if (!c.ayudaStock || c.type !== 'select') return;
-    const select = document.getElementById(idInput(c));
+  // Extraído a función aparte porque tanto el <select> nativo como el
+  // combobox de búsqueda (buscar:true, ver abajo) terminan en lo mismo: un
+  // "extra" con {stock, categoria, precioSugerido} -- solo cambia de dónde sale.
+  function aplicarExtraCampo(c, extra) {
     const ayudaEl = cont.querySelector(`[data-rol="ayuda-${c.id}"]`);
-    // El nombre del campo de cantidad a clampear es 'cantidad' por defecto
-    // (Ventas), pero un módulo puede declarar otro nombre (ej. Postventa
-    // usa 'cantidad_repuesto') con ayudaStockCampoCantidad en su esquema.
     const idCampoCantidad = c.ayudaStockCampoCantidad || 'cantidad';
     const campoCantidad = esquema.campos.find(cm => cm.id === idCampoCantidad);
     const inputCantidad = campoCantidad ? document.getElementById(idInput(campoCantidad)) : null;
 
+    if (!extra) { if (ayudaEl) ayudaEl.textContent = ''; return; }
+    if (ayudaEl) {
+      ayudaEl.textContent = `Disponible: ${extra.stock} unidad(es)`;
+      ayudaEl.style.color = extra.stock > 0 ? 'var(--muted)' : 'var(--coral)';
+    }
+    if (inputCantidad) inputCantidad.max = extra.stock;
+
+    (c.sugiere || []).forEach(idCampoSugerido => {
+      const campoSugerido = esquema.campos.find(cm => cm.id === idCampoSugerido);
+      if (!campoSugerido) return;
+      const inputSugerido = document.getElementById(idInput(campoSugerido));
+      if (!inputSugerido) return;
+      if (idCampoSugerido === 'categoria' && extra.categoria) inputSugerido.value = extra.categoria;
+      if (idCampoSugerido === 'precio_unitario' && extra.precioSugerido) inputSugerido.value = extra.precioSugerido;
+      // Postventa: al elegir un repuesto principal, sugiere su precio
+      // unitario como costo_repuestos (copia el valor tal cual, sin
+      // multiplicar por cantidad_repuesto -- si la cantidad cambia
+      // después, este campo NO se recalcula solo, queda editable a mano).
+      if (idCampoSugerido === 'costo_repuestos' && extra.precioSugerido) inputSugerido.value = extra.precioSugerido;
+    });
+  }
+
+  esquema.campos.forEach(c => {
+    if (!c.ayudaStock || c.type !== 'select' || c.buscar) return;
+    const select = document.getElementById(idInput(c));
     select.addEventListener('change', () => {
       const opcion = select.selectedOptions[0];
       const extra = opcion && opcion.dataset.extra ? JSON.parse(opcion.dataset.extra) : null;
-      if (!extra) { ayudaEl.textContent = ''; return; }
-      ayudaEl.textContent = `Disponible: ${extra.stock} unidad(es)`;
-      ayudaEl.style.color = extra.stock > 0 ? 'var(--muted)' : 'var(--coral)';
-      if (inputCantidad) inputCantidad.max = extra.stock;
+      aplicarExtraCampo(c, extra);
+    });
+  });
 
-      (c.sugiere || []).forEach(idCampoSugerido => {
-        const campoSugerido = esquema.campos.find(cm => cm.id === idCampoSugerido);
-        if (!campoSugerido) return;
-        const inputSugerido = document.getElementById(idInput(campoSugerido));
-        if (!inputSugerido) return;
-        if (idCampoSugerido === 'categoria' && extra.categoria) inputSugerido.value = extra.categoria;
-        if (idCampoSugerido === 'precio_unitario' && extra.precioSugerido) inputSugerido.value = extra.precioSugerido;
-        // Postventa: al elegir un repuesto principal, sugiere su precio
-        // unitario como costo_repuestos (copia el valor tal cual, sin
-        // multiplicar por cantidad_repuesto -- si la cantidad cambia
-        // después, este campo NO se recalcula solo, queda editable a mano).
-        if (idCampoSugerido === 'costo_repuestos' && extra.precioSugerido) inputSugerido.value = extra.precioSugerido;
-      });
+  // Campos con buscar:true (ver js/esquemas.js): montar el combobox de
+  // búsqueda en vivo en vez de un <select>. Se guardan los handles para
+  // poder limpiarlos (texto + selección) después de guardar, más abajo.
+  const comboboxes = {};
+  esquema.campos.forEach(c => {
+    if (!c.buscar || !c.buscarFuente) return;
+    comboboxes[c.id] = renderComboboxBusqueda(`mount_${idInput(c)}`, {
+      idHidden: idInput(c),
+      placeholder: c.placeholderBusqueda || 'Buscar…',
+      required: !!c.required,
+      buscar: c.buscarFuente,
+      renderResultado: renderResultadoProducto,
+      etiquetaSeleccionado: (item) => item.nombre || (c.mapearOpcion ? c.mapearOpcion(item).label : String(item.id)),
+      valorSeleccionado: (item) => item.id,
+      onSeleccionar: (item) => {
+        const opcion = c.mapearOpcion ? c.mapearOpcion(item) : null;
+        aplicarExtraCampo(c, opcion ? opcion.extra : null);
+      },
+      onLimpiar: () => aplicarExtraCampo(c, null)
     });
   });
 
@@ -178,6 +233,7 @@ export function renderFormulario(contenedorId, esquema, onGuardar, { puedeCrear 
     statusEl.textContent = `Se guardó: ${esquema.etiqueta}.`;
     statusEl.style.color = 'var(--teal)';
     esquema.campos.forEach(c => {
+      if (c.buscar && comboboxes[c.id]) { comboboxes[c.id].limpiar(); return; }
       const input = document.getElementById(idInput(c));
       if (c.type === 'select') input.value = '';
       else input.value = valorInicial(c);

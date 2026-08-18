@@ -18,8 +18,16 @@ export const ESQUEMAS = {
       // (GET /clientes, GET /inventario). Ver poblarSelectsVentas() en app.js.
       { id: 'cliente_id', label: 'Cliente', type: 'select', required: true, fuente: 'clientes',
         vacio: 'Selecciona un cliente…', accionExtra: { texto: '+ Nuevo cliente', evento: 'nuevoCliente' } },
+      // buscar:true -- con inventarios grandes (100s/1000s de productos), un
+      // <select> con todas las opciones se vuelve inmanejable. En vez de
+      // opciones precargadas, este campo se resuelve por búsqueda en vivo
+      // contra el backend (ver componentes/comboboxBusqueda.js). fuente,
+      // ayudaStock y sugiere se siguen leyendo igual -- buscar:true solo
+      // cambia CÓMO se resuelven las opciones, no qué información usa el
+      // campo una vez elegido un producto.
       { id: 'producto_id', label: 'Producto', type: 'select', required: true, fuente: 'inventario',
-        vacio: 'Selecciona un producto…', ayudaStock: true, sugiere: ['categoria', 'precio_unitario'] },
+        vacio: 'Selecciona un producto…', ayudaStock: true, sugiere: ['categoria', 'precio_unitario'],
+        buscar: true, placeholderBusqueda: 'Buscar producto por nombre o categoría…' },
       // categoria/precio_unitario: vueltos a ser MANUALES a pedido (antes se
       // tomaban solos del catálogo). Al elegir un producto se sugieren con
       // los valores de su ficha en Inventario (ver 'sugiere' arriba y su uso
@@ -85,6 +93,14 @@ export const ESQUEMAS = {
 
   clientes: {
     etiqueta: 'cliente',
+    // Habilita el botón de acción "WhatsApp" en tablaRegistros.js -- lee el
+    // teléfono del campo indicado, sin duplicar el dato en ningún lado. Es
+    // un flag a nivel de esquema (no de campo) porque no cambia cómo se
+    // captura/valida el teléfono, solo qué acciones aparecen en la tabla.
+    // Cualquier otro módulo con su propio campo de teléfono (ej.
+    // conductores) puede sumar la misma línea más adelante sin tocar
+    // tablaRegistros.js.
+    whatsapp: { campoTelefono: 'telefono' },
     campos: [
       { id: 'fecha_registro', label: 'Fecha', type: 'date', required: true },
       { id: 'nombre', label: 'Nombre', type: 'text', required: true },

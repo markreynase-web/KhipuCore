@@ -432,7 +432,7 @@ function abrirNuevoUsuario() {
         campos: [
           { id: 'nombre', label: 'Nombre completo', type: 'text', required: true },
           { id: 'email', label: 'Correo', type: 'email', required: true },
-          { id: 'password', label: 'Contraseña', type: 'password', required: true, placeholder: 'Mínimo 6 caracteres' },
+          { id: 'password', label: 'Contraseña', type: 'password', required: true, placeholder: 'Mín. 8 caracteres, mayúscula, minúscula y número' },
           { id: 'rol', label: 'Rol', type: 'select', required: true, vacio: 'Selecciona un rol…',
             opcionesResueltas: roles.map(r => ({ value: r.nombre, label: r.nombre })) }
         ]

@@ -402,8 +402,15 @@ async function activarCapturaSiCorresponde(config) {
   };
 
   async function esquemaConOpcionesFrescas() {
+    // Campos con buscar:true (ver js/esquemas.js) NO precargan su lista --
+    // esa es justo la idea (fuente puede tener miles de filas). En vez de
+    // opcionesResueltas, se les cuelga buscarFuente()/mapearOpcion() para
+    // que el combobox (componentes/comboboxBusqueda.js, montado desde
+    // formularioRegistro.js) pida resultados en vivo, reusando el mismo
+    // CONSTRUCTORES_OPCION de siempre -- ni el combobox ni formularioRegistro.js
+    // necesitan saber qué forma tiene una fila de "inventario".
     const fuentes = [...new Set(
-      backend.esquema.campos.map(c => c.fuente).filter(f => f && CONSTRUCTORES_OPCION[f])
+      backend.esquema.campos.filter(c => !c.buscar).map(c => c.fuente).filter(f => f && CONSTRUCTORES_OPCION[f])
     )];
     const listas = Object.fromEntries(await Promise.all(
       fuentes.map(async f => [f, await backend.listarDeModulo(f)])
@@ -418,6 +425,13 @@ async function activarCapturaSiCorresponde(config) {
     const campos = backend.esquema.campos.map(c => {
       if (c.fuente === 'categoriasInventario') {
         return { ...c, opcionesResueltas: (categoriasUnicas || []).map(cat => ({ value: cat, label: cat })) };
+      }
+      if (c.buscar && c.fuente && CONSTRUCTORES_OPCION[c.fuente]) {
+        return {
+          ...c,
+          buscarFuente: (termino) => backend.buscarEnModulo(c.fuente, termino, 20),
+          mapearOpcion: CONSTRUCTORES_OPCION[c.fuente]
+        };
       }
       if (!c.fuente || !listas[c.fuente]) return c;
       return { ...c, opcionesResueltas: listas[c.fuente].map(CONSTRUCTORES_OPCION[c.fuente]) };

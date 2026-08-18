@@ -11,7 +11,7 @@
 // { filas, mapa, stats, cols } que ya arma parsing.js para un CSV, usando
 // el "mapa" declarado en el esquema de cada módulo (js/esquemas.js).
 
-import { listarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, importarCSV, backendDisponible, ultimoErrorAPI } from './api.js';
+import { listarRegistros, buscarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, importarCSV, backendDisponible, ultimoErrorAPI } from './api.js';
 import { ESQUEMAS } from './esquemas.js';
 
 function transformarFilasApi(filasApi, mapa) {
@@ -58,6 +58,9 @@ export async function iniciarModoBackend({ baseUrl, moduloId, onError }) {
     ultimoError: ultimoErrorAPI,
     // Para poblar selects (ej. productos/clientes en el formulario de Ventas)
     // con datos frescos de OTRO módulo, no solo del propio.
-    listarDeModulo: (otroModulo, filtros) => listarRegistros(baseUrl, otroModulo, filtros)
+    listarDeModulo: (otroModulo, filtros) => listarRegistros(baseUrl, otroModulo, filtros),
+    // Buscar-mientras-escribís en OTRO módulo (ver campo.buscar en
+    // js/esquemas.js + componentes/comboboxBusqueda.js).
+    buscarEnModulo: (otroModulo, termino, limite) => buscarRegistros(baseUrl, otroModulo, termino, limite)
   };
 }

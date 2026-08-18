@@ -2,8 +2,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { pool } from '../db.js';
 import { auth } from '../middleware/auth.js';
+import { registrarAuditoria } from '../registroAuditoria.js';
+import { enviarCorreoRecuperacion } from '../mailer.js';
+import { permitir } from '../rateLimiter.js';
+import { passwordCumplePolitica, MENSAJE_POLITICA_PASSWORD } from '../passwordPolicy.js';
 
 const router = Router();
 const DURACION_TOKEN = '8h';
@@ -152,6 +157,174 @@ router.post('/login/empresa', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo completar el inicio de sesión.' });
+  }
+});
+
+// --- Recuperación de contraseña ---
+// Las tres rutas de abajo son públicas a propósito (nadie tiene sesión
+// todavía cuando las usa) -- por eso NO llevan auth(). La seguridad acá no
+// es "quién puede llamar a esto" sino "qué se revela y qué tan explotable
+// es": nunca se confirma si un correo existe (ver MENSAJE_GENERICO), el
+// token es aleatorio de 256 bits y de un solo uso, y hay un límite de
+// solicitudes por correo (ver rateLimiter.js).
+
+const DURACION_RESET_MS = 30 * 60 * 1000; // 30 minutos -- dentro del rango 15-60 recomendado
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizarEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+// audit_log.empresa_id es NOT NULL (ver 012_empresas.sql) -- pero un evento
+// de recuperación de contraseña es de la IDENTIDAD (usuarios), no de una
+// empresa concreta. Se resuelve la primera empresa a la que pertenece ese
+// usuario (si tiene alguna) para que el evento SÍ aparezca en la pantalla de
+// Auditoría de esa empresa; un super admin sin ninguna empresa (o un usuario
+// sin membresías activas) simplemente no genera fila de auditoría -- mismo
+// criterio de "el audit log es un además, nunca bloquea" que ya documenta
+// registroAuditoria.js.
+async function empresaIdParaAuditoria(usuarioId) {
+  const { rows } = await pool.query(
+    'SELECT empresa_id FROM usuario_empresa WHERE usuario_id = $1 ORDER BY empresa_id LIMIT 1',
+    [usuarioId]
+  );
+  return rows[0]?.empresa_id ?? null;
+}
+
+// POST /forgot-password { email }
+router.post('/forgot-password', async (req, res) => {
+  const email = normalizarEmail(req.body?.email);
+  const MENSAJE_GENERICO = { mensaje: 'Si existe una cuenta asociada a este correo, recibirás instrucciones para restablecer tu contraseña.' };
+
+  if (!email || !REGEX_EMAIL.test(email)) {
+    return res.status(400).json({ error: 'Ingresa un correo electrónico válido.' });
+  }
+
+  // El límite se aplica ANTES de buscar si la cuenta existe, con el mismo
+  // mensaje de "demasiados intentos" exista o no esa cuenta -- así ni
+  // siquiera la frecuencia de respuestas deja adivinar si un correo está
+  // registrado.
+  if (!permitir(`forgot:${email}`, { maxIntentos: 3, ventanaMs: 15 * 60 * 1000 })) {
+    return res.status(429).json({ error: 'Ya solicitaste esto hace poco. Espera unos minutos antes de volver a intentar.' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, nombre, email FROM usuarios WHERE lower(email) = $1 AND activo = true',
+      [email]
+    );
+    const usuario = rows[0];
+
+    // No revelar si el correo existe: SIEMPRE 200 con el mismo mensaje. Todo
+    // lo de abajo (token, correo, auditoría) solo corre cuando SÍ hay una
+    // cuenta real -- no tiene sentido generar un token para nadie.
+    if (!usuario) return res.json(MENSAJE_GENERICO);
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + DURACION_RESET_MS);
+    await pool.query(
+      'INSERT INTO password_reset_tokens (usuario_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+      [usuario.id, tokenHash, expiresAt]
+    );
+
+    const baseFrontend = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    const resetUrl = `${baseFrontend}/pages/restablecer-password.html?token=${token}`;
+    await enviarCorreoRecuperacion({ to: usuario.email, nombre: usuario.nombre, resetUrl });
+
+    const empresaIdAuditoria = await empresaIdParaAuditoria(usuario.id);
+    if (empresaIdAuditoria) {
+      // accion <= 20 caracteres: audit_log.accion es VARCHAR(20) (ver
+      // 006_auditoria.sql) -- 'solicitar_recuperacion' (22) no entraba.
+      await registrarAuditoria(pool, {
+        usuario: { id: usuario.id, nombre: usuario.nombre, empresa_id: empresaIdAuditoria },
+        accion: 'solicitar_reset', modulo: 'auth', registroId: usuario.id, detalle: null
+      });
+    }
+
+    res.json(MENSAJE_GENERICO);
+  } catch (err) {
+    console.error(err);
+    // Acá sí se distingue: un error real de servidor no es lo mismo que
+    // "no existe esa cuenta" (eso arriba siempre da 200) -- decirlo no
+    // revela nada sobre ninguna cuenta, solo que algo falló y conviene reintentar.
+    res.status(500).json({ error: 'No se pudo procesar tu solicitud. Intenta de nuevo en unos minutos.' });
+  }
+});
+
+// GET /reset-password/validar?token=... -- la pantalla de "nueva
+// contraseña" lo llama al cargar, para mostrar de entrada "enlace inválido"
+// en vez de esperar a que el usuario escriba una contraseña para recién ahí
+// descubrirlo. Nunca distingue expirado/usado/inexistente -- ver sección de
+// abajo, "no mostrar información técnica".
+router.get('/reset-password/validar', async (req, res) => {
+  const token = String(req.query.token || '');
+  if (!token) return res.json({ valido: false });
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const { rows } = await pool.query(
+      'SELECT 1 FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()',
+      [tokenHash]
+    );
+    res.json({ valido: rows.length > 0 });
+  } catch (err) {
+    console.error(err);
+    res.json({ valido: false });
+  }
+});
+
+// POST /reset-password { token, password }
+router.post('/reset-password', async (req, res) => {
+  const token = String(req.body?.token || '');
+  const password = req.body?.password;
+  if (!token) return res.status(400).json({ error: 'Este enlace ya no es válido.' });
+  if (!passwordCumplePolitica(password)) {
+    return res.status(400).json({ error: MENSAJE_POLITICA_PASSWORD });
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const cliente = await pool.connect();
+  try {
+    await cliente.query('BEGIN');
+    // FOR UPDATE: si el enlace se abre/envía dos veces casi al mismo tiempo
+    // (doble clic, dos pestañas), esto evita que ambos requests pasen la
+    // validación "no usado todavía" a la vez y el token se gaste dos veces.
+    const { rows } = await cliente.query(
+      `SELECT prt.id, prt.usuario_id, u.nombre
+       FROM password_reset_tokens prt
+       JOIN usuarios u ON u.id = prt.usuario_id
+       WHERE prt.token_hash = $1 AND prt.used_at IS NULL AND prt.expires_at > now()
+       FOR UPDATE OF prt`,
+      [tokenHash]
+    );
+    if (!rows.length) {
+      await cliente.query('ROLLBACK');
+      return res.status(400).json({ error: 'Este enlace ya no es válido.' });
+    }
+    const fila = rows[0];
+
+    const hash = await bcrypt.hash(password, 10);
+    await cliente.query('UPDATE usuarios SET password_hash = $1, actualizado_el = now() WHERE id = $2', [hash, fila.usuario_id]);
+    // Se marca usado, nunca se borra la fila -- queda como registro de que
+    // ese token existió y se consumió (ver comentario en la migración 030).
+    await cliente.query('UPDATE password_reset_tokens SET used_at = now() WHERE id = $1', [fila.id]);
+    await cliente.query('COMMIT');
+
+    const empresaIdAuditoria = await empresaIdParaAuditoria(fila.usuario_id);
+    if (empresaIdAuditoria) {
+      await registrarAuditoria(pool, {
+        usuario: { id: fila.usuario_id, nombre: fila.nombre, empresa_id: empresaIdAuditoria },
+        accion: 'completar_reset', modulo: 'auth', registroId: fila.usuario_id, detalle: null
+      });
+    }
+
+    res.json({ mensaje: 'Contraseña actualizada correctamente.' });
+  } catch (err) {
+    await cliente.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo actualizar la contraseña. Intenta de nuevo.' });
+  } finally {
+    cliente.release();
   }
 });
 

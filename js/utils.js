@@ -70,6 +70,24 @@ export function parseNumeroFlexible(v) {
   return parseFloat(s);
 }
 
+// Convierte un teléfono guardado libremente (con +, espacios, guiones,
+// paréntesis) al formato que exige wa.me: solo dígitos, con código de país
+// adelante. KhipuCore no tiene un campo de país/código separado -- solo
+// `telefono` como texto libre (ver esquemas.js: clientes/conductores) -- así
+// que la única señal disponible es la cantidad de dígitos:
+//   - 9 dígitos exactos => se asume Perú (+51) y se antepone '51'.
+//   - cualquier otra longitud => se asume que YA incluye código de país
+//     (ej. alguien lo cargó como "+1 305 555 0100"), se deja tal cual.
+// Devuelve null si no queda nada usable (vacío, o muy corto para ser un
+// teléfono real) -- eso es lo que decide si el botón de WhatsApp se
+// deshabilita, nunca se arma un enlace con un número inválido.
+export function formatearTelefonoWhatsapp(telefono) {
+  if (!telefono) return null;
+  const soloDigitos = String(telefono).replace(/\D/g, '');
+  if (soloDigitos.length < 8) return null;
+  return soloDigitos.length === 9 ? `51${soloDigitos}` : soloDigitos;
+}
+
 export function conTimeout(promesa, ms, etiqueta) {
   return Promise.race([
     promesa,

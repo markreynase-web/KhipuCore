@@ -51,6 +51,7 @@ function sonIguales(antes, despues, esNumerico) {
  * @param {string} [config.columnaFecha] - columna usada para filtrar ?desde&hasta y para ORDER BY (default 'fecha')
  * @param {object} [config.valoresPorDefecto] - valor a usar si el campo llega vacío, ej. { cantidad: 1 }
  * @param {(datos:object)=>object} [config.antesDeGuardar] - calcula/ajusta campos derivados (ej. monto = cantidad*precio) antes de INSERT/UPDATE
+ * @param {string[]} [config.columnasBusqueda] - columnas de texto en las que ?buscar= hace ILIKE (ver GET / abajo). Opt-in: un módulo que no la declara mantiene el comportamiento de siempre.
  */
 export function crearRouterCRUD(config) {
   const {
@@ -61,7 +62,8 @@ export function crearRouterCRUD(config) {
     camposNumericos = [],
     columnaFecha = 'fecha',
     valoresPorDefecto = {},
-    antesDeGuardar
+    antesDeGuardar,
+    columnasBusqueda = []
   } = config;
 
   if (!modulo) throw new Error(`crearRouterCRUD: falta "modulo" para la tabla ${tabla} (se necesita para permisos y auditoría).`);
@@ -114,9 +116,16 @@ export function crearRouterCRUD(config) {
   // permiso específico de esa acción.
   router.use(auth, requireEmpresa, requireModulo(modulo));
 
-  // GET /?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
+  // GET /?desde=AAAA-MM-DD&hasta=AAAA-MM-DD&buscar=texto&limite=20
+  // ?buscar= solo tiene efecto si el módulo declaró columnasBusqueda -- si no
+  // la declaró, el parámetro se ignora y el comportamiento es el de siempre
+  // (pensado para el buscador-mientras-escribís de Ventas, ver componentes/
+  // comboboxBusqueda.js, pero cualquier módulo puede sumarse solo agregando
+  // columnasBusqueda a su config). unaccent() (migración 029) hace que
+  // "costeno" encuentre "Costeño" -- ver esa migración para por qué existe
+  // la extensión de Postgres.
   router.get('/', verificarPermiso(permiso('ver')), async (req, res) => {
-    const { desde, hasta } = req.query;
+    const { desde, hasta, buscar, limite } = req.query;
     // empresa_id SIEMPRE va primero y SIEMPRE está presente -- a diferencia
     // de desde/hasta, no es un filtro opcional: sin esto, cualquier empresa
     // vería los datos de todas las demás.
@@ -124,10 +133,28 @@ export function crearRouterCRUD(config) {
     const condiciones = [`empresa_id = $1`];
     if (desde) { valores.push(desde); condiciones.push(`${columnaFecha} >= $${valores.length}`); }
     if (hasta) { valores.push(hasta); condiciones.push(`${columnaFecha} <= $${valores.length}`); }
+
+    const termino = typeof buscar === 'string' ? buscar.trim() : '';
+    if (termino && columnasBusqueda.length) {
+      valores.push(`%${termino}%`);
+      const posicion = valores.length;
+      const porColumna = columnasBusqueda.map(c => `unaccent(${c}) ILIKE unaccent($${posicion})`);
+      condiciones.push(`(${porColumna.join(' OR ')})`);
+    }
+
     const where = `WHERE ${condiciones.join(' AND ')}`;
+    // Sin ?buscar=, se mantiene el límite de siempre (5000, pensado para
+    // cargar todo un módulo). Con ?buscar=, es un autocomplete: no tiene
+    // sentido devolver más de un puñado de resultados, y ?limite= deja que
+    // quien llama lo ajuste (con techo de 50 para no volverse, por error, un
+    // "tráeme todo" disfrazado).
+    const limiteFinal = termino && columnasBusqueda.length
+      ? Math.min(Math.max(parseInt(limite, 10) || 20, 1), 50)
+      : 5000;
+
     try {
       const { rows } = await pool.query(
-        `SELECT * FROM ${tabla} ${where} ORDER BY ${columnaFecha} DESC, id DESC LIMIT 5000`,
+        `SELECT * FROM ${tabla} ${where} ORDER BY ${columnaFecha} DESC, id DESC LIMIT ${limiteFinal}`,
         valores
       );
       res.json(rows);

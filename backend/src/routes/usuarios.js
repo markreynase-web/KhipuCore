@@ -13,6 +13,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db.js';
 import { auth, requireEmpresa } from '../middleware/auth.js';
 import { verificarPermiso } from '../middleware/permisos.js';
+import { passwordCumplePolitica, MENSAJE_POLITICA_PASSWORD } from '../passwordPolicy.js';
 
 const router = Router();
 router.use(auth, requireEmpresa);
@@ -68,7 +69,10 @@ router.post('/', verificarPermiso('usuarios.crear'), async (req, res) => {
   if (!nombre || !email || !password || !rol) {
     return res.status(400).json({ error: 'Nombre, email, contraseña y rol son requeridos.' });
   }
-  if (password.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+  // Misma política que la recuperación de contraseña (ver
+  // src/passwordPolicy.js) -- antes esta ruta solo exigía 6 caracteres,
+  // unificado a pedido explícito para que alta y recuperación pidan lo mismo.
+  if (!passwordCumplePolitica(password)) return res.status(400).json({ error: MENSAJE_POLITICA_PASSWORD });
 
   try {
     const { rows: existente } = await pool.query('SELECT id FROM usuarios WHERE lower(email) = lower($1)', [email]);

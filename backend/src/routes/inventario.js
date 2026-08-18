@@ -121,7 +121,11 @@ router.use(crearRouterCRUD({
   camposRequeridos: ['fecha_registro', 'nombre'],
   camposNumericos: ['stock', 'stock_minimo', 'precio_unitario', 'costo_unitario'],
   columnaFecha: 'fecha_registro',
-  valoresPorDefecto: { stock: 0, stock_minimo: 0 }
+  valoresPorDefecto: { stock: 0, stock_minimo: 0 },
+  // Habilita GET /?buscar=texto para el buscador-mientras-escribís del
+  // producto en Ventas (ver componentes/comboboxBusqueda.js). No hay columna
+  // de código/SKU en este catálogo -- si se agrega alguna vez, sumarla acá.
+  columnasBusqueda: ['nombre', 'categoria']
 }));
 
 export default router;
