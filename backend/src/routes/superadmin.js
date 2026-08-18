@@ -327,6 +327,47 @@ router.post('/empresas/:id/admin', async (req, res) => {
   }
 });
 
+// Borra la empresa DE VERDAD -- no es reversible, a diferencia de PUT
+// .../empresas/:id con activo:false (que solo bloquea el login y se puede
+// revertir en cualquier momento). Arrastra en cascada TODOS sus datos:
+// ventas, inventario, clientes, cada módulo activo (ver
+// 031_eliminar_empresa_cascade.sql). Por eso exige escribir el nombre EXACTO
+// de la empresa en confirmarNombre -- así no es posible borrar por error con
+// una llamada apurada a la API, ni con un solo clic distraído en el panel.
+router.delete('/empresas/:id', async (req, res) => {
+  const confirmarNombre = String(req.body?.confirmarNombre || '').trim();
+  const cliente = await pool.connect();
+  try {
+    const { rows } = await cliente.query(`SELECT id, nombre FROM empresas WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const empresa = rows[0];
+
+    if (confirmarNombre !== empresa.nombre) {
+      return res.status(400).json({ error: 'El nombre no coincide. Escribe el nombre exacto de la empresa para confirmar.' });
+    }
+
+    await cliente.query('BEGIN');
+    // Se audita ANTES del DELETE, no después: audit_log.empresa_id pasa a
+    // NULL por el ON DELETE SET NULL de esa tabla, así que esta fila
+    // sobrevive al borrado -- a propósito, queda como el único rastro de que
+    // esta empresa existió alguna vez.
+    await registrarAuditoria(cliente, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: empresa.id },
+      accion: 'eliminar', modulo: 'superadmin', registroId: empresa.id, detalle: { nombre: empresa.nombre }
+    });
+    await cliente.query(`DELETE FROM empresas WHERE id = $1`, [empresa.id]);
+    await cliente.query('COMMIT');
+
+    res.status(204).end();
+  } catch (err) {
+    await cliente.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo borrar la empresa.' });
+  } finally {
+    cliente.release();
+  }
+});
+
 // Vida corta (30 min, contra las 8h de una sesión normal) porque esto es
 // acceso de soporte, no una sesión de trabajo -- si hace falta más tiempo,
 // se vuelve a pedir.

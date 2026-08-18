@@ -52,7 +52,7 @@
 <script type="module">
   import { haySesionActiva, obtenerSesion, cerrarSesion, esSuperAdmin, guardarSesion, respaldarSesionSuperAdmin } from '../js/sesion.js';
   import { API_BASE_URL } from '../js/apiConfig.js';
-  import { abrirPanelLateral } from '../components/panelLateral.js';
+  import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
   import { renderFooter } from '../components/footer.js';
   import { escapeHtml } from '../js/utils.js';
 
@@ -412,6 +412,23 @@
               <span class="form-status" id="adminStatus"></span>
             </div>
           </form>
+
+          <div class="sa-subtitulo" style="margin-top:26px; color:var(--coral);">Zona de peligro</div>
+          <div style="border:1.5px solid var(--coral); border-radius:10px; padding:14px 16px; margin-top:6px;">
+            <p style="font-size:12.5px; color:var(--muted); margin:0 0 10px; line-height:1.5;">
+              Borra la empresa y TODOS sus datos de forma permanente: ${empresa.usuarios_count} usuario(s), ${empresa.modulos_count} módulo(s) activo(s), y cada venta/cliente/registro de cada módulo que haya usado. No se puede deshacer -- a diferencia de desactivar, esto no se reactiva.
+            </p>
+            <label style="font-size:12px; font-weight:600; color:var(--ink); display:block; margin-bottom:6px;">
+              Escribe "${escapeHtml(empresa.nombre)}" para confirmar
+            </label>
+            <input type="text" id="confirmarBorrado" placeholder="${escapeHtml(empresa.nombre)}" autocomplete="off"
+              style="width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:9px 11px; border:1px solid var(--paper-line); border-radius:8px; background:#fff; color:var(--ink); box-sizing:border-box; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <button type="button" class="btn" id="btnBorrarEmpresa" disabled
+                style="background:var(--coral); color:#fff; border:none;">🗑️ Borrar empresa permanentemente</button>
+              <span class="form-status" id="borrarStatus"></span>
+            </div>
+          </div>
         `;
 
         document.getElementById('btnGuardarNombre').addEventListener('click', async () => {
@@ -575,6 +592,35 @@
             statusEl.style.color = 'var(--teal)';
             document.getElementById('formAdmin').reset();
             await cargarEmpresas();
+          }
+        });
+
+        // El botón queda deshabilitado hasta que el nombre escrito coincide
+        // letra por letra -- es la primera barrera, antes incluso de llegar
+        // al confirm() de abajo. El backend igual vuelve a validar esto
+        // mismo (ver DELETE /superadmin/empresas/:id): esta comprobación acá
+        // es para que el usuario no llegue a intentarlo con el nombre mal
+        // escrito, no un reemplazo de la validación real.
+        const inputConfirmar = document.getElementById('confirmarBorrado');
+        const btnBorrar = document.getElementById('btnBorrarEmpresa');
+        inputConfirmar.addEventListener('input', () => {
+          btnBorrar.disabled = inputConfirmar.value.trim() !== empresa.nombre;
+        });
+        btnBorrar.addEventListener('click', async () => {
+          if (!confirm(`Última confirmación: esto borra "${empresa.nombre}" y TODOS sus datos para siempre, sin forma de deshacerlo. ¿Continuar?`)) return;
+          const statusEl = document.getElementById('borrarStatus');
+          btnBorrar.disabled = true;
+          statusEl.textContent = 'Borrando...';
+          statusEl.style.color = 'var(--muted)';
+          const res = await api(`/superadmin/empresas/${empresa.id}`, {
+            method: 'DELETE', body: JSON.stringify({ confirmarNombre: inputConfirmar.value.trim() })
+          });
+          if (res !== null) {
+            cerrarPanelLateral();
+            await cargarEmpresas();
+          } else {
+            btnBorrar.disabled = false;
+            statusEl.textContent = '';
           }
         });
       }
