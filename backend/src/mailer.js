@@ -1,32 +1,32 @@
 // src/mailer.js
-// Envío de correo vía SMTP genérico (nodemailer) -- funciona con cualquier
-// proveedor (Gmail con contraseña de aplicación, SendGrid, Brevo, Resend,
-// Mailtrap para pruebas, un SMTP propio...) porque nodemailer solo necesita
-// host/puerto/usuario/clave, nunca un SDK específico de proveedor. Ver
-// .env.example para las variables necesarias.
+// Envío de correo vía la API REST de Brevo (HTTPS), no SMTP.
 //
-// Nada de esto se hardcodea -- todo sale de variables de entorno. Si no
-// están configuradas, enviarCorreoRecuperacion() no revienta: registra el
-// enlace en el log del servidor (ver nota abajo) para poder probar el flujo
-// completo en desarrollo sin credenciales SMTP reales.
+// Antes esto era SMTP genérico con nodemailer ("funciona con cualquier
+// proveedor"). Se cambió porque en producción (Render, plan free) las
+// conexiones salientes por SMTP a smtp-relay.brevo.com:587 nunca conectan
+// -- confirmado en los logs: "Connection timeout", con host/usuario/clave
+// correctos. HTTPS no tiene ese problema (es el mismo tipo de llamada que ya
+// hace khipuAiTools.js contra la API de Anthropic, que sí funciona). El
+// trade-off es real: esto ata el envío de correo específicamente a Brevo, ya
+// no es "cualquier SMTP" -- aceptado a propósito para que la recuperación de
+// contraseña funcione en el hosting real, no solo en teoría.
+//
+// Nada se hardcodea -- BREVO_API_KEY y EMAIL_FROM salen de variables de
+// entorno (ver .env.example). Si BREVO_API_KEY no está configurada,
+// enviarCorreoRecuperacion() no revienta: registra el enlace en el log del
+// servidor, para poder probar el flujo completo sin credenciales reales
+// mientras desarrollas (mismo criterio que antes con SMTP no configurado).
 
-import nodemailer from 'nodemailer';
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
-function transporteConfigurado() {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
-}
-
-let transportadorCache = null;
-function obtenerTransportador() {
-  if (!transportadorCache) {
-    transportadorCache = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-    });
-  }
-  return transportadorCache;
+// EMAIL_FROM ya viene como "KhipuCore <correo@dominio.com>" (ver
+// .env.example) -- se reutiliza el mismo valor en vez de pedir variables
+// nuevas, porque ya está bien cargado tanto en local como en Render.
+function remitenteConfigurado() {
+  const from = process.env.EMAIL_FROM || '';
+  const m = from.match(/^(.*)<(.+)>$/);
+  if (m) return { name: m[1].trim() || 'KhipuCore', email: m[2].trim() };
+  return from ? { name: 'KhipuCore', email: from.trim() } : null;
 }
 
 function plantillaRecuperacion({ nombre, resetUrl }) {
@@ -80,23 +80,30 @@ function plantillaRecuperacion({ nombre, resetUrl }) {
  * usuario, se haya podido enviar el correo o no.
  */
 export async function enviarCorreoRecuperacion({ to, nombre, resetUrl }) {
-  if (!transporteConfigurado()) {
-    // Sin SMTP_HOST/SMTP_USER/SMTP_PASSWORD configurados (ver .env.example)
-    // no hay forma de mandar el correo de verdad. En vez de fallar en
-    // silencio, se deja el enlace acá -- permite probar el flujo completo
-    // (crear token, abrir el enlace, cambiar la contraseña) en desarrollo
-    // sin depender de credenciales SMTP reales. En producción, este log es
-    // la señal de que faltan configurar esas variables en Render.
-    console.warn(`[mailer] SMTP no configurado -- enlace de recuperación para ${to}:\n  ${resetUrl}`);
-    return { enviado: false, motivo: 'smtp_no_configurado' };
+  const apiKey = process.env.BREVO_API_KEY;
+  const sender = remitenteConfigurado();
+
+  if (!apiKey || !sender) {
+    console.warn(`[mailer] BREVO_API_KEY o EMAIL_FROM no configurados -- enlace de recuperación para ${to}:\n  ${resetUrl}`);
+    return { enviado: false, motivo: 'no_configurado' };
   }
+
   try {
-    await obtenerTransportador().sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-      to,
-      subject: 'Restablece tu contraseña de KhipuCore',
-      html: plantillaRecuperacion({ nombre, resetUrl })
+    const res = await fetch(BREVO_ENDPOINT, {
+      method: 'POST',
+      headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: to, name: nombre || undefined }],
+        subject: 'Restablece tu contraseña de KhipuCore',
+        htmlContent: plantillaRecuperacion({ nombre, resetUrl })
+      })
     });
+    if (!res.ok) {
+      const cuerpo = await res.json().catch(() => ({}));
+      console.error('No se pudo enviar el correo de recuperación (Brevo):', res.status, cuerpo.message || JSON.stringify(cuerpo));
+      return { enviado: false, motivo: 'error_envio' };
+    }
     return { enviado: true };
   } catch (err) {
     console.error('No se pudo enviar el correo de recuperación:', err.message);
