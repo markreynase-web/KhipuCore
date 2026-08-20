@@ -4,6 +4,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import ventasRouter from './routes/ventas.js';
 import inventarioRouter from './routes/inventario.js';
@@ -49,10 +50,87 @@ dotenv.config();
 
 const app = express();
 
-const origenesPermitidos = (process.env.CORS_ORIGIN || '*')
+// V-08 (auditoría de seguridad): headers HTTP de defensa en profundidad.
+// Este servidor SOLO devuelve JSON (el frontend lo sirve Vercel aparte, ver
+// vercel.json en la raíz del repo -- ahí van los headers que de verdad
+// protegen las páginas HTML, incluido frame-ancestors, que el spec de CSP
+// ignora si se manda por <meta> en vez de header real). Por eso acá la CSP
+// puede ser la más estricta posible: default-src 'none', esta API nunca
+// necesita cargar ni ejecutar nada por sí misma.
+app.use(helmet({
+  // Todas las directivas relevantes van explícitas -- helmet completa con
+  // sus propios defaults cualquier directiva que no se liste acá (ej.
+  // font-src/style-src/img-src traían "https:" de fábrica la primera vez
+  // que se probó esto, no lo que se había decidido). default-src 'none' +
+  // cada directiva puesta a mano es la única forma de que la política real
+  // sea la que dice el comentario de arriba, no la que helmet asuma.
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'none'"],
+      scriptSrc: ["'none'"],
+      styleSrc: ["'none'"],
+      imgSrc: ["'none'"],
+      fontSrc: ["'none'"],
+      connectSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'none'"],
+      formAction: ["'none'"],
+      frameAncestors: ["'none'"]
+    }
+  },
+  // El frontend consume esta API desde OTRO origen (Vercel, no Render) --
+  // el default de helmet (Cross-Origin-Resource-Policy: same-origin)
+  // bloquearía esas respuestas aunque CORS las permita. cross-origin es
+  // correcto acá a propósito, no un descuido.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  // COEP exige que todo recurso cross-origin declare explícitamente que
+  // puede embeberse -- no tiene sentido para una API JSON consumida por
+  // fetch(), y activado por error podría romper la llamada desde el frontend.
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  frameguard: { action: 'sameorigin' },
+  // Render sirve https://khipucore.onrender.com con HTTPS real (confirmado:
+  // API_BASE_URL en el frontend ya es https:// a mano) y redirige HTTP a
+  // HTTPS -- no hay ningún escenario legítimo de HTTP directo en producción.
+  // max-age prudente (180 días), sin includeSubDomains ni preload a propósito.
+  hsts: { maxAge: 15552000, includeSubDomains: false, preload: false }
+  // X-Content-Type-Options: nosniff y quitar X-Powered-By quedan en el
+  // comportamiento por defecto de helmet (ambos ON) -- es exactamente lo
+  // que se pidió, no hace falta configurarlos a mano.
+}));
+app.use((req, res, next) => {
+  // helmet ya no trae un middleware propio de Permissions-Policy (el spec
+  // cambió mucho entre versiones) -- se setea a mano, solo con las APIs que
+  // se comprobó que KhipuCore no usa en ningún lado del frontend (grep de
+  // mediaDevices/geolocation/bluetooth/usb/payment en todo el repo: cero
+  // resultados).
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()');
+  next();
+});
+
+// V-09 (auditoría de seguridad): antes, "" || '*' hacía que la AUSENCIA de
+// CORS_ORIGIN terminara siendo indistinguible de haberla puesto a mano en
+// '*' -- cualquier origen quedaba permitido por accidente. Ahora, sin la
+// variable, origenesPermitidos queda vacío y NINGÚN origen cross-origin
+// pasa (fail-closed). Un '*' explícito en la variable sigue funcionando
+// igual que antes -- eso es una elección deliberada de quien despliega, no
+// el comportamiento por defecto.
+const origenesPermitidos = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
+
+if (!origenesPermitidos.length) {
+  // Mismo criterio que el aviso de JWT_SECRET de arriba: no tumba el
+  // servidor (Render sigue pudiendo healthcheckear /api/salud), pero deja
+  // bien visible en los logs que ningún origen cross-origin va a poder usar
+  // la API hasta que se configure -- en vez de fallar en silencio (o, peor,
+  // fallar abierto).
+  console.error(
+    'Falta CORS_ORIGIN en las variables de entorno -- por seguridad, NINGÚN origen cross-origin va a poder usar esta API hasta que la configures (ver .env.example).'
+  );
+}
 
 app.use(cors({
   origin: (origenPeticion, callback) => {
@@ -74,6 +152,18 @@ if (!process.env.JWT_SECRET) {
     'cualquier texto largo y aleatorio antes de usar el login.'
   );
 }
+
+// V-08 (hallazgo de Cache-Control): todo lo que sigue de acá para abajo es
+// auth (login, recuperación de contraseña, /me) o alguno de los ~30 módulos
+// de datos por-empresa/por-usuario -- nunca debería quedar en un caché
+// compartido (proxies, CDN) ni en el historial/back-forward-cache del
+// navegador. /api/salud ya respondió arriba y nunca llega hasta este
+// middleware -- por eso no hace falta una excepción explícita por ruta,
+// alcanza con el ORDEN: esto va después de /api/salud, antes de todo lo demás.
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 app.use('/api/auth', authRouter);
 app.use('/api/ventas', ventasRouter);
