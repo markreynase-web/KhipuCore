@@ -53,9 +53,13 @@ function dibujarLista() {
   const ordenados = [...tratamientosCache].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || (b.id - a.id)).slice(0, 15);
   document.getElementById('tratLista').innerHTML = ordenados.length ? ordenados.map(t => {
     const est = ETIQUETA_ESTADO[t.estado] || { texto: t.estado, color: 'muted' };
-    const sub = [t.pieza_dental ? `Pieza ${t.pieza_dental}` : null, escapeHtml(String(t.fecha || '').slice(0, 10))].filter(Boolean).join(' · ');
+    // sub se arma crudo y se escapa UNA sola vez en el punto de inserción --
+    // mismo patrón que el resto de los dashboards. Antes, pieza_dental (un
+    // campo de texto libre) se insertaba sin pasar por escapeHtml(), lo que
+    // permitía XSS almacenado vía ese campo.
+    const sub = [t.pieza_dental ? `Pieza ${t.pieza_dental}` : null, String(t.fecha || '').slice(0, 10)].filter(Boolean).join(' · ');
     return `<div class="rank-row">
-      <span class="rank-name">${escapeHtml(t.cliente_nombre)} — ${escapeHtml(t.procedimiento)}<div class="rank-sub">${sub}</div></span>
+      <span class="rank-name">${escapeHtml(t.cliente_nombre)} — ${escapeHtml(t.procedimiento)}<div class="rank-sub">${escapeHtml(sub)}</div></span>
       <span class="evento-badge evento-badge-${est.color}">${escapeHtml(est.texto)}</span>
       <span class="rank-val">${fmtNum(Number(t.costo) || 0)}</span>
     </div>`;
