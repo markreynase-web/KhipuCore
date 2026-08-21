@@ -69,6 +69,13 @@ router.post('/', verificarPermiso('usuarios.crear'), async (req, res) => {
   if (!nombre || !email || !password || !rol) {
     return res.status(400).json({ error: 'Nombre, email, contraseña y rol son requeridos.' });
   }
+  // Nadie puede crear una cuenta con rol "administrador" salvo alguien que ya
+  // es administrador -- sin este check, cualquier rol con usuarios.crear
+  // (por bug o por una futura mala configuración de permisos) podría crear
+  // una cuenta nueva ya con el máximo privilegio.
+  if (rol === 'administrador' && req.usuario.rol !== 'administrador') {
+    return res.status(403).json({ error: 'Solo un administrador puede crear una cuenta con rol de administrador.' });
+  }
   // Misma política que la recuperación de contraseña (ver
   // src/passwordPolicy.js) -- antes esta ruta solo exigía 6 caracteres,
   // unificado a pedido explícito para que alta y recuperación pidan lo mismo.
@@ -120,6 +127,26 @@ router.post('/', verificarPermiso('usuarios.crear'), async (req, res) => {
 router.put('/:id', verificarPermiso('usuarios.editar'), async (req, res) => {
   const { nombre, rol, activo } = req.body || {};
   const empresaId = req.usuario.empresa_id;
+  const idObjetivo = Number(req.params.id);
+
+  if (rol) {
+    // Nadie cambia su propio rol -- es una acción que otra persona toma
+    // sobre vos, nunca vos mismo (mismo criterio que el auto-borrado del
+    // DELETE de abajo). Va primero porque es la regla más fundamental: da
+    // igual a qué rol se quiera cambiar, la respuesta es siempre la misma.
+    // Esto es lo que de verdad cierra la escalación de privilegios: aunque
+    // alguien tuviera usuarios.editar de más por error, no podría usarlo
+    // sobre su propia cuenta.
+    if (idObjetivo === req.usuario.id) {
+      return res.status(400).json({ error: 'No podés cambiar tu propio rol.' });
+    }
+    // Mismo candado que en el POST: nadie asigna "administrador" salvo
+    // alguien que ya lo es.
+    if (rol === 'administrador' && req.usuario.rol !== 'administrador') {
+      return res.status(403).json({ error: 'Solo un administrador puede asignar el rol de administrador.' });
+    }
+  }
+
   try {
     let rolId = null;
     if (rol) {
