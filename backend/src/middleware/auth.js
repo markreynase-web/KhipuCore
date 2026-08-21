@@ -43,15 +43,39 @@ export function requireEmpresa(req, res, next) {
 // módulo puede pasar a estar desactivado en cualquier momento (por ejemplo,
 // si el super admin lo apaga por falta de pago) y eso debe bloquear la API
 // de inmediato, no recién cuando venza el token de 8h.
+// V-05 (auditoría de seguridad): además de confirmar que el módulo esté
+// habilitado para la empresa (lo de siempre), esta misma consulta ahora
+// también confirma que la membresía del usuario a esa empresa siga activa
+// -- mismo viaje a la base de datos, sin round-trip nuevo. Antes, eliminar o
+// deshabilitar a alguien (o borrar su usuario_empresa) no cortaba su sesión
+// hasta que el JWT expirara solo (hasta 8h): el módulo se revisaba, pero
+// nunca si esa persona seguía teniendo derecho a estar en la empresa.
+//
+// Excepción a propósito: las sesiones de impersonación de soporte
+// (ver routes/superadmin.js POST /empresas/:id/impersonar) NUNCA tienen una
+// fila real en usuario_empresa -- el super admin no se vincula formalmente a
+// la empresa que soporta, es un acceso sintetizado y de corta vida (30 min)
+// que ya queda auditado en el momento en que se genera. Exigirles la misma
+// fila rompería la impersonación por completo, así que para esas sesiones
+// (impersonando:true en el JWT) se sigue validando solo el módulo, igual
+// que antes.
 export function requireModulo(moduloId) {
   return async (req, res, next) => {
     try {
+      const esImpersonacion = req.usuario?.impersonando === true;
       const { rows } = await pool.query(
-        'SELECT 1 FROM empresa_modulos WHERE empresa_id = $1 AND modulo_id = $2',
-        [req.usuario.empresa_id, moduloId]
+        esImpersonacion
+          ? `SELECT 1 FROM empresa_modulos WHERE empresa_id = $1 AND modulo_id = $2`
+          : `SELECT 1 FROM empresa_modulos em
+             WHERE em.empresa_id = $1 AND em.modulo_id = $2
+               AND EXISTS (
+                 SELECT 1 FROM usuario_empresa ue
+                 WHERE ue.usuario_id = $3 AND ue.empresa_id = $1 AND ue.activo = true
+               )`,
+        esImpersonacion ? [req.usuario.empresa_id, moduloId] : [req.usuario.empresa_id, moduloId, req.usuario.id]
       );
       if (!rows.length) {
-        return res.status(403).json({ error: `Tu empresa no tiene el módulo "${moduloId}" habilitado.` });
+        return res.status(403).json({ error: `Tu empresa no tiene el módulo "${moduloId}" habilitado, o tu acceso a esta empresa ya no está activo.` });
       }
       next();
     } catch (err) {
