@@ -64,6 +64,16 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son requeridos.' });
 
+  // Mismo mecanismo que ya usa forgot-password (rateLimiter.js), aplicado acá
+  // por primera vez -- antes este endpoint no tenía ningún freno contra
+  // fuerza bruta o credential stuffing. 5 intentos/15min por email: más
+  // holgado que forgot-password (3) porque acá es normal tipear mal la
+  // contraseña un par de veces seguidas.
+  const emailNormalizado = String(email).trim().toLowerCase();
+  if (!permitir(`login:${emailNormalizado}`, { maxIntentos: 5, ventanaMs: 15 * 60 * 1000 })) {
+    return res.status(429).json({ error: 'Demasiados intentos. Espera unos minutos antes de volver a intentar.' });
+  }
+
   try {
     const { rows } = await pool.query(
       'SELECT * FROM usuarios WHERE lower(email) = lower($1) AND activo = true',
