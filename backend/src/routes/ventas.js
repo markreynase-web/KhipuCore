@@ -26,6 +26,42 @@ function numeroOCero(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// V-06 (auditoría de seguridad): el precio sigue siendo manual a propósito
+// (descuentos, precios negociados -- ver comentario arriba), pero ya no
+// puede ser CUALQUIER precio positivo. Rango ±30% respecto al precio de
+// catálogo (inventario.precio_unitario). Si el producto no tiene precio de
+// catálogo cargado (0 -- inventario.precio_unitario es NOT NULL DEFAULT 0,
+// así que "sin precio" es un valor real y esperado, no un error), no hay
+// contra qué validar y se permite cualquier precio positivo, igual que
+// antes -- no tiene sentido bloquear ventas de un producto que nunca tuvo
+// precio de catálogo.
+const RANGO_PRECIO = 0.30;
+
+function validarRangoPrecio(precio, precioCatalogo) {
+  if (!precioCatalogo || precioCatalogo <= 0) return { ok: true };
+  // .toFixed(2) normaliza el error de punto flotante de multiplicar por 0.7
+  // (100 * 0.7 = 70.00000000000001 en JS) -- sin esto, un precio exactamente
+  // en el límite del rango podía rechazarse por error.
+  const min = +(precioCatalogo * (1 - RANGO_PRECIO)).toFixed(2);
+  const max = +(precioCatalogo * (1 + RANGO_PRECIO)).toFixed(2);
+  const precioRedondeado = +precio.toFixed(2);
+  if (precioRedondeado < min || precioRedondeado > max) return { ok: false, min, max };
+  return { ok: true };
+}
+
+// Arma el detalle de desviación para auditoría -- null si el precio cobrado
+// coincide con el de catálogo (no hay nada que registrar de más).
+function desviacionPrecio(precio, precioCatalogo) {
+  if (!precioCatalogo || precioCatalogo <= 0) return null;
+  const precioRedondeado = +precio.toFixed(2);
+  if (precioRedondeado === +precioCatalogo.toFixed(2)) return null;
+  return {
+    precio_catalogo: precioCatalogo,
+    precio_cobrado: precioRedondeado,
+    desviacion_pct: +(((precioRedondeado - precioCatalogo) / precioCatalogo) * 100).toFixed(2)
+  };
+}
+
 // GET /?desde&hasta -- igual que el CRUD generico, solo lectura.
 router.get('/', verificarPermiso('ventas.ver'), async (req, res) => {
   const { desde, hasta } = req.query;
@@ -73,7 +109,7 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
     // dos ventas simultaneas del mismo producto no pueden leer el mismo stock
     // "viejo" a la vez y las dos pasar la validacion por error.
     const { rows: prodRows } = await cliente.query(
-      `SELECT id, nombre, categoria AS categoria_catalogo, stock FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`,
+      `SELECT id, nombre, categoria AS categoria_catalogo, stock, precio_unitario AS precio_catalogo FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`,
       [producto_id, empresaId]
     );
     if (!prodRows.length) {
@@ -81,12 +117,23 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
       return res.status(404).json({ error: 'El producto seleccionado ya no existe en inventario.' });
     }
     const producto = prodRows[0];
+    const precioCatalogo = Number(producto.precio_catalogo) || 0;
 
     if (Number(producto.stock) < cant) {
       await cliente.query('ROLLBACK');
       return res.status(409).json({
         error: `Stock insuficiente: quedan ${producto.stock} unidad(es) de "${producto.nombre}" y se intento vender ${cant}.`,
         stockDisponible: Number(producto.stock)
+      });
+    }
+
+    // V-06: el precio manual sigue permitido, pero no CUALQUIER precio --
+    // ver validarRangoPrecio() arriba.
+    const rangoPrecio = validarRangoPrecio(precio, precioCatalogo);
+    if (!rangoPrecio.ok) {
+      await cliente.query('ROLLBACK');
+      return res.status(400).json({
+        error: `El precio debe estar entre S/ ${rangoPrecio.min.toFixed(2)} y S/ ${rangoPrecio.max.toFixed(2)} (±30% del precio de catálogo de "${producto.nombre}": S/ ${precioCatalogo.toFixed(2)}).`
       });
     }
 
@@ -120,7 +167,14 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
       [monto, clienteRow.id, empresaId]
     );
 
-    await registrarAuditoria(cliente, { usuario: req.usuario, accion: 'crear', modulo: 'ventas', registroId: venta.id, detalle: { producto: producto.nombre, cliente: clienteRow.nombre, cantidad: cant, precio_unitario: precio, monto } });
+    const desviacion = desviacionPrecio(precio, precioCatalogo);
+    await registrarAuditoria(cliente, {
+      usuario: req.usuario, accion: 'crear', modulo: 'ventas', registroId: venta.id,
+      detalle: {
+        producto: producto.nombre, cliente: clienteRow.nombre, cantidad: cant, precio_unitario: precio, monto,
+        ...(desviacion ? { desviacion_precio: desviacion } : {})
+      }
+    });
     await cliente.query('COMMIT');
     res.status(201).json(venta);
   } catch (err) {
@@ -156,17 +210,38 @@ router.put('/:id', verificarPermiso('ventas.editar'), async (req, res) => {
     let cantidadFinal = Number(venta.cantidad);
     const precioFinal = nuevoPrecio !== null ? nuevoPrecio : Number(venta.precio_unitario);
 
-    if (nuevaCant !== null && nuevaCant !== Number(venta.cantidad)) {
-      const diferencia = nuevaCant - Number(venta.cantidad); // positivo = vende mas, negativo = devuelve
-      const { rows: prodRows } = await cliente.query(`SELECT id, stock FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`, [venta.producto_id, empresaId]);
+    // V-06: se necesita leer el producto de catálogo si cambia la cantidad
+    // (para ajustar stock, como antes) o si cambia el precio (para validar
+    // el rango ±30%) -- un solo SELECT cubre ambos casos, no uno por cada uno.
+    const cantidadCambio = nuevaCant !== null && nuevaCant !== Number(venta.cantidad);
+    let producto = null;
+    let precioCatalogo = 0;
+    if (cantidadCambio || nuevoPrecio !== null) {
+      const { rows: prodRows } = await cliente.query(
+        `SELECT id, stock, precio_unitario AS precio_catalogo FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`,
+        [venta.producto_id, empresaId]
+      );
       if (!prodRows.length) { await cliente.query('ROLLBACK'); return res.status(404).json({ error: 'El producto de esta venta ya no existe en inventario.' }); }
-      const producto = prodRows[0];
+      producto = prodRows[0];
+      precioCatalogo = Number(producto.precio_catalogo) || 0;
+    }
 
+    if (nuevoPrecio !== null) {
+      const rangoPrecio = validarRangoPrecio(precioFinal, precioCatalogo);
+      if (!rangoPrecio.ok) {
+        await cliente.query('ROLLBACK');
+        return res.status(400).json({
+          error: `El precio debe estar entre S/ ${rangoPrecio.min.toFixed(2)} y S/ ${rangoPrecio.max.toFixed(2)} (±30% del precio de catálogo: S/ ${precioCatalogo.toFixed(2)}).`
+        });
+      }
+    }
+
+    if (cantidadCambio) {
+      const diferencia = nuevaCant - Number(venta.cantidad); // positivo = vende mas, negativo = devuelve
       if (diferencia > 0 && Number(producto.stock) < diferencia) {
         await cliente.query('ROLLBACK');
         return res.status(409).json({ error: `Stock insuficiente para aumentar la cantidad: solo quedan ${producto.stock} unidad(es) mas.` });
       }
-
       await cliente.query(`UPDATE inventario SET stock = stock - $1, actualizado_el = now() WHERE id = $2 AND empresa_id = $3`, [diferencia, producto.id, empresaId]);
       cantidadFinal = nuevaCant;
     }
@@ -192,6 +267,9 @@ router.put('/:id', verificarPermiso('ventas.editar'), async (req, res) => {
     if (categoria && categoria !== venta.categoria) cambios.categoria = { antes: venta.categoria, despues: categoria };
     if (fecha && fecha !== venta.fecha?.toISOString?.().slice(0, 10)) cambios.fecha = { antes: venta.fecha, despues: fecha };
     if (notas !== undefined && notas !== venta.notas) cambios.notas = { antes: venta.notas, despues: notas };
+
+    const desviacion = nuevoPrecio !== null ? desviacionPrecio(precioFinal, precioCatalogo) : null;
+    if (desviacion) cambios.desviacion_precio = desviacion;
 
     await registrarAuditoria(cliente, {
       usuario: req.usuario, accion: 'editar', modulo: 'ventas', registroId: venta.id,
