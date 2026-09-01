@@ -9,7 +9,10 @@
     "start": "node src/server.js",
     "migrate": "node src/migrate.js",
     "seed:admin": "node src/seedAdmin.js",
-    "seed:superadmin": "node src/seedSuperAdmin.js"
+    "seed:superadmin": "node src/seedSuperAdmin.js",
+    "test": "node --test",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0",
