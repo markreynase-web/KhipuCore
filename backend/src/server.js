@@ -6,6 +6,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { requestId } from './middleware/requestId.js';
+import { logger } from './logger.js';
 import ventasRouter from './routes/ventas.js';
 import inventarioRouter from './routes/inventario.js';
 import clientesRouter from './routes/clientes.js';
@@ -49,6 +51,12 @@ import pagosMembresiaRouter from './routes/pagosMembresia.js';
 dotenv.config();
 
 const app = express();
+
+// Primero que cualquier otra cosa -- así TODA respuesta, incluidas las de
+// error y las de un preflight CORS, lleva X-Request-Id, y cualquier log de
+// esta request (los de más abajo, o los que ya existían por ruta) puede
+// leer req.requestId.
+app.use(requestId);
 
 // V-08 (auditoría de seguridad): headers HTTP de defensa en profundidad.
 // Este servidor SOLO devuelve JSON (el frontend lo sirve Vercel aparte, ver
@@ -207,9 +215,26 @@ app.use('/api/pagos_membresia', pagosMembresiaRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
+// Manejador global -- solo atrapa lo que ninguna ruta ya haya atrapado por
+// su cuenta (casi todas tienen su propio try/catch con console.error, ver
+// diagnóstico de observabilidad; esto cubre lo que se escapa de eso, ej.
+// un JSON malformado que rompe express.json() antes de llegar a cualquier
+// ruta). Log estructurado con pino: requestId para poder correlacionar
+// esta línea con cualquier otra de la misma request, y contexto de quién
+// y qué -- nunca el body crudo sin pasar por el redact ya configurado en
+// logger.js.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(err);
+  logger.error({
+    requestId: req.requestId,
+    method: req.method,
+    url: req.originalUrl,
+    statusCode: 500,
+    usuario_id: req.usuario?.id ?? null,
+    empresa_id: req.usuario?.empresa_id ?? null,
+    body: req.body,
+    err
+  }, 'Error no controlado');
   res.status(500).json({ error: 'Error interno del servidor.' });
 });
 

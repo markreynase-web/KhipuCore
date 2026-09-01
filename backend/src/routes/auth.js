@@ -9,6 +9,7 @@ import { registrarAuditoria } from '../registroAuditoria.js';
 import { enviarCorreoRecuperacion } from '../mailer.js';
 import { permitir } from '../rateLimiter.js';
 import { passwordCumplePolitica, MENSAJE_POLITICA_PASSWORD } from '../passwordPolicy.js';
+import { logger } from '../logger.js';
 
 const router = Router();
 const DURACION_TOKEN = '8h';
@@ -128,7 +129,7 @@ router.post('/login', async (req, res) => {
       empresas: membresias.map(m => ({ id: m.empresa_id, nombre: m.empresa_nombre }))
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ requestId: req.requestId, method: req.method, url: req.originalUrl, statusCode: 500, body: req.body, err }, 'No se pudo iniciar sesión.');
     res.status(500).json({ error: 'No se pudo iniciar sesión.' });
   }
 });
@@ -165,7 +166,7 @@ router.post('/login/empresa', async (req, res) => {
     const sesion = await firmarSesion(fila, fila.empresa_id, fila.empresa_nombre);
     res.json(sesion);
   } catch (err) {
-    console.error(err);
+    logger.error({ requestId: req.requestId, method: req.method, url: req.originalUrl, statusCode: 500, body: req.body, err }, 'No se pudo completar el inicio de sesión.');
     res.status(500).json({ error: 'No se pudo completar el inicio de sesión.' });
   }
 });
@@ -254,7 +255,7 @@ router.post('/forgot-password', async (req, res) => {
 
     res.json(MENSAJE_GENERICO);
   } catch (err) {
-    console.error(err);
+    logger.error({ requestId: req.requestId, method: req.method, url: req.originalUrl, statusCode: 500, body: req.body, err }, 'No se pudo procesar la solicitud de recuperación de contraseña.');
     // Acá sí se distingue: un error real de servidor no es lo mismo que
     // "no existe esa cuenta" (eso arriba siempre da 200) -- decirlo no
     // revela nada sobre ninguna cuenta, solo que algo falló y conviene reintentar.
@@ -278,7 +279,7 @@ router.get('/reset-password/validar', async (req, res) => {
     );
     res.json({ valido: rows.length > 0 });
   } catch (err) {
-    console.error(err);
+    logger.error({ requestId: req.requestId, method: req.method, url: req.originalUrl, statusCode: 200, query: req.query, err }, 'Error al validar un token de reset.');
     res.json({ valido: false });
   }
 });
@@ -331,7 +332,7 @@ router.post('/reset-password', async (req, res) => {
     res.json({ mensaje: 'Contraseña actualizada correctamente.' });
   } catch (err) {
     await cliente.query('ROLLBACK');
-    console.error(err);
+    logger.error({ requestId: req.requestId, method: req.method, url: req.originalUrl, statusCode: 500, body: req.body, err }, 'No se pudo actualizar la contraseña (reset).');
     res.status(500).json({ error: 'No se pudo actualizar la contraseña. Intenta de nuevo.' });
   } finally {
     cliente.release();
