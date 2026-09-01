@@ -11,7 +11,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 import { auth, requireSuperAdmin } from '../middleware/auth.js';
-import { registrarAuditoria } from '../registroAuditoria.js';
+import { registrarAuditoria, registrarAuditoriaPlataforma } from '../registroAuditoria.js';
 
 const router = Router();
 router.use(auth, requireSuperAdmin);
@@ -160,6 +160,10 @@ router.post('/modulos', async (req, res) => {
       [id, String(label).trim(), icon || null, String(page).trim(), !!base_de_datos, deps]
     );
     res.status(201).json(rows[0]);
+    registrarAuditoriaPlataforma(pool, {
+      usuario: req.usuario, accion: 'crear', entidad: 'modulo', entidadId: rows[0].id,
+      detalle: { label: rows[0].label, page: rows[0].page }
+    });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: `Ya existe un módulo con id "${id}".` });
     console.error(err);
@@ -186,6 +190,12 @@ router.put('/modulos/:id', async (req, res) => {
         return res.status(400).json({ error: `Estas dependencias no existen en el catálogo: ${faltantes.join(', ')}.` });
       }
     }
+    // Leído ANTES de pisarlo -- es la única forma de saber después qué
+    // cambió de verdad (mismo criterio que crudFactory.js / PUT /empresas/:id).
+    const { rows: antesRows } = await pool.query('SELECT * FROM modulos WHERE id = $1', [req.params.id]);
+    if (!antesRows.length) return res.status(404).json({ error: 'Ese módulo no existe en el catálogo.' });
+    const antes = antesRows[0];
+
     const { rows } = await pool.query(
       `UPDATE modulos SET
          label = COALESCE($1, label),
@@ -200,6 +210,22 @@ router.put('/modulos/:id', async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'Ese módulo no existe en el catálogo.' });
     res.json(rows[0]);
+
+    const despues = rows[0];
+    const cambios = {};
+    ['label', 'icon', 'page', 'base_de_datos'].forEach(campo => {
+      if (String(antes[campo] ?? '') !== String(despues[campo] ?? '')) {
+        cambios[campo] = { antes: antes[campo], despues: despues[campo] };
+      }
+    });
+    // dependencias es un arreglo -- comparación aparte, String() no alcanza.
+    if (JSON.stringify(antes.dependencias ?? []) !== JSON.stringify(despues.dependencias ?? [])) {
+      cambios.dependencias = { antes: antes.dependencias, despues: despues.dependencias };
+    }
+    registrarAuditoriaPlataforma(pool, {
+      usuario: req.usuario, accion: 'editar', entidad: 'modulo', entidadId: req.params.id,
+      detalle: Object.keys(cambios).length ? cambios : 'Sin cambios en los valores (se guardó igual).'
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo actualizar el módulo.' });
@@ -223,9 +249,17 @@ router.delete('/modulos/:id', async (req, res) => {
     if (dependientes.length) {
       return res.status(400).json({ error: `No se puede borrar: lo necesitan ${dependientes.map(d => d.id).join(', ')}.` });
     }
+    // "Foto" de lo que se va a borrar -- una vez eliminado, es la única
+    // forma de saber después qué era (mismo criterio que mascotas.js/
+    // inventario.js en sus DELETE).
+    const { rows: existente } = await pool.query('SELECT label, page FROM modulos WHERE id = $1', [req.params.id]);
     const { rowCount } = await pool.query(`DELETE FROM modulos WHERE id = $1`, [req.params.id]);
     if (!rowCount) return res.status(404).json({ error: 'Ese módulo no existe en el catálogo.' });
     res.status(204).end();
+    registrarAuditoriaPlataforma(pool, {
+      usuario: req.usuario, accion: 'eliminar', entidad: 'modulo', entidadId: req.params.id,
+      detalle: { eliminado: existente[0] }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo borrar el módulo.' });

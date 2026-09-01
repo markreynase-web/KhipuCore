@@ -35,3 +35,31 @@ export async function registrarAuditoria(db, { usuario, accion, modulo, registro
     console.error('No se pudo escribir en audit_log:', err.message);
   }
 }
+
+// Igual filosofía que registrarAuditoria() de arriba (nunca tumba la
+// operación principal), pero para eventos de PLATAFORMA de Super Admin que
+// no pertenecen a ninguna empresa puntual (ej. alta/edición/baja de un
+// módulo en el catálogo global). audit_log.empresa_id es NOT NULL a
+// propósito -- cada fila ahí SIEMPRE pertenece a un tenant real (ver
+// 012_empresas.sql); forzar un valor inventado para esto sería falso.
+// superadmin_audit_log (migración 033) es la tabla separada para esto, sin
+// esa restricción -- nunca aparece en GET /api/auditoria (que filtra por
+// empresa_id), es exclusiva de Super Admin.
+export async function registrarAuditoriaPlataforma(db, { usuario, accion, entidad, entidadId, detalle }) {
+  try {
+    await db.query(
+      `INSERT INTO superadmin_audit_log (usuario_id, usuario_nombre, accion, entidad, entidad_id, detalle)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        usuario?.id ?? null,
+        usuario?.nombre ?? 'Desconocido',
+        accion,
+        entidad,
+        entidadId ? String(entidadId) : null,
+        detalle ? JSON.stringify(detalle) : null
+      ]
+    );
+  } catch (err) {
+    console.error('No se pudo escribir en superadmin_audit_log:', err.message);
+  }
+}
