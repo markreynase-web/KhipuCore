@@ -43,13 +43,24 @@ function puertoLibre() {
   });
 }
 
-export async function iniciarServidorTest() {
+// `overridesEnv` es opcional -- hoy solo lo usa recuperacion-password.test.js
+// para forzar `BREVO_API_KEY: null` y así el servidor de test caiga en la
+// rama "no_configurado" de mailer.js (loguea el link, nunca llama a la API
+// real de Brevo) en vez de mandar correos reales a direcciones @example.invalid.
+// Un valor `null` BORRA la variable heredada de .env; cualquier otro valor la
+// reemplaza. Sin overridesEnv, el comportamiento es idéntico al de siempre.
+export async function iniciarServidorTest(overridesEnv = {}) {
   const port = await puertoLibre();
   const baseUrl = `http://127.0.0.1:${port}`;
 
+  const env = { ...envParaServidorDePrueba(), PORT: String(port), ...overridesEnv };
+  for (const [clave, valor] of Object.entries(env)) {
+    if (valor === null) delete env[clave];
+  }
+
   const proceso = spawn(process.execPath, ['src/server.js'], {
     cwd: RAIZ_BACKEND,
-    env: { ...envParaServidorDePrueba(), PORT: String(port) },
+    env,
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
