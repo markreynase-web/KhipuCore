@@ -41,6 +41,15 @@ router.post('/empresas', async (req, res) => {
       [String(nombre).trim(), logo || null]
     );
     res.status(201).json(rows[0]);
+    // empresa_id acá es la recién creada -- es lo único que la hace
+    // auditable en audit_log (empresa_id es NOT NULL, ver 012_empresas.sql).
+    // req.usuario NO trae empresa_id en una sesión real de super admin, por
+    // eso se arma el objeto a mano en vez de pasar req.usuario tal cual.
+    registrarAuditoria(pool, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: rows[0].id },
+      accion: 'crear', modulo: 'superadmin', registroId: rows[0].id,
+      detalle: { nombre: rows[0].nombre }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo crear la empresa.' });
@@ -65,6 +74,13 @@ router.put('/empresas/:id', async (req, res) => {
     return res.status(400).json({ error: 'color_primario debe ser un color hex válido, ej. #E3B23C.' });
   }
   try {
+    // Leída ANTES de pisarla -- es la única forma de saber después qué
+    // cambió de verdad (mismo criterio que crudFactory.js). Sin datos
+    // sensibles en esta tabla (empresas no tiene hashes/tokens).
+    const { rows: antesRows } = await pool.query('SELECT * FROM empresas WHERE id = $1', [req.params.id]);
+    if (!antesRows.length) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const antes = antesRows[0];
+
     const { rows } = await pool.query(
       `UPDATE empresas SET
          nombre = COALESCE($1, nombre),
@@ -78,6 +94,19 @@ router.put('/empresas/:id', async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'Empresa no encontrada.' });
     res.json(rows[0]);
+
+    const despues = rows[0];
+    const cambios = {};
+    ['nombre', 'logo', 'activo', 'color_primario'].forEach(campo => {
+      if (String(antes[campo] ?? '') !== String(despues[campo] ?? '')) {
+        cambios[campo] = { antes: antes[campo], despues: despues[campo] };
+      }
+    });
+    registrarAuditoria(pool, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: req.params.id },
+      accion: 'editar', modulo: 'superadmin', registroId: req.params.id,
+      detalle: Object.keys(cambios).length ? cambios : 'Sin cambios en los valores (se guardó igual).'
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo actualizar la empresa.' });
@@ -249,6 +278,11 @@ router.post('/empresas/:id/modulos', async (req, res) => {
       [req.params.id, modulo_id]
     );
     res.status(201).json({ ok: true });
+    registrarAuditoria(pool, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: req.params.id },
+      accion: 'crear', modulo: 'superadmin', registroId: req.params.id,
+      detalle: { moduloActivado: modulo_id }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo habilitar el módulo.' });
@@ -276,6 +310,11 @@ router.delete('/empresas/:id/modulos/:moduloId', async (req, res) => {
       [req.params.id, req.params.moduloId]
     );
     res.status(204).end();
+    registrarAuditoria(pool, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: req.params.id },
+      accion: 'eliminar', modulo: 'superadmin', registroId: req.params.id,
+      detalle: { moduloDesactivado: req.params.moduloId }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo deshabilitar el módulo.' });
@@ -321,6 +360,13 @@ router.post('/empresas/:id/admin', async (req, res) => {
       [usuarioId, req.params.id, rolAdmin[0].id]
     );
     res.status(201).json(rows[0]);
+    // Nunca password/hash en detalle -- solo el email (identificador
+    // funcional) y si la cuenta ya existía o se creó de cero.
+    registrarAuditoria(pool, {
+      usuario: { id: req.usuario.id, nombre: req.usuario.nombre, empresa_id: req.params.id },
+      accion: 'crear', modulo: 'superadmin', registroId: req.params.id,
+      detalle: { adminEmail: email, cuentaReutilizada: existentes.length > 0 }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo crear el administrador de la empresa.' });
