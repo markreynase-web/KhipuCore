@@ -15,7 +15,7 @@ import { iniciarModoBackend } from './modoBackend.js';
 import { renderFormulario } from '../components/formularioRegistro.js';
 import { renderTabla } from '../components/tablaRegistros.js';
 import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
-import { tienePermiso, haySesionActiva } from './sesion.js';
+import { tienePermiso, haySesionActiva, obtenerSesion } from './sesion.js';
 import { ESQUEMAS } from './esquemas.js';
 import { crearRegistro } from './api.js';
 import { renderVentasDashboard } from './ventasDashboard.js';
@@ -546,9 +546,17 @@ async function iniciar() {
   // todavía no tienen cuentas ni base de datos propia, así que se quedan
   // libres como hasta ahora.
   const moduloActual = buscarModulo(config, NAMESPACE);
-  if (moduloActual?.baseDeDatos && !haySesionActiva()) {
-    location.replace('login.html');
-    return;
+  if (moduloActual?.baseDeDatos) {
+    // Se lee ANTES de haySesionActiva() -- esa función limpia la sesión
+    // como efecto secundario si el token venció (ver sesion.js), así que
+    // acá es la última oportunidad de saber si HABÍA una sesión guardada,
+    // para distinguir "nunca inició sesión" de "su sesión venció" y mostrar
+    // el mensaje correcto en login.html (sub-bloque B1, Fase 3 Eje B).
+    const habiaSesionGuardada = !!obtenerSesion()?.token;
+    if (!haySesionActiva()) {
+      location.replace(habiaSesionGuardada ? 'login.html?expirado=true' : 'login.html');
+      return;
+    }
   }
 
   renderSidebar(config, NAMESPACE);

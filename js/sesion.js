@@ -22,9 +22,42 @@ export function cerrarSesion() {
   localStorage.removeItem(CLAVE);
 }
 
+// Decodifica el payload de un JWT (base64url, sin validar la firma -- eso
+// ya lo hace el backend en cada request; acá solo interesa leer "exp" para
+// evitar mandar de entrada un token que sabemos vencido) y compara contra
+// la hora actual. Un token sin campo "exp" no se asume vencido (no hay con
+// qué compararlo); uno malformado sí, para el lado seguro.
+export function tokenExpirado(token) {
+  if (!token || typeof token !== 'string') return true;
+  try {
+    const payloadB64 = token.split('.')[1];
+    if (!payloadB64) return true;
+    const normalizado = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const relleno = normalizado.length % 4 === 0 ? '' : '='.repeat(4 - (normalizado.length % 4));
+    const payload = JSON.parse(atob(normalizado + relleno));
+    if (typeof payload.exp !== 'number') return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
+}
+
+// Sub-bloque B1 (Fase 3, Eje B): antes esto solo confirmaba que HUBIERA un
+// token guardado, nunca si seguía vigente -- un token vencido en
+// localStorage "parecía" una sesión activa hasta que la primera llamada
+// real al backend fallaba. Ahora, si el token venció, se limpia la sesión
+// acá mismo (efecto secundario a propósito: cualquier código que llame a
+// esta función para decidir si redirige a login queda, de paso, con
+// localStorage ya limpio, sin tener que acordarse de llamar cerrarSesion()
+// aparte).
 export function haySesionActiva() {
   const s = obtenerSesion();
-  return !!(s && s.token);
+  if (!s || !s.token) return false;
+  if (tokenExpirado(s.token)) {
+    cerrarSesion();
+    return false;
+  }
+  return true;
 }
 
 // Fase 4.5 (Frontend): no basta con bloquear en el backend, también hay que

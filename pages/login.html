@@ -380,6 +380,14 @@
   const campoEmail = document.getElementById('campoEmail');
   const campoPassword = document.getElementById('campoPassword');
 
+  // Sub-bloque B1 (Fase 3, Eje B): tanto el interceptor de 401 (js/api.js)
+  // como el guard de página (js/app.js) redirigen acá con ?expirado=true
+  // cuando SÍ había una sesión guardada pero ya venció -- distinto de
+  // entrar a login.html por primera vez, que no debe mostrar este mensaje.
+  if (new URLSearchParams(location.search).get('expirado') === 'true') {
+    errorEl.textContent = 'Tu sesión ha expirado por seguridad. Por favor, ingresa de nuevo.';
+  }
+
   const btnTogglePass = document.getElementById('btnTogglePass');
   btnTogglePass.addEventListener('click', () => {
     const input = document.getElementById('password');

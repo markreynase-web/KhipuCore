@@ -4,11 +4,24 @@
 // backend apagado, error del servidor) devuelve null en vez de lanzar,
 // así el resto de la app puede caer a modo local sin romperse.
 
-import { obtenerSesion } from './sesion.js';
+import { obtenerSesion, cerrarSesion } from './sesion.js';
 
 function headerAuth() {
   const sesion = obtenerSesion();
   return sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {};
+}
+
+// Sub-bloque B1 (Fase 3, Eje B): antes, un 401 se trataba exactamente
+// igual que "el backend está apagado" -- pedirJSON() devolvía null en
+// silencio y cada módulo se quedaba sin datos, sin decirle al usuario por
+// qué ni limpiar el token vencido. Esto centraliza la reacción: se limpia
+// la sesión y se manda a login con un mensaje claro, una sola vez (para
+// cualquier llamada que use pedirJSON() o importarCSV()).
+function manejarSesionVencida() {
+  cerrarSesion();
+  if (!location.pathname.endsWith('login.html')) {
+    location.replace('login.html?expirado=true');
+  }
 }
 
 // Guarda el mensaje del último error de escritura (crear/editar/borrar) para
@@ -27,9 +40,12 @@ async function pedirJSON(baseUrl, path, opciones = {}) {
       headers: { 'Content-Type': 'application/json', ...headerAuth() },
       ...opciones
     });
+    if (res.status === 401) {
+      manejarSesionVencida();
+      return null;
+    }
     if (!res.ok) {
       const cuerpo = await res.json().catch(() => ({}));
-      if (res.status === 401) throw new Error('Tu sesión venció o no has iniciado sesión. Vuelve a entrar.');
       if (res.status === 403) throw new Error(cuerpo.error || 'No tienes permiso para esto.');
       throw new Error(cuerpo.error || `HTTP ${res.status}`);
     }
@@ -83,6 +99,10 @@ export async function importarCSV(baseUrl, modulo, file) {
   formData.append('archivo', file);
   try {
     const res = await fetch(`${baseUrl}/${modulo}/import`, { method: 'POST', body: formData, headers: headerAuth() });
+    if (res.status === 401) {
+      manejarSesionVencida();
+      return null;
+    }
     const cuerpo = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(cuerpo.error || `HTTP ${res.status}`);
     return cuerpo;
