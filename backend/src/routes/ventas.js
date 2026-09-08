@@ -63,14 +63,32 @@ function desviacionPrecio(precio, precioCatalogo) {
 }
 
 // GET /?desde&hasta -- igual que el CRUD generico, solo lectura.
+// Paginación (Fase 3, Eje A) opt-in, mismo criterio que crudFactory.js:
+// sin ?pagina=/?page=, responde igual que siempre (array plano, hasta
+// 5000 filas) -- js/modoBackend.js asume un array plano acá también.
 router.get('/', verificarPermiso('ventas.ver'), async (req, res) => {
-  const { desde, hasta } = req.query;
+  const { desde, hasta, limite, pagina, page } = req.query;
   const valores = [req.usuario.empresa_id];
   const condiciones = [`empresa_id = $1`];
   if (desde) { valores.push(desde); condiciones.push(`fecha >= $${valores.length}`); }
   if (hasta) { valores.push(hasta); condiciones.push(`fecha <= $${valores.length}`); }
   const where = `WHERE ${condiciones.join(' AND ')}`;
   try {
+    const paginaCruda = pagina ?? page;
+    if (paginaCruda !== undefined) {
+      const paginaFinal = Math.max(parseInt(paginaCruda, 10) || 1, 1);
+      const limiteFinal = Math.min(Math.max(parseInt(limite, 10) || 50, 1), 100);
+      const offset = (paginaFinal - 1) * limiteFinal;
+      const [{ rows: datos }, { rows: totalRows }] = await Promise.all([
+        pool.query(`SELECT * FROM ventas ${where} ORDER BY fecha DESC, id DESC LIMIT ${limiteFinal} OFFSET ${offset}`, valores),
+        pool.query(`SELECT count(*)::int AS total FROM ventas ${where}`, valores)
+      ]);
+      const total = totalRows[0].total;
+      return res.json({
+        datos,
+        meta: { total, pagina: paginaFinal, limite: limiteFinal, paginasTotales: Math.ceil(total / limiteFinal) }
+      });
+    }
     const { rows } = await pool.query(`SELECT * FROM ventas ${where} ORDER BY fecha DESC, id DESC LIMIT 5000`, valores);
     res.json(rows);
   } catch (err) {

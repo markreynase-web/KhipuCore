@@ -5,6 +5,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import { requestId } from './middleware/requestId.js';
 import { logger } from './logger.js';
@@ -57,6 +58,13 @@ const app = express();
 // esta request (los de más abajo, o los que ya existían por ruta) puede
 // leer req.requestId.
 app.use(requestId);
+
+// Fase 3, Eje A (Escalabilidad) -- Sub-bloque A3: comprime toda respuesta
+// JSON con gzip/br cuando el cliente lo acepta (Accept-Encoding). Aditivo y
+// transparente -- ningún consumidor de la API nota la diferencia salvo por
+// el header Content-Encoding; útil sobre todo para los listados de hasta
+// 5000 filas de crudFactory.js / ventas.js / finanzas.js.
+app.use(compression());
 
 // V-08 (auditoría de seguridad): headers HTTP de defensa en profundidad.
 // Este servidor SOLO devuelve JSON (el frontend lo sirve Vercel aparte, ver

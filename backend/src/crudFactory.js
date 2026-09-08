@@ -124,8 +124,18 @@ export function crearRouterCRUD(config) {
   // columnasBusqueda a su config). unaccent() (migración 029) hace que
   // "costeno" encuentre "Costeño" -- ver esa migración para por qué existe
   // la extensión de Postgres.
+  //
+  // Paginación (Fase 3, Eje A -- Escalabilidad), opt-in a propósito: SIN
+  // ?pagina= o ?page=, esta ruta responde EXACTAMENTE igual que siempre (un
+  // array plano, hasta 5000 filas) -- js/modoBackend.js (el único consumidor
+  // real de esto en el frontend, usado por los ~30 módulos) asume un array
+  // plano en `filasApi.map(...)`, así que cambiar la forma de la respuesta
+  // por default habría roto cada pantalla de la app en la primera carga. Con
+  // ?pagina= (o ?page=) presente, se activa el modo paginado y la respuesta
+  // pasa a ser { datos, meta } -- queda disponible para que el frontend lo
+  // adopte más adelante, módulo por módulo, sin apuro.
   router.get('/', verificarPermiso(permiso('ver')), async (req, res) => {
-    const { desde, hasta, buscar, limite } = req.query;
+    const { desde, hasta, buscar, limite, pagina, page } = req.query;
     // empresa_id SIEMPRE va primero y SIEMPRE está presente -- a diferencia
     // de desde/hasta, no es un filtro opcional: sin esto, cualquier empresa
     // vería los datos de todas las demás.
@@ -143,16 +153,36 @@ export function crearRouterCRUD(config) {
     }
 
     const where = `WHERE ${condiciones.join(' AND ')}`;
-    // Sin ?buscar=, se mantiene el límite de siempre (5000, pensado para
-    // cargar todo un módulo). Con ?buscar=, es un autocomplete: no tiene
-    // sentido devolver más de un puñado de resultados, y ?limite= deja que
-    // quien llama lo ajuste (con techo de 50 para no volverse, por error, un
-    // "tráeme todo" disfrazado).
-    const limiteFinal = termino && columnasBusqueda.length
-      ? Math.min(Math.max(parseInt(limite, 10) || 20, 1), 50)
-      : 5000;
 
     try {
+      const paginaCruda = pagina ?? page;
+      if (paginaCruda !== undefined) {
+        const paginaFinal = Math.max(parseInt(paginaCruda, 10) || 1, 1);
+        const limiteFinal = Math.min(Math.max(parseInt(limite, 10) || 50, 1), 100);
+        const offset = (paginaFinal - 1) * limiteFinal;
+        const [{ rows: datos }, { rows: totalRows }] = await Promise.all([
+          pool.query(
+            `SELECT * FROM ${tabla} ${where} ORDER BY ${columnaFecha} DESC, id DESC LIMIT ${limiteFinal} OFFSET ${offset}`,
+            valores
+          ),
+          pool.query(`SELECT count(*)::int AS total FROM ${tabla} ${where}`, valores)
+        ]);
+        const total = totalRows[0].total;
+        return res.json({
+          datos,
+          meta: { total, pagina: paginaFinal, limite: limiteFinal, paginasTotales: Math.ceil(total / limiteFinal) }
+        });
+      }
+
+      // Sin ?pagina=/?page=: comportamiento de siempre. Sin ?buscar=, se
+      // mantiene el límite de siempre (5000, pensado para cargar todo un
+      // módulo). Con ?buscar=, es un autocomplete: no tiene sentido devolver
+      // más de un puñado de resultados, y ?limite= deja que quien llama lo
+      // ajuste (con techo de 50 para no volverse, por error, un "tráeme
+      // todo" disfrazado).
+      const limiteFinal = termino && columnasBusqueda.length
+        ? Math.min(Math.max(parseInt(limite, 10) || 20, 1), 50)
+        : 5000;
       const { rows } = await pool.query(
         `SELECT * FROM ${tabla} ${where} ORDER BY ${columnaFecha} DESC, id DESC LIMIT ${limiteFinal}`,
         valores
