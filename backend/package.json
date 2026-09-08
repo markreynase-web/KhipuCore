@@ -10,7 +10,7 @@
     "migrate": "node src/migrate.js",
     "seed:admin": "node src/seedAdmin.js",
     "seed:superadmin": "node src/seedSuperAdmin.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=2",
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js"
   },
