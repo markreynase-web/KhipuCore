@@ -67,11 +67,15 @@ function desviacionPrecio(precio, precioCatalogo) {
 // sin ?pagina=/?page=, responde igual que siempre (array plano, hasta
 // 5000 filas) -- js/modoBackend.js asume un array plano acá también.
 router.get('/', verificarPermiso('ventas.ver'), async (req, res) => {
-  const { desde, hasta, limite, pagina, page } = req.query;
+  const { desde, hasta, limite, pagina, page, sucursal_id } = req.query;
   const valores = [req.usuario.empresa_id];
   const condiciones = [`empresa_id = $1`];
   if (desde) { valores.push(desde); condiciones.push(`fecha >= $${valores.length}`); }
   if (hasta) { valores.push(hasta); condiciones.push(`fecha <= $${valores.length}`); }
+  // Opt-in, mismo criterio que columnasFiltroExacto de crudFactory.js: sin
+  // el query param, trae todo igual que siempre (incluidas las ventas
+  // históricas con sucursal_id null, de antes de esta sub-fase).
+  if (sucursal_id) { valores.push(sucursal_id); condiciones.push(`sucursal_id = $${valores.length}`); }
   const where = `WHERE ${condiciones.join(' AND ')}`;
   try {
     const paginaCruda = pagina ?? page;
@@ -107,6 +111,9 @@ router.get('/', verificarPermiso('ventas.ver'), async (req, res) => {
 // igual -- es lo que permite validar y descontar el stock -- pero el precio
 // que se cobra ya no tiene por qué ser el que dice inventario (ej. descuentos,
 // precio negociado).
+// Sub-fase C (sucursales): el body NO lleva sucursal_id -- se deriva del
+// producto (cada fila de inventario ya pertenece a una sola sucursal desde
+// la Sub-fase B), ver el INSERT INTO ventas más abajo.
 router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
   const { fecha, cliente_id, producto_id, categoria, cantidad, precio_unitario, notas } = req.body;
   const cant = numeroOCero(cantidad);
@@ -127,7 +134,7 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
     // dos ventas simultaneas del mismo producto no pueden leer el mismo stock
     // "viejo" a la vez y las dos pasar la validacion por error.
     const { rows: prodRows } = await cliente.query(
-      `SELECT id, nombre, categoria AS categoria_catalogo, stock, precio_unitario AS precio_catalogo FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`,
+      `SELECT id, nombre, categoria AS categoria_catalogo, stock, precio_unitario AS precio_catalogo, sucursal_id FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`,
       [producto_id, empresaId]
     );
     if (!prodRows.length) {
@@ -165,19 +172,28 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
     const categoriaFinal = categoria || producto.categoria_catalogo || null;
     const monto = +(cant * precio).toFixed(2);
 
+    // Sub-fase C (sucursales): sucursal_id de la venta se DERIVA del
+    // producto vendido, nunca lo manda el cliente -- cada fila de
+    // inventario ya pertenece a una sola sucursal desde la Sub-fase B, así
+    // que es la única fuente de verdad posible (evita que alguien mande
+    // "sucursal X" mientras el stock que de verdad se descuenta es de la
+    // sucursal Y). Mismo criterio que empresa_id: siempre server-side.
     const { rows: ventaRows } = await cliente.query(
-      `INSERT INTO ventas (fecha, cliente, cliente_id, producto, producto_id, categoria, cantidad, precio_unitario, monto, notas, empresa_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [fecha, clienteRow.nombre, clienteRow.id, producto.nombre, producto.id, categoriaFinal, cant, precio, monto, notas || null, empresaId]
+      `INSERT INTO ventas (fecha, cliente, cliente_id, producto, producto_id, categoria, cantidad, precio_unitario, monto, notas, empresa_id, sucursal_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [fecha, clienteRow.nombre, clienteRow.id, producto.nombre, producto.id, categoriaFinal, cant, precio, monto, notas || null, empresaId, producto.sucursal_id]
     );
     const venta = ventaRows[0];
 
     await cliente.query(`UPDATE inventario SET stock = stock - $1, actualizado_el = now() WHERE id = $2 AND empresa_id = $3`, [cant, producto.id, empresaId]);
 
+    // El ingreso en finanzas hereda la misma sucursal que la venta -- para
+    // que el reporte de ganancia por sucursal (GET /api/finanzas/resumen-
+    // sucursales) no tenga que ir a buscarla con un JOIN contra ventas.
     await cliente.query(
-      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id, empresa_id)
-       VALUES ($1, 'ingreso', 'Ventas', $2, $3, 'ventas', $4, $5)`,
-      [fecha, `Venta de ${producto.nombre} a ${clienteRow.nombre}`, monto, venta.id, empresaId]
+      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id, empresa_id, sucursal_id)
+       VALUES ($1, 'ingreso', 'Ventas', $2, $3, 'ventas', $4, $5, $6)`,
+      [fecha, `Venta de ${producto.nombre} a ${clienteRow.nombre}`, monto, venta.id, empresaId, producto.sucursal_id]
     );
 
     await cliente.query(
