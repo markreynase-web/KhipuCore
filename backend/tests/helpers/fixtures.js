@@ -19,7 +19,7 @@ const PREFIJO = 'QA-TEST (borrar)';
 export function nuevoContexto() {
   return {
     empresaIds: [], usuarioIds: [], productoIds: [], clienteIds: [], ventaIds: [],
-    mascotaIds: [], flotaIds: [], atencionIds: []
+    mascotaIds: [], flotaIds: [], atencionIds: [], sucursalIds: []
   };
 }
 
@@ -37,7 +37,28 @@ export async function crearEmpresa(ctx, sufijo = '', modulos = ['ventas', 'inven
   for (const moduloId of modulos) {
     await pool.query(`INSERT INTO empresa_modulos (empresa_id, modulo_id) VALUES ($1,$2)`, [empresaId, moduloId]);
   }
+  // Sub-fase B (sucursales): mismo comportamiento que ahora tiene
+  // POST /api/superadmin/empresas -- ninguna empresa existe sin al menos
+  // una sucursal, porque inventario.js ya exige sucursal_id en cada
+  // producto nuevo. No hace falta trackearla aparte en ctx: cascada sola
+  // cuando limpiarContexto() borra la empresa (sucursales.empresa_id tiene
+  // ON DELETE CASCADE, ver 036_sucursales_cajas.sql).
+  await pool.query(
+    `INSERT INTO sucursales (empresa_id, nombre, principal) VALUES ($1, 'Sucursal Principal', true)`,
+    [empresaId]
+  );
   return empresaId;
+}
+
+// Sucursal ADICIONAL (no la principal automática de arriba) -- para tests
+// que necesitan más de una, ej. filtrar inventario por sucursal_id.
+export async function crearSucursal(ctx, empresaId, nombre = 'Sucursal') {
+  const { rows } = await pool.query(
+    `INSERT INTO sucursales (empresa_id, nombre) VALUES ($1, $2) RETURNING id`,
+    [empresaId, `${PREFIJO} ${nombre}`]
+  );
+  ctx.sucursalIds.push(rows[0].id);
+  return rows[0].id;
 }
 
 export async function crearUsuario(ctx, { empresaId, rolNombre = 'administrador', activo = true }) {
@@ -62,11 +83,24 @@ export async function crearUsuario(ctx, { empresaId, rolNombre = 'administrador'
   return { usuarioId, email, password: PASSWORD_QA };
 }
 
-export async function crearProducto(ctx, empresaId, { nombre = 'Producto', stock = 100, precio_unitario = 100 } = {}) {
+// sucursalId opcional -- sin indicarlo, usa la "Sucursal Principal" que
+// crearEmpresa() ya garantiza que existe (ver arriba). La columna es
+// NOT NULL desde la migración 037, así que este fixture SIEMPRE necesita
+// una -- de ahí el lookup si no viene explícita.
+export async function crearProducto(ctx, empresaId, { nombre = 'Producto', stock = 100, precio_unitario = 100, sucursalId } = {}) {
+  let sucursal = sucursalId;
+  if (!sucursal) {
+    const { rows: sucursalRows } = await pool.query(
+      `SELECT id FROM sucursales WHERE empresa_id = $1 AND principal = true LIMIT 1`,
+      [empresaId]
+    );
+    if (!sucursalRows.length) throw new Error(`La empresa ${empresaId} no tiene sucursal principal -- ¿se creó con crearEmpresa()?`);
+    sucursal = sucursalRows[0].id;
+  }
   const { rows } = await pool.query(
-    `INSERT INTO inventario (fecha_registro, empresa_id, nombre, categoria, stock, precio_unitario)
-     VALUES (CURRENT_DATE, $1, $2, 'general', $3, $4) RETURNING id`,
-    [empresaId, `${PREFIJO} ${nombre}`, stock, precio_unitario]
+    `INSERT INTO inventario (fecha_registro, empresa_id, nombre, categoria, stock, precio_unitario, sucursal_id)
+     VALUES (CURRENT_DATE, $1, $2, 'general', $3, $4, $5) RETURNING id`,
+    [empresaId, `${PREFIJO} ${nombre}`, stock, precio_unitario, sucursal]
   );
   ctx.productoIds.push(rows[0].id);
   return rows[0].id;

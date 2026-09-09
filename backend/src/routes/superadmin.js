@@ -35,11 +35,23 @@ router.get('/empresas', async (req, res) => {
 router.post('/empresas', async (req, res) => {
   const { nombre, logo } = req.body || {};
   if (!nombre) return res.status(400).json({ error: 'nombre es requerido.' });
+  const cliente = await pool.connect();
   try {
-    const { rows } = await pool.query(
+    await cliente.query('BEGIN');
+    const { rows } = await cliente.query(
       `INSERT INTO empresas (nombre, logo) VALUES ($1, $2) RETURNING *`,
       [String(nombre).trim(), logo || null]
     );
+    // Sub-fase B (sucursales): inventario.js ya exige sucursal_id en cada
+    // producto nuevo, así que ninguna empresa puede arrancar sin al menos
+    // una -- mismo rol que cumplió el backfill de la migración 036 para las
+    // empresas que ya existían, pero ahora en el momento de creación, para
+    // las que se den de alta de acá en adelante.
+    await cliente.query(
+      `INSERT INTO sucursales (empresa_id, nombre, principal) VALUES ($1, 'Sucursal Principal', true)`,
+      [rows[0].id]
+    );
+    await cliente.query('COMMIT');
     res.status(201).json(rows[0]);
     // empresa_id acá es la recién creada -- es lo único que la hace
     // auditable en audit_log (empresa_id es NOT NULL, ver 012_empresas.sql).
@@ -51,8 +63,11 @@ router.post('/empresas', async (req, res) => {
       detalle: { nombre: rows[0].nombre }
     });
   } catch (err) {
+    await cliente.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'No se pudo crear la empresa.' });
+  } finally {
+    cliente.release();
   }
 });
 

@@ -11,6 +11,7 @@ import { requestId } from './middleware/requestId.js';
 import { logger } from './logger.js';
 import ventasRouter from './routes/ventas.js';
 import inventarioRouter from './routes/inventario.js';
+import sucursalesRouter from './routes/sucursales.js';
 import clientesRouter from './routes/clientes.js';
 import finanzasRouter from './routes/finanzas.js';
 import authRouter from './routes/auth.js';
@@ -184,6 +185,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRouter);
 app.use('/api/ventas', ventasRouter);
 app.use('/api/inventario', inventarioRouter);
+app.use('/api/sucursales', sucursalesRouter);
 app.use('/api/clientes', clientesRouter);
 app.use('/api/finanzas', finanzasRouter);
 app.use('/api/usuarios', usuariosRouter);

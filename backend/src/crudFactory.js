@@ -52,6 +52,7 @@ function sonIguales(antes, despues, esNumerico) {
  * @param {object} [config.valoresPorDefecto] - valor a usar si el campo llega vacío, ej. { cantidad: 1 }
  * @param {(datos:object)=>object} [config.antesDeGuardar] - calcula/ajusta campos derivados (ej. monto = cantidad*precio) antes de INSERT/UPDATE
  * @param {string[]} [config.columnasBusqueda] - columnas de texto en las que ?buscar= hace ILIKE (ver GET / abajo). Opt-in: un módulo que no la declara mantiene el comportamiento de siempre.
+ * @param {string[]} [config.columnasFiltroExacto] - columnas que aceptan un filtro exacto ?columna=valor en GET / (ej. ['sucursal_id']). Opt-in, mismo criterio que columnasBusqueda: un módulo que no la declara mantiene el comportamiento de siempre, y sin el query param el filtro simplemente no se aplica.
  */
 export function crearRouterCRUD(config) {
   const {
@@ -63,7 +64,8 @@ export function crearRouterCRUD(config) {
     columnaFecha = 'fecha',
     valoresPorDefecto = {},
     antesDeGuardar,
-    columnasBusqueda = []
+    columnasBusqueda = [],
+    columnasFiltroExacto = []
   } = config;
 
   if (!modulo) throw new Error(`crearRouterCRUD: falta "modulo" para la tabla ${tabla} (se necesita para permisos y auditoría).`);
@@ -151,6 +153,19 @@ export function crearRouterCRUD(config) {
       const porColumna = columnasBusqueda.map(c => `unaccent(${c}) ILIKE unaccent($${posicion})`);
       condiciones.push(`(${porColumna.join(' OR ')})`);
     }
+
+    // Filtro exacto opt-in (ej. ?sucursal_id=3 en inventario) -- sin el query
+    // param, no se agrega ninguna condición y el comportamiento es el de
+    // siempre. Solo columnas que el propio módulo declaró de antemano en
+    // columnasFiltroExacto pueden filtrarse así (nunca un nombre de columna
+    // que venga del cliente), así que sigue siendo seguro interpolarlo.
+    columnasFiltroExacto.forEach(c => {
+      const v = req.query[c];
+      if (v !== undefined && v !== '') {
+        valores.push(v);
+        condiciones.push(`${c} = $${valores.length}`);
+      }
+    });
 
     const where = `WHERE ${condiciones.join(' AND ')}`;
 
