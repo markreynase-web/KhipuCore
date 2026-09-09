@@ -1,0 +1,57 @@
+# .github/workflows/backup-diario.yml
+# Fase 3, Eje "Brecha competitiva" -- Nivel 1 (Urgente): backup automático
+# real, no manual. Corre lejos de Render a propósito: el servicio de
+# backend en Render no trae pg_dump (contenedor Node estándar) y su disco
+# es efímero -- cualquier archivo que se guardara ahí se perdería en el
+# próximo redeploy o reinicio. Un runner de GitHub Actions sí puede instalar
+# postgresql-client, y su artifact de salida vive en almacenamiento de
+# GitHub, fuera del servidor -- exactamente el "almacenamiento externo" que
+# ya pide backend/BACKUP.md.
+#
+# Reutiliza scripts/backup.js tal cual (cero cambios) -- ese script no tiene
+# dependencias npm, solo necesita Node + pg_dump en el PATH.
+#
+# Secreto requerido (Settings -> Secrets and variables -> Actions):
+#   PROD_DATABASE_URL -- la URL de conexión de producción. Nunca se loguea
+#   completa (el propio script solo imprime host/nombre de base).
+
+name: Backup diario de la base de datos
+
+on:
+  schedule:
+    # 08:00 UTC = 03:00 hora Perú (UTC-5) -- tráfico bajo.
+    - cron: '0 8 * * *'
+  # Permite disparar una corrida manual desde la pestaña Actions, para
+  # probar el workflow sin esperar al cron.
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar postgresql-client (trae pg_dump)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Ejecutar el backup
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: npm run backup
+
+      - name: Subir el backup como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: khipucore-backup-${{ github.run_id }}
+          path: backend/backups/*.dump
+          retention-days: 30
+          if-no-files-found: error
