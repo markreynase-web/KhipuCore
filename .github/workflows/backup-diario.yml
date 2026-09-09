@@ -11,6 +11,14 @@
 # Reutiliza scripts/backup.js tal cual (cero cambios) -- ese script no tiene
 # dependencias npm, solo necesita Node + pg_dump en el PATH.
 #
+# Versión de pg_dump: el paquete "postgresql-client" genérico de Ubuntu
+# instala la versión de sus propios repos (16.x), pero la base real
+# (Supabase) corre PostgreSQL 17 -- pg_dump se niega a respaldar un
+# servidor MÁS NUEVO que él mismo (mismo motivo por el que el entorno de
+# desarrollo local tiene instalado específicamente v17, no cualquier
+# versión -- ver BACKUP.md). Por eso acá se agrega el repositorio oficial
+# de PGDG y se instala "postgresql-client-17" a propósito, no el genérico.
+#
 # Secreto requerido (Settings -> Secrets and variables -> Actions):
 #   PROD_DATABASE_URL -- la URL de conexión de producción. Nunca se loguea
 #   completa (el propio script solo imprime host/nombre de base).
@@ -40,8 +48,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Instalar postgresql-client (trae pg_dump)
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Instalar postgresql-client-17 (trae pg_dump 17, misma versión que el servidor)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
 
       - name: Ejecutar el backup
         env:
