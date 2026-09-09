@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Sucursales</title>
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+</head>
+<body data-modulo="sucursales">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Sucursales</h1>
+        <div class="topbar-subtitle" id="topbarSubtitle">DÓNDE OPERA TU NEGOCIO</div>
+      </div>
+      <div class="topbar-search" id="topbarSearch"></div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <main>
+      <div class="kpis" id="sucKpis"></div>
+
+      <div class="inicio-columnas">
+        <div class="inicio-col">
+          <section class="panel captura-panel" id="capturaSection">
+            <div class="captura-header">
+              <h3>Sucursales</h3>
+              <div class="captura-header-acciones">
+                <button type="button" class="btn btn-ochre" id="btnNuevaSucursal" style="display:none;">+ Nueva sucursal</button>
+              </div>
+            </div>
+            <span id="formStatus" class="form-status"></span>
+            <div id="tablaSucursales">Cargando…</div>
+          </section>
+        </div>
+        <div class="inicio-col inicio-col-angosta">
+          <div class="panel" style="padding:20px;">
+            <h3 style="margin-bottom:4px;">Ganancia por sucursal</h3>
+            <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">Ingresos − egresos, todo el historial. Ver Finanzas para filtrar por fecha.</div>
+            <div id="gananciaLista">Cargando…</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer></footer>
+  </div>
+</div>
+
+<script type="module">
+import { cargarConfigEmpresa } from '../js/config.js';
+import { renderSidebar } from '../components/sidebar.js';
+import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
+import { renderTopbar } from '../components/topbar.js';
+import { renderFooter } from '../components/footer.js';
+import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
+import { listarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, ultimoErrorAPI } from '../js/api.js';
+import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
+import { renderFormulario } from '../components/formularioRegistro.js';
+import { escapeHtml, fmtNum } from '../js/utils.js';
+import { kpiCard } from '../js/kpiCard.js';
+
+if (!haySesionActiva()) location.replace('login.html');
+
+let config;
+
+function badgeEstado(activo) {
+  return activo
+    ? `<span class="role-badge role-numerico">Activa</span>`
+    : `<span class="role-badge role-fecha">Inactiva</span>`;
+}
+function badgePrincipal() {
+  return `<span class="role-badge role-categoria">Principal</span>`;
+}
+
+function dibujarKpis(sucursales) {
+  const activas = sucursales.filter(s => s.activo).length;
+  const principal = sucursales.find(s => s.principal);
+  document.getElementById('sucKpis').innerHTML = [
+    kpiCard({ acento: 'blue', icono: '🏢', label: 'Sucursales', value: fmtNum(sucursales.length), sub: `${activas} activa(s)` }),
+    kpiCard({ acento: 'teal', icono: '⭐', label: 'Principal', value: principal ? principal.nombre : '—', sub: 'creada automáticamente' })
+  ].join('');
+}
+
+async function cargarTabla() {
+  const cont = document.getElementById('tablaSucursales');
+  const sucursales = await listarRegistros(config.apiBaseUrl, 'sucursales');
+  if (!sucursales) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+  dibujarKpis(sucursales);
+  if (!sucursales.length) { cont.innerHTML = '<p class="tabla-vacia">No hay sucursales registradas todavía.</p>'; return; }
+
+  const puedeEditar = tienePermiso('sucursales.editar');
+  const puedeEliminar = tienePermiso('sucursales.eliminar');
+  const puedeAlgo = puedeEditar || puedeEliminar;
+
+  cont.innerHTML = `
+    <div class="tabla-registros-wrap" style="margin-top:14px;">
+      <table class="tabla-registros">
+        <thead><tr><th>Nombre</th><th>Dirección</th><th>Estado</th>${puedeAlgo ? '<th class="col-acciones"></th>' : ''}</tr></thead>
+        <tbody>
+          ${sucursales.map(s => {
+            const botones = [
+              puedeEditar ? `<button type="button" class="icon-btn" data-accion="editar" title="Editar">✏️</button>` : '',
+              // La principal nunca se borra (mismo candado que el backend,
+              // DELETE /api/sucursales/:id) -- no se muestra el botón para
+              // no ofrecer una acción que el servidor va a rechazar igual.
+              (puedeEliminar && !s.principal) ? `<button type="button" class="icon-btn peligro" data-accion="eliminar" title="Eliminar">🗑️</button>` : ''
+            ].join('');
+            return `
+            <tr data-id="${s.id}">
+              <td>${escapeHtml(s.nombre)} ${s.principal ? badgePrincipal() : ''}</td>
+              <td>${s.direccion ? escapeHtml(s.direccion) : '<span style="color:var(--muted);">Sin dirección</span>'}</td>
+              <td>${badgeEstado(s.activo)}</td>
+              ${puedeAlgo ? `<td class="col-acciones"><div class="acciones-icono">${botones}</div></td>` : ''}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  cont.querySelectorAll('[data-accion="editar"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.closest('tr').dataset.id;
+      const sucursal = sucursales.find(s => String(s.id) === id);
+      abrirEdicion(sucursal);
+    });
+  });
+
+  cont.querySelectorAll('[data-accion="eliminar"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('tr').dataset.id;
+      const sucursal = sucursales.find(s => String(s.id) === id);
+      if (!confirm(`¿Eliminar la sucursal "${sucursal.nombre}"? No se puede deshacer.`)) return;
+      btn.disabled = true;
+      const res = await eliminarRegistro(config.apiBaseUrl, 'sucursales', id);
+      if (res) { cargarTabla(); return; }
+      btn.disabled = false;
+      alert(ultimoErrorAPI() || 'No se pudo eliminar la sucursal.');
+    });
+  });
+}
+
+function abrirEdicion(sucursal) {
+  abrirPanelLateral({
+    titulo: 'Editar sucursal',
+    icono: '🏢',
+    montar: (body) => {
+      body.innerHTML = `
+        <form class="form-registro" style="grid-template-columns:1fr;" id="formEditarSucursal">
+          <div class="campo"><label>Nombre</label><input type="text" id="editNombre" value="${escapeHtml(sucursal.nombre)}" required></div>
+          <div class="campo"><label>Dirección</label><input type="text" id="editDireccion" value="${sucursal.direccion ? escapeHtml(sucursal.direccion) : ''}" placeholder="Opcional"></div>
+          <div class="campo" style="flex-direction:row; align-items:center; gap:8px;">
+            <input type="checkbox" id="editActivo" ${sucursal.activo ? 'checked' : ''} style="width:auto;">
+            <label style="text-transform:none; letter-spacing:normal;">Sucursal activa</label>
+          </div>
+          <div class="campo campo-accion">
+            <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">Guardar cambios</button>
+            <span class="form-status" id="editStatus"></span>
+          </div>
+        </form>
+      `;
+      document.getElementById('formEditarSucursal').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const cambios = {
+          nombre: document.getElementById('editNombre').value.trim(),
+          direccion: document.getElementById('editDireccion').value.trim(),
+          activo: document.getElementById('editActivo').checked
+        };
+        const res = await actualizarRegistro(config.apiBaseUrl, 'sucursales', sucursal.id, cambios);
+        const statusEl = document.getElementById('editStatus');
+        if (!res) { statusEl.textContent = ultimoErrorAPI() || 'No se pudo guardar el cambio.'; statusEl.style.color = 'var(--coral)'; return; }
+        cerrarPanelLateral();
+        cargarTabla();
+      });
+    }
+  });
+}
+
+function abrirNuevaSucursal() {
+  abrirPanelLateral({
+    titulo: 'Nueva sucursal',
+    icono: '🏢',
+    montar: (body) => {
+      body.innerHTML = '<div id="formNuevaSucursal"></div>';
+      renderFormulario('formNuevaSucursal', {
+        etiqueta: 'sucursal',
+        campos: [
+          { id: 'nombre', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej. Sede Miraflores' },
+          { id: 'direccion', label: 'Dirección', type: 'text', placeholder: 'Opcional' }
+        ]
+      }, async (valores) => {
+        const res = await crearRegistro(config.apiBaseUrl, 'sucursales', valores);
+        if (res) { cerrarPanelLateral(); cargarTabla(); }
+        return res;
+      }, { puedeCrear: true, obtenerUltimoError: ultimoErrorAPI });
+    }
+  });
+}
+
+// Reusa GET /api/finanzas/resumen-sucursales (Sub-fase C) -- sin filtro de
+// fecha, para dar una foto de "quién gana más" a simple vista. Finanzas
+// sigue siendo el lugar para cortar por período.
+async function cargarGanancia() {
+  const cont = document.getElementById('gananciaLista');
+  if (!tienePermiso('finanzas.ver')) { cont.innerHTML = '<div class="rank-row">Necesitas acceso a Finanzas para ver esto.</div>'; return; }
+  const sesion = obtenerSesion();
+  let resumen;
+  try {
+    const res = await fetch(`${config.apiBaseUrl}/finanzas/resumen-sucursales`, { headers: { Authorization: `Bearer ${sesion.token}` } });
+    if (!res.ok) throw new Error();
+    resumen = await res.json();
+  } catch {
+    cont.innerHTML = '<div class="rank-row">No se pudo cargar el resumen.</div>';
+    return;
+  }
+
+  const filas = [...resumen.porSucursal].sort((a, b) => b.ganancia - a.ganancia);
+  if (resumen.sinSucursal.ingresos || resumen.sinSucursal.egresos) {
+    filas.push({ sucursal_nombre: 'Sin asignar', ganancia: resumen.sinSucursal.ganancia });
+  }
+
+  cont.innerHTML = filas.length
+    ? filas.map(f => `
+      <div class="rank-row">
+        <span class="rank-name">${escapeHtml(f.sucursal_nombre)}</span>
+        <span class="rank-val" style="color:${f.ganancia >= 0 ? 'var(--teal)' : 'var(--coral)'};">S/ ${fmtNum(f.ganancia)}</span>
+      </div>`).join('') + `
+      <div class="rank-row" style="border-top:1px solid var(--borde); margin-top:6px; padding-top:10px; font-weight:600;">
+        <span class="rank-name">Total</span>
+        <span class="rank-val">S/ ${fmtNum(resumen.total.ganancia)}</span>
+      </div>`
+    : '<div class="rank-row">Sin movimientos registrados todavía.</div>';
+}
+
+(async function iniciar() {
+  config = await cargarConfigEmpresa();
+  renderSidebar(config, 'sucursales');
+  renderKhipuAiWidget(config);
+  await renderTopbar(config);
+  renderFooter();
+
+  if (!tienePermiso('sucursales.ver')) {
+    document.getElementById('tablaSucursales').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
+    document.getElementById('gananciaLista').innerHTML = '';
+    return;
+  }
+
+  const btnNueva = document.getElementById('btnNuevaSucursal');
+  if (tienePermiso('sucursales.crear')) {
+    btnNueva.style.display = 'inline-flex';
+    btnNueva.addEventListener('click', abrirNuevaSucursal);
+  }
+
+  cargarTabla();
+  cargarGanancia();
+})();
+</script>
+</body>
+</html>

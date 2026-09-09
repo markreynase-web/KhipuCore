@@ -239,6 +239,29 @@ test('#15 PUT /usuarios/:id con sucursal_id de otra empresa: 404', async () => {
   assert.equal(membresia[0].sucursal_id, null, 'no debe haber quedado asignada la sucursal ajena');
 });
 
+// ---------- SUCURSALES (hallazgo tardío: sucursales.js se escribió en la
+// Sub-fase B, antes de que existiera esta restricción, y se había quedado
+// sin el middleware -- un usuario restringido veía TODAS las sucursales de
+// la empresa. Corregido, este bloque lo prueba explícitamente. ----------
+
+test('#15b GET /sucursales restringido: solo su propia fila, no las demás de la empresa', async () => {
+  const r = await fetch(`${servidor.baseUrl}/api/sucursales`, { headers: headersA });
+  assert.equal(r.status, 200);
+  const sucursales = await r.json();
+  assert.equal(sucursales.length, 1);
+  assert.equal(sucursales[0].id, sucursalA);
+});
+
+test('#15c PUT/DELETE /sucursales/:id de una sucursal ajena (restringido): 404', async () => {
+  const rPut = await fetch(`${servidor.baseUrl}/api/sucursales/${sucursalB}`, {
+    method: 'PUT', headers: headersA, body: JSON.stringify({ nombre: 'QA-TEST (borrar) hackeado' })
+  });
+  assert.equal(rPut.status, 404);
+
+  const rDelete = await fetch(`${servidor.baseUrl}/api/sucursales/${sucursalB}`, { method: 'DELETE', headers: headersA });
+  assert.equal(rDelete.status, 404);
+});
+
 // ---------- SESIONES ESPECIALES ----------
 
 test('#16 Impersonación de super admin: sin restricción, ve ambas sucursales', async () => {

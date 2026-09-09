@@ -68,9 +68,18 @@ router.get('/turnos', verificarPermiso('cajas.ver'), async (req, res) => {
   if (estado) { valores.push(estado); condiciones.push(`t.estado = $${valores.length}`); }
   if (sucursalEfectiva) { valores.push(sucursalEfectiva); condiciones.push(`c.sucursal_id = $${valores.length}`); }
   try {
+    // Sub-fase F: nombre de quién abrió/cerró, no solo el id -- para que el
+    // historial del frontend no tenga que resolverlo aparte. LEFT JOIN
+    // porque usuario_cierre_id es null mientras el turno sigue abierto (y,
+    // desde la Sub-fase E, usuario_apertura_id también puede quedar null si
+    // esa cuenta se borró -- ver migración 040, ON DELETE SET NULL).
     const { rows } = await pool.query(
-      `SELECT t.*, c.nombre AS caja_nombre, c.sucursal_id
-       FROM turnos_caja t JOIN cajas c ON c.id = t.caja_id
+      `SELECT t.*, c.nombre AS caja_nombre, c.sucursal_id,
+              ua.nombre AS usuario_apertura_nombre, uc.nombre AS usuario_cierre_nombre
+       FROM turnos_caja t
+       JOIN cajas c ON c.id = t.caja_id
+       LEFT JOIN usuarios ua ON ua.id = t.usuario_apertura_id
+       LEFT JOIN usuarios uc ON uc.id = t.usuario_cierre_id
        WHERE ${condiciones.join(' AND ')}
        ORDER BY t.fecha_apertura DESC LIMIT 500`,
       valores
@@ -93,8 +102,12 @@ router.get('/turnos/:id', verificarPermiso('cajas.ver'), async (req, res) => {
     : [req.params.id, req.usuario.empresa_id];
   try {
     const { rows } = await pool.query(
-      `SELECT t.*, c.nombre AS caja_nombre, c.sucursal_id
-       FROM turnos_caja t JOIN cajas c ON c.id = t.caja_id
+      `SELECT t.*, c.nombre AS caja_nombre, c.sucursal_id,
+              ua.nombre AS usuario_apertura_nombre, uc.nombre AS usuario_cierre_nombre
+       FROM turnos_caja t
+       JOIN cajas c ON c.id = t.caja_id
+       LEFT JOIN usuarios ua ON ua.id = t.usuario_apertura_id
+       LEFT JOIN usuarios uc ON uc.id = t.usuario_cierre_id
        WHERE t.id = $1 AND t.empresa_id = $2${condSucursal}`,
       valores
     );

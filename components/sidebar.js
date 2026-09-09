@@ -71,6 +71,16 @@ export function renderSidebar(config, paginaActualId) {
   if (sinSesion || tieneAlgunPermiso('usuarios')) {
     seccionAdmin.push({ id: 'usuarios', label: 'Usuarios', icon: '👤', href: 'usuarios.html' });
   }
+  // Sub-fase F: Sucursales y Cajas, mismo criterio que Usuarios/Auditoría --
+  // no dependen de un módulo contratado (empresa_modulos), son transversales
+  // y se gatean solo por permiso (ver backend/src/routes/sucursales.js y
+  // cajas.js, que a propósito no usan requireModulo()).
+  if (sinSesion || tieneAlgunPermiso('sucursales')) {
+    seccionAdmin.push({ id: 'sucursales', label: 'Sucursales', icon: '🏢', href: 'sucursales.html' });
+  }
+  if (sinSesion || tieneAlgunPermiso('cajas')) {
+    seccionAdmin.push({ id: 'cajas', label: 'Cajas', icon: '🧾', href: 'cajas.html' });
+  }
   if (sinSesion || tieneAlgunPermiso('auditoria')) {
     seccionAdmin.push({ id: 'auditoria', label: 'Auditoría', icon: '🛡️', href: 'auditoria.html' });
   }

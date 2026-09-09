@@ -74,6 +74,12 @@ export const ESQUEMAS = {
     campos: [
       { id: 'fecha_registro', label: 'Fecha', type: 'date', required: true },
       { id: 'nombre', label: 'Producto', type: 'text', required: true },
+      // Sub-fase F: el stock ya es por sucursal desde la Sub-fase B (cada
+      // fila de inventario pertenece a UNA sola sucursal) -- el backend
+      // (POST /api/inventario) ya lo exige; esto es lo que le agrega el
+      // selector al formulario. Mismo mecanismo que cliente_id/producto_id
+      // en Ventas (fuente + CONSTRUCTORES_OPCION en js/app.js), nada nuevo.
+      { id: 'sucursal_id', label: 'Sucursal', type: 'select', required: true, fuente: 'sucursales', vacio: 'Selecciona una sucursal…' },
       { id: 'categoria', label: 'Categoría', type: 'text', placeholder: 'Opcional' },
       { id: 'stock', label: 'Stock', type: 'number', required: true, defecto: 0, min: 0, step: '0.01' },
       { id: 'stock_minimo', label: 'Stock mínimo', type: 'number', defecto: 0, min: 0, step: '0.01' },

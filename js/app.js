@@ -379,6 +379,10 @@ async function activarCapturaSiCorresponde(config) {
   // derivados de inventario.categoria, así que se resuelve aparte.
   const CONSTRUCTORES_OPCION = {
     clientes: cl => ({ value: cl.id, label: cl.nombre }),
+    // Sub-fase F: sucursal_id en Inventario (ver js/esquemas.js). "Sucursal
+    // Principal" queda igual de visible que cualquier otra -- no hace falta
+    // marcarla especial acá, ya se distingue sola por el nombre.
+    sucursales: s => ({ value: s.id, label: s.nombre }),
     inventario: p => ({
       value: p.id, label: `${p.nombre} - ${p.stock} disponible(s)`,
       extra: { stock: Number(p.stock), categoria: p.categoria || '', precioSugerido: Number(p.precio_unitario) || 0 }

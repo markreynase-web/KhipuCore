@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhipuCore — Cajas</title>
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/layout.css">
+<link rel="stylesheet" href="../css/cards.css">
+<link rel="stylesheet" href="../css/forms.css">
+<link rel="stylesheet" href="../css/tables.css">
+<link rel="stylesheet" href="../css/panel-lateral.css">
+</head>
+<body data-modulo="cajas">
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="topbarTitle">Cajas</h1>
+        <div class="topbar-subtitle" id="topbarSubtitle">APERTURA, CIERRE Y ARQUEO</div>
+      </div>
+      <div class="topbar-search" id="topbarSearch"></div>
+      <div id="sesionWidget" class="sesion-widget"></div>
+    </header>
+
+    <main>
+      <div class="kpis" id="cajKpis"></div>
+
+      <section class="panel captura-panel" id="capturaSection">
+        <div class="captura-header">
+          <h3>Cajas</h3>
+          <div class="captura-header-acciones">
+            <button type="button" class="btn btn-ochre" id="btnNuevaCaja" style="display:none;">+ Nueva caja</button>
+          </div>
+        </div>
+        <span id="formStatus" class="form-status"></span>
+        <div id="tablaCajas">Cargando…</div>
+      </section>
+
+      <section class="panel captura-panel" style="margin-top:20px;">
+        <div class="captura-header"><h3>Historial de turnos</h3></div>
+        <div id="tablaTurnos">Cargando…</div>
+      </section>
+    </main>
+
+    <footer></footer>
+  </div>
+</div>
+
+<script type="module">
+import { cargarConfigEmpresa } from '../js/config.js';
+import { renderSidebar } from '../components/sidebar.js';
+import { renderKhipuAiWidget } from '../components/khipuAiWidget.js';
+import { renderTopbar } from '../components/topbar.js';
+import { renderFooter } from '../components/footer.js';
+import { obtenerSesion, tienePermiso, haySesionActiva } from '../js/sesion.js';
+import { listarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, ultimoErrorAPI } from '../js/api.js';
+import { abrirPanelLateral, cerrarPanelLateral } from '../components/panelLateral.js';
+import { renderFormulario } from '../components/formularioRegistro.js';
+import { escapeHtml, fmtNum } from '../js/utils.js';
+import { kpiCard } from '../js/kpiCard.js';
+
+if (!haySesionActiva()) location.replace('login.html');
+
+let config;
+let sucursales = [];
+
+// El backend no tiene "PUT/DELETE /cajas/turnos" para golpear a mano --
+// estas 3 son las únicas rutas de ciclo de vida de turno (ver
+// backend/src/routes/cajas.js), así que van con fetch directo (mismo
+// patrón que ya usa usuarios.html para /usuarios/roles y /auditoria).
+async function pedirJSON(path, opciones = {}) {
+  const sesion = obtenerSesion();
+  const res = await fetch(`${config.apiBaseUrl}${path}`, {
+    ...opciones,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sesion.token}`, ...(opciones.headers || {}) }
+  });
+  const cuerpo = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(cuerpo.error || `HTTP ${res.status}`);
+  return cuerpo;
+}
+
+function badgeEstadoTurno(turnoAbierto) {
+  return turnoAbierto
+    ? `<span class="role-badge role-numerico">Turno abierto</span>`
+    : `<span class="role-badge role-fecha">Sin turno abierto</span>`;
+}
+
+function fechaHora(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function dibujarKpis(cajas, turnosAbiertos, turnosHoy) {
+  document.getElementById('cajKpis').innerHTML = [
+    kpiCard({ acento: 'blue', icono: '🧾', label: 'Cajas', value: fmtNum(cajas.length), sub: `en ${new Set(cajas.map(c => c.sucursal_id)).size} sucursal(es)` }),
+    kpiCard({ acento: 'teal', icono: '🟢', label: 'Turnos abiertos ahora', value: fmtNum(turnosAbiertos.length), sub: `${cajas.length - turnosAbiertos.length} caja(s) sin turno` }),
+    kpiCard({ acento: 'orange', icono: '📅', label: 'Cierres hoy', value: fmtNum(turnosHoy.length), sub: 'turnos cerrados hoy' })
+  ].join('');
+}
+
+async function cargarCajas() {
+  const cont = document.getElementById('tablaCajas');
+  const [cajas, turnosAbiertos] = await Promise.all([
+    listarRegistros(config.apiBaseUrl, 'cajas'),
+    pedirJSON('/cajas/turnos?estado=abierto').catch(() => [])
+  ]);
+  if (!cajas) { cont.innerHTML = '<p class="tabla-vacia">No se pudo conectar con el backend.</p>'; return; }
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  let turnosHoy = [];
+  try { turnosHoy = (await pedirJSON('/cajas/turnos?estado=cerrado')).filter(t => String(t.fecha_cierre).slice(0, 10) === hoy); } catch { /* sin datos, se queda en 0 */ }
+
+  dibujarKpis(cajas, turnosAbiertos, turnosHoy);
+  if (!cajas.length) { cont.innerHTML = '<p class="tabla-vacia">No hay cajas registradas todavía.</p>'; return; }
+
+  const porCaja = new Map(turnosAbiertos.map(t => [t.caja_id, t]));
+  const nombreSucursal = new Map(sucursales.map(s => [s.id, s.nombre]));
+  const puedeEditar = tienePermiso('cajas.editar');
+  const puedeEliminar = tienePermiso('cajas.eliminar');
+  const puedeAlgo = puedeEditar || puedeEliminar;
+
+  cont.innerHTML = `
+    <div class="tabla-registros-wrap" style="margin-top:14px;">
+      <table class="tabla-registros">
+        <thead><tr><th>Caja</th><th>Sucursal</th><th>Estado</th>${puedeAlgo ? '<th class="col-acciones"></th>' : ''}</tr></thead>
+        <tbody>
+          ${cajas.map(c => {
+            const turno = porCaja.get(c.id);
+            const botones = [];
+            if (puedeEditar && !turno) botones.push(`<button type="button" class="btn btn-ochre" data-accion="abrir" style="padding:6px 12px; font-size:12px;">Abrir turno</button>`);
+            if (puedeEditar && turno) botones.push(`<button type="button" class="btn btn-ochre" data-accion="cerrar" data-turno="${turno.id}" style="padding:6px 12px; font-size:12px;">Cerrar turno</button>`);
+            if (puedeEliminar && !turno) botones.push(`<button type="button" class="icon-btn peligro" data-accion="eliminar" title="Eliminar">🗑️</button>`);
+            return `
+            <tr data-id="${c.id}">
+              <td>${escapeHtml(c.nombre)}${c.activa ? '' : ' <span class="role-badge role-fecha">Desactivada</span>'}</td>
+              <td>${escapeHtml(nombreSucursal.get(c.sucursal_id) || '—')}</td>
+              <td>${badgeEstadoTurno(!!turno)}${turno ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Desde ${fechaHora(turno.fecha_apertura)}${turno.usuario_apertura_nombre ? ' · ' + escapeHtml(turno.usuario_apertura_nombre) : ''}</div>` : ''}</td>
+              ${puedeAlgo ? `<td class="col-acciones"><div class="acciones-icono" style="gap:8px;">${botones.join('')}</div></td>` : ''}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  cont.querySelectorAll('[data-accion="abrir"]').forEach(btn => {
+    btn.addEventListener('click', () => abrirTurno(btn.closest('tr').dataset.id));
+  });
+  cont.querySelectorAll('[data-accion="cerrar"]').forEach(btn => {
+    btn.addEventListener('click', () => cerrarTurno(btn.dataset.turno));
+  });
+  cont.querySelectorAll('[data-accion="eliminar"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('tr').dataset.id;
+      const caja = cajas.find(c => String(c.id) === id);
+      if (!confirm(`¿Eliminar la caja "${caja.nombre}"? No se puede deshacer.`)) return;
+      btn.disabled = true;
+      const res = await eliminarRegistro(config.apiBaseUrl, 'cajas', id);
+      if (res) { cargarCajas(); return; }
+      btn.disabled = false;
+      alert(ultimoErrorAPI() || 'No se pudo eliminar la caja.');
+    });
+  });
+}
+
+function abrirTurno(cajaId) {
+  abrirPanelLateral({
+    titulo: 'Abrir turno',
+    icono: '🟢',
+    montar: (body) => {
+      body.innerHTML = `
+        <form class="form-registro" style="grid-template-columns:1fr;" id="formAbrirTurno">
+          <div class="campo"><label>Monto de apertura</label><input type="number" id="montoApertura" min="0" step="0.01" value="0" required></div>
+          <div class="campo campo-accion">
+            <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">Abrir turno</button>
+            <span class="form-status" id="abrirStatus"></span>
+          </div>
+        </form>
+      `;
+      document.getElementById('formAbrirTurno').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('abrirStatus');
+        try {
+          await pedirJSON(`/cajas/${cajaId}/turnos`, { method: 'POST', body: JSON.stringify({ monto_apertura: Number(document.getElementById('montoApertura').value) }) });
+          cerrarPanelLateral();
+          cargarCajas();
+          cargarTurnos();
+        } catch (err) {
+          statusEl.textContent = err.message;
+          statusEl.style.color = 'var(--coral)';
+        }
+      });
+    }
+  });
+}
+
+// Muestra el "esperado en caja" calculado en vivo (GET /cajas/turnos/:id)
+// ANTES de pedir el monto declarado -- así quien cierra ya tiene una
+// referencia mientras cuenta el efectivo, en vez de adivinar a ciegas.
+function cerrarTurno(turnoId) {
+  abrirPanelLateral({
+    titulo: 'Cerrar turno',
+    icono: '🔴',
+    montar: async (body) => {
+      body.innerHTML = '<div class="rank-row">Calculando lo esperado en caja…</div>';
+      let turno;
+      try { turno = await pedirJSON(`/cajas/turnos/${turnoId}`); }
+      catch (err) { body.innerHTML = `<div class="rank-row">${escapeHtml(err.message)}</div>`; return; }
+
+      body.innerHTML = `
+        <div class="rank-row"><span class="rank-name">Apertura</span><span class="rank-val">${fmtNum(Number(turno.monto_apertura))}</span></div>
+        <div class="rank-row"><span class="rank-name">Ingresos del turno</span><span class="rank-val">${fmtNum(turno.ingresos_turno)}</span></div>
+        <div class="rank-row"><span class="rank-name">Egresos del turno</span><span class="rank-val">${fmtNum(turno.egresos_turno)}</span></div>
+        <div class="rank-row" style="border-top:1px solid var(--borde); margin-top:6px; padding-top:10px; font-weight:600;">
+          <span class="rank-name">Esperado en caja</span><span class="rank-val">${fmtNum(turno.monto_esperado)}</span>
+        </div>
+        <div style="font-size:11px; color:var(--muted); margin:10px 0 16px;">
+          Este cálculo asume que todo lo registrado en Finanzas durante el turno es efectivo -- si ya cobras con Yape/tarjeta/transferencia, la diferencia de abajo no necesariamente es un faltante real.
+        </div>
+        <form class="form-registro" style="grid-template-columns:1fr;" id="formCerrarTurno">
+          <div class="campo"><label>Monto declarado (contado en caja)</label><input type="number" id="montoDeclarado" min="0" step="0.01" required></div>
+          <div class="campo"><label>Notas</label><input type="text" id="notasCierre" placeholder="Opcional"></div>
+          <div class="campo campo-accion">
+            <button type="submit" class="btn btn-ochre" style="width:100%; justify-content:center;">Cerrar turno</button>
+            <span class="form-status" id="cerrarStatus"></span>
+          </div>
+        </form>
+      `;
+      document.getElementById('formCerrarTurno').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('cerrarStatus');
+        try {
+          const cerrado = await pedirJSON(`/cajas/turnos/${turnoId}/cerrar`, {
+            method: 'PUT',
+            body: JSON.stringify({ monto_cierre_declarado: Number(document.getElementById('montoDeclarado').value), notas: document.getElementById('notasCierre').value.trim() || undefined })
+          });
+          const diferencia = Number(cerrado.diferencia);
+          alert(diferencia === 0
+            ? 'Turno cerrado. Cuadró exacto.'
+            : `Turno cerrado. Diferencia: ${diferencia > 0 ? '+' : ''}${fmtNum(diferencia)} (${diferencia > 0 ? 'sobra' : 'falta'}).`);
+          cerrarPanelLateral();
+          cargarCajas();
+          cargarTurnos();
+        } catch (err) {
+          statusEl.textContent = err.message;
+          statusEl.style.color = 'var(--coral)';
+        }
+      });
+    }
+  });
+}
+
+function abrirNuevaCaja() {
+  abrirPanelLateral({
+    titulo: 'Nueva caja',
+    icono: '🧾',
+    montar: (body) => {
+      body.innerHTML = '<div id="formNuevaCaja"></div>';
+      renderFormulario('formNuevaCaja', {
+        etiqueta: 'caja',
+        campos: [
+          { id: 'nombre', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej. Caja 1' },
+          { id: 'sucursal_id', label: 'Sucursal', type: 'select', required: true, vacio: 'Selecciona una sucursal…',
+            opcionesResueltas: sucursales.map(s => ({ value: s.id, label: s.nombre })) }
+        ]
+      }, async (valores) => {
+        const res = await crearRegistro(config.apiBaseUrl, 'cajas', { ...valores, sucursal_id: Number(valores.sucursal_id) });
+        if (res) { cerrarPanelLateral(); cargarCajas(); }
+        return res;
+      }, { puedeCrear: true, obtenerUltimoError: ultimoErrorAPI });
+    }
+  });
+}
+
+async function cargarTurnos() {
+  const cont = document.getElementById('tablaTurnos');
+  let turnos;
+  try { turnos = await pedirJSON('/cajas/turnos'); }
+  catch { cont.innerHTML = '<p class="tabla-vacia">No se pudo cargar el historial.</p>'; return; }
+  if (!turnos.length) { cont.innerHTML = '<p class="tabla-vacia">Sin turnos registrados todavía.</p>'; return; }
+
+  const nombreSucursal = new Map(sucursales.map(s => [s.id, s.nombre]));
+  cont.innerHTML = `
+    <div class="tabla-registros-wrap" style="margin-top:14px;">
+      <table class="tabla-registros">
+        <thead><tr>
+          <th>Caja</th><th>Sucursal</th><th>Apertura</th><th>Cierre</th>
+          <th>Monto apertura</th><th>Monto declarado</th><th>Esperado</th><th>Diferencia</th>
+        </tr></thead>
+        <tbody>
+          ${turnos.map(t => {
+            const diferencia = t.diferencia !== null ? Number(t.diferencia) : null;
+            return `
+            <tr>
+              <td>${escapeHtml(t.caja_nombre)}</td>
+              <td>${escapeHtml(nombreSucursal.get(t.sucursal_id) || '—')}</td>
+              <td>${fechaHora(t.fecha_apertura)}${t.usuario_apertura_nombre ? `<div style="font-size:11px; color:var(--muted);">${escapeHtml(t.usuario_apertura_nombre)}</div>` : ''}</td>
+              <td>${t.fecha_cierre ? fechaHora(t.fecha_cierre) : badgeEstadoTurno(true)}${t.usuario_cierre_nombre ? `<div style="font-size:11px; color:var(--muted);">${escapeHtml(t.usuario_cierre_nombre)}</div>` : ''}</td>
+              <td>${fmtNum(Number(t.monto_apertura))}</td>
+              <td>${t.monto_cierre_declarado !== null ? fmtNum(Number(t.monto_cierre_declarado)) : '—'}</td>
+              <td>${t.monto_cierre_sistema !== null ? fmtNum(Number(t.monto_cierre_sistema)) : '—'}</td>
+              <td style="color:${diferencia === null ? 'inherit' : diferencia === 0 ? 'var(--teal)' : 'var(--coral)'};">${diferencia !== null ? (diferencia > 0 ? '+' : '') + fmtNum(diferencia) : '—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+(async function iniciar() {
+  config = await cargarConfigEmpresa();
+  renderSidebar(config, 'cajas');
+  renderKhipuAiWidget(config);
+  await renderTopbar(config);
+  renderFooter();
+
+  if (!tienePermiso('cajas.ver')) {
+    document.getElementById('tablaCajas').innerHTML = '<p class="tabla-vacia">Tu rol no tiene permiso para ver esta sección.</p>';
+    document.getElementById('tablaTurnos').innerHTML = '';
+    return;
+  }
+
+  sucursales = (await listarRegistros(config.apiBaseUrl, 'sucursales')) || [];
+
+  const btnNueva = document.getElementById('btnNuevaCaja');
+  if (tienePermiso('cajas.crear')) {
+    btnNueva.style.display = 'inline-flex';
+    btnNueva.addEventListener('click', abrirNuevaCaja);
+  }
+
+  cargarCajas();
+  cargarTurnos();
+})();
+</script>
+</body>
+</html>

@@ -93,6 +93,7 @@ if (!haySesionActiva()) location.replace('login.html');
 
 let config;
 let roles = [];
+let sucursales = []; // Sub-fase F: para el select "Sucursal" del panel de editar
 let chartRol = null;
 let chartEstado = null;
 let chartNuevos = null;
@@ -119,6 +120,14 @@ async function pedirRoles() {
     if (!res.ok) return [];
     return await res.json();
   } catch { return []; }
+}
+
+// Sub-fase F: lista de sucursales para el select "Sucursal" del panel de
+// editar usuario. Si quien está logueado no tiene sucursales.ver (rol sin
+// ese permiso, ver migración 037), listarRegistros() simplemente devuelve
+// null -- se cae a lista vacía y el select queda solo con "Todas", sin romper nada.
+async function pedirSucursales() {
+  return (await listarRegistros(config.apiBaseUrl, 'sucursales')) || [];
 }
 
 function badgeRol(rol) {
@@ -165,7 +174,7 @@ async function cargarTabla() {
   cont.innerHTML = `
     <div class="tabla-registros-wrap" style="margin-top:14px;">
       <table class="tabla-registros">
-        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th>${puedeAlgo ? '<th class="col-acciones"></th>' : ''}</tr></thead>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Sucursal</th><th>Estado</th>${puedeAlgo ? '<th class="col-acciones"></th>' : ''}</tr></thead>
         <tbody>
           ${usuarios.map(u => {
             // Nadie puede eliminarse a sí mismo (mismo candado que el backend,
@@ -177,11 +186,16 @@ async function cargarTabla() {
               puedeVerActividad ? `<button type="button" class="icon-btn" data-accion="actividad" title="Ver actividad">📋</button>` : '',
               (puedeEliminar && !esUnoMismo) ? `<button type="button" class="icon-btn peligro" data-accion="eliminar" title="Quitar acceso">🗑️</button>` : ''
             ].join('');
+            // Sub-fase F: sucursal_id/sucursal_nombre ya vienen en GET
+            // /api/usuarios desde la Sub-fase D -- null = sin restricción,
+            // ve/opera en todas las sucursales de la empresa.
+            const sucursalTexto = u.sucursal_id ? escapeHtml(u.sucursal_nombre) : 'Todas';
             return `
             <tr data-id="${u.id}">
               <td>${escapeHtml(u.nombre)}</td>
               <td>${escapeHtml(u.email)}</td>
               <td>${badgeRol(u.rol)}</td>
+              <td>${sucursalTexto}</td>
               <td>${badgeEstado(u.activo)}</td>
               ${puedeAlgo ? `<td class="col-acciones"><div class="acciones-icono">${botones}</div></td>` : ''}
             </tr>`;
@@ -394,6 +408,14 @@ function abrirEdicion(usuario) {
           <div class="campo"><label>Rol</label>
             <select id="editRol">${roles.map(r => `<option value="${r.nombre}" ${r.nombre === usuario.rol ? 'selected' : ''}>${r.nombre}</option>`).join('')}</select>
           </div>
+          <div class="campo">
+            <label>Sucursal</label>
+            <select id="editSucursal">
+              <option value="">Todas (sin restricción)</option>
+              ${sucursales.map(s => `<option value="${s.id}" ${s.id === usuario.sucursal_id ? 'selected' : ''}>${escapeHtml(s.nombre)}</option>`).join('')}
+            </select>
+            <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Restringe a esta persona a ver y operar solo en esa sucursal (ventas, inventario, finanzas, cajas). "Todas" es lo de siempre.</span>
+          </div>
           <div class="campo" style="flex-direction:row; align-items:center; gap:8px;">
             <input type="checkbox" id="editActivo" ${usuario.activo ? 'checked' : ''} style="width:auto;">
             <label style="text-transform:none; letter-spacing:normal;">Cuenta activa (una cuenta inactiva no puede iniciar sesión)</label>
@@ -406,10 +428,15 @@ function abrirEdicion(usuario) {
       `;
       document.getElementById('formEditarUsuario').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const sucursalValor = document.getElementById('editSucursal').value;
         const cambios = {
           nombre: document.getElementById('editNombre').value.trim(),
           rol: document.getElementById('editRol').value,
-          activo: document.getElementById('editActivo').checked
+          activo: document.getElementById('editActivo').checked,
+          // '' ("Todas") -> null explícito, para que el backend lo trate
+          // como "quitar la restricción" (ver PUT /api/usuarios/:id, patrón
+          // "provisto": distingue "no mandado" de "mandado como null").
+          sucursal_id: sucursalValor ? Number(sucursalValor) : null
         };
         const res = await actualizarRegistro(config.apiBaseUrl, 'usuarios', usuario.id, cambios);
         const statusEl = document.getElementById('editStatus');
@@ -458,6 +485,7 @@ function abrirNuevoUsuario() {
   }
 
   roles = await pedirRoles();
+  sucursales = await pedirSucursales();
   dibujarRoles();
   dibujarChartPermisos();
 
