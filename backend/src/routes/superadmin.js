@@ -73,7 +73,32 @@ router.put('/empresas/:id', async (req, res) => {
   if (colorPrimario && !HEX_COLOR.test(colorPrimario)) {
     return res.status(400).json({ error: 'color_primario debe ser un color hex válido, ej. #E3B23C.' });
   }
+  // plan_id: mismo criterio que color_primario -- un PUT que no lo manda
+  // debe dejarlo igual, uno que lo manda null debe poder "desasignar" el
+  // plan (vuelve a limite_usuarios ilimitado, ver POST /api/usuarios).
+  const planProvisto = Object.prototype.hasOwnProperty.call(req.body || {}, 'plan_id');
+  const planId = req.body?.plan_id;
+  // Validación de FORMATO (síncrona, sin tocar la base) antes del try: un
+  // plan_id que no es ni numérico ni null/undefined nunca puede existir en
+  // la tabla, así que se rechaza acá sin gastar una query -- y sobre todo,
+  // sin mandar un valor no numérico a Postgres (ver nota de abajo).
+  if (planProvisto && planId !== null && planId !== undefined && !Number.isInteger(planId)) {
+    return res.status(400).json({ error: 'plan_id debe ser un número entero, o null para quitar el plan.' });
+  }
   try {
+    // La validación de EXISTENCIA (si el id numérico corresponde a un plan
+    // real) va DENTRO del try -- hallazgo de la revisión: antes esta query
+    // vivía afuera del try/catch. Un plan_id que Postgres rechazara por
+    // tipo (ej. un objeto/array que igual pasara la guarda de arriba)
+    // habría quedado como una promesa rechazada sin capturar en un handler
+    // async de Express 4 (que no las atrapa solo) -- y sin ningún
+    // process.on('unhandledRejection', ...) en server.js, Node tumba el
+    // proceso ENTERO por default, no solo esta request.
+    if (planProvisto && planId !== null && planId !== undefined) {
+      const { rows: planRows } = await pool.query('SELECT id FROM planes WHERE id = $1', [planId]);
+      if (!planRows.length) return res.status(400).json({ error: `El plan #${planId} no existe.` });
+    }
+
     // Leída ANTES de pisarla -- es la única forma de saber después qué
     // cambió de verdad (mismo criterio que crudFactory.js). Sin datos
     // sensibles en esta tabla (empresas no tiene hashes/tokens).
@@ -87,17 +112,18 @@ router.put('/empresas/:id', async (req, res) => {
          logo = COALESCE($2, logo),
          activo = COALESCE($3, activo),
          color_primario = CASE WHEN $4 THEN $5 ELSE color_primario END,
+         plan_id = CASE WHEN $7 THEN $8 ELSE plan_id END,
          actualizado_el = now()
        WHERE id = $6
        RETURNING *`,
-      [nombre || null, logo || null, activo === undefined ? null : activo, colorProvisto, colorPrimario || null, req.params.id]
+      [nombre || null, logo || null, activo === undefined ? null : activo, colorProvisto, colorPrimario || null, req.params.id, planProvisto, planId ?? null]
     );
     if (!rows.length) return res.status(404).json({ error: 'Empresa no encontrada.' });
     res.json(rows[0]);
 
     const despues = rows[0];
     const cambios = {};
-    ['nombre', 'logo', 'activo', 'color_primario'].forEach(campo => {
+    ['nombre', 'logo', 'activo', 'color_primario', 'plan_id'].forEach(campo => {
       if (String(antes[campo] ?? '') !== String(despues[campo] ?? '')) {
         cambios[campo] = { antes: antes[campo], despues: despues[campo] };
       }
@@ -110,6 +136,20 @@ router.put('/empresas/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo actualizar la empresa.' });
+  }
+});
+
+// Catálogo de planes (para el selector de "asignar plan" en el panel de
+// empresas). Sin escritura todavía -- los 3 planes se siembran en la
+// migración 035; editarlos por API queda para cuando exista el sistema
+// completo de Contratación/Suscripciones.
+router.get('/planes', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM planes ORDER BY id`);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudieron leer los planes.' });
   }
 });
 

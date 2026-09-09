@@ -82,6 +82,9 @@ router.post('/', verificarPermiso('usuarios.crear'), async (req, res) => {
   if (!passwordCumplePolitica(password)) return res.status(400).json({ error: MENSAJE_POLITICA_PASSWORD });
 
   try {
+    // Estas dos validaciones no dependen del límite de usuarios ni de
+    // ningún lock -- se quedan afuera de la transacción, sin motivo para
+    // serializarlas.
     const { rows: existente } = await pool.query('SELECT id FROM usuarios WHERE lower(email) = lower($1)', [email]);
     if (existente.length) {
       return res.status(409).json({ error: 'Ya existe una cuenta con ese email. Pídele a esa persona que te comparta acceso, o contacta soporte para vincularla a tu empresa.' });
@@ -94,6 +97,41 @@ router.post('/', verificarPermiso('usuarios.crear'), async (req, res) => {
     const cliente = await pool.connect();
     try {
       await cliente.query('BEGIN');
+
+      // Nivel 1 (Urgente) del roadmap competitivo: el límite de usuarios
+      // del plan, aplicado de verdad -- antes ningún plan lo hacía cumplir.
+      // FOR UPDATE bloquea la fila de la empresa hasta el COMMIT/ROLLBACK,
+      // mismo patrón que ya usa ventas.js para el stock -- sin esto, dos
+      // invitaciones simultáneas justo en el límite podrían pasar la
+      // validación LAS DOS antes de que cualquiera de las dos insertara,
+      // superando el límite (hallazgo real de la revisión antes de
+      // commitear, no un caso hipotético). Cuenta solo membresías ACTIVAS:
+      // desactivar a alguien libera un cupo para invitar a otra persona,
+      // sin tener que borrar la cuenta. Sin plan asignado, o con
+      // limite_usuarios NULL (Profesional/Empresarial hoy) = sin límite,
+      // mismo comportamiento que antes de esta migración.
+      const { rows: empresaRows } = await cliente.query(
+        `SELECT plan_id FROM empresas WHERE id = $1 FOR UPDATE`,
+        [req.usuario.empresa_id]
+      );
+      const planId = empresaRows[0]?.plan_id;
+      if (planId) {
+        const { rows: planRows } = await cliente.query('SELECT limite_usuarios FROM planes WHERE id = $1', [planId]);
+        const limiteUsuarios = planRows[0]?.limite_usuarios;
+        if (limiteUsuarios !== null && limiteUsuarios !== undefined) {
+          const { rows: countRows } = await cliente.query(
+            `SELECT count(*)::int AS total FROM usuario_empresa WHERE empresa_id = $1 AND activo = true`,
+            [req.usuario.empresa_id]
+          );
+          if (countRows[0].total >= limiteUsuarios) {
+            await cliente.query('ROLLBACK');
+            return res.status(403).json({
+              error: `Tu empresa alcanzó el límite de ${limiteUsuarios} usuario(s) de su plan actual.`
+            });
+          }
+        }
+      }
+
       const { rows: nuevoUsuario } = await cliente.query(
         `INSERT INTO usuarios (nombre, email, password_hash) VALUES ($1, $2, $3) RETURNING id, nombre, email`,
         [nombre, email, hash]
