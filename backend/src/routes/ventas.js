@@ -15,11 +15,12 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { auth, requireEmpresa, requireModulo } from '../middleware/auth.js';
+import { resolverRestriccionSucursal } from '../middleware/sucursal.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { registrarAuditoria } from '../registroAuditoria.js';
 
 const router = Router();
-router.use(auth, requireEmpresa, requireModulo('ventas'));
+router.use(auth, requireEmpresa, resolverRestriccionSucursal, requireModulo('ventas'));
 
 function numeroOCero(v) {
   const n = Number(v);
@@ -75,7 +76,13 @@ router.get('/', verificarPermiso('ventas.ver'), async (req, res) => {
   // Opt-in, mismo criterio que columnasFiltroExacto de crudFactory.js: sin
   // el query param, trae todo igual que siempre (incluidas las ventas
   // históricas con sucursal_id null, de antes de esta sub-fase).
-  if (sucursal_id) { valores.push(sucursal_id); condiciones.push(`sucursal_id = $${valores.length}`); }
+  //
+  // Sub-fase D: si el usuario está restringido, su sucursal SIEMPRE gana --
+  // nunca el query param del cliente en ese caso (un pedido explícito de
+  // otra ya lo cortó resolverRestriccionSucursal con 403 antes de llegar
+  // acá). Esto decide el valor EFECTIVO, no relee sin más req.query.
+  const sucursalEfectiva = req.sucursalRestringida ?? sucursal_id;
+  if (sucursalEfectiva) { valores.push(sucursalEfectiva); condiciones.push(`sucursal_id = $${valores.length}`); }
   const where = `WHERE ${condiciones.join(' AND ')}`;
   try {
     const paginaCruda = pagina ?? page;
@@ -133,9 +140,16 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
     // FOR UPDATE: bloquea la fila del producto hasta el COMMIT/ROLLBACK, asi
     // dos ventas simultaneas del mismo producto no pueden leer el mismo stock
     // "viejo" a la vez y las dos pasar la validacion por error.
+    //
+    // Sub-fase D: acceso INDIRECTO por producto_id (no un query param
+    // explícito) -- si el usuario está restringido y el producto es de otra
+    // sucursal, la condición va directo acá, en el WHERE de la SELECT
+    // inicial (nunca "traer y comparar después"): el resultado es el mismo
+    // 404 genérico de "no existe", sin revelar que sí existe en otra sede.
     const { rows: prodRows } = await cliente.query(
-      `SELECT id, nombre, categoria AS categoria_catalogo, stock, precio_unitario AS precio_catalogo, sucursal_id FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`,
-      [producto_id, empresaId]
+      `SELECT id, nombre, categoria AS categoria_catalogo, stock, precio_unitario AS precio_catalogo, sucursal_id
+       FROM inventario WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR sucursal_id = $3) FOR UPDATE`,
+      [producto_id, empresaId, req.sucursalRestringida ?? null]
     );
     if (!prodRows.length) {
       await cliente.query('ROLLBACK');
@@ -237,7 +251,14 @@ router.put('/:id', verificarPermiso('ventas.editar'), async (req, res) => {
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
-    const { rows: ventaRows } = await cliente.query(`SELECT * FROM ventas WHERE id = $1 AND empresa_id = $2 FOR UPDATE`, [req.params.id, empresaId]);
+    // Sub-fase D: acceso indirecto por id -- va en el WHERE de la SELECT
+    // inicial, no "traer y comparar después". Una venta histórica sin
+    // sucursal_id (NULL) tampoco la puede tocar un usuario restringido: la
+    // igualdad "sucursal_id = $3" nunca es true contra NULL.
+    const { rows: ventaRows } = await cliente.query(
+      `SELECT * FROM ventas WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR sucursal_id = $3) FOR UPDATE`,
+      [req.params.id, empresaId, req.sucursalRestringida ?? null]
+    );
     if (!ventaRows.length) { await cliente.query('ROLLBACK'); return res.status(404).json({ error: 'Venta no encontrada.' }); }
     const venta = ventaRows[0];
 
@@ -326,7 +347,11 @@ router.delete('/:id', verificarPermiso('ventas.eliminar'), async (req, res) => {
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
-    const { rows } = await cliente.query(`SELECT * FROM ventas WHERE id = $1 AND empresa_id = $2 FOR UPDATE`, [req.params.id, empresaId]);
+    // Sub-fase D: mismo criterio que PUT -- va en el WHERE de la SELECT inicial.
+    const { rows } = await cliente.query(
+      `SELECT * FROM ventas WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR sucursal_id = $3) FOR UPDATE`,
+      [req.params.id, empresaId, req.sucursalRestringida ?? null]
+    );
     if (!rows.length) { await cliente.query('ROLLBACK'); return res.status(404).json({ error: 'Venta no encontrada.' }); }
     const venta = rows[0];
 

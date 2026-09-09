@@ -20,6 +20,7 @@ import multer from 'multer';
 import Papa from 'papaparse';
 import { pool } from './db.js';
 import { auth, requireEmpresa, requireModulo } from './middleware/auth.js';
+import { resolverRestriccionSucursal } from './middleware/sucursal.js';
 import { verificarPermiso } from './middleware/permisos.js';
 import { registrarAuditoria } from './registroAuditoria.js';
 
@@ -72,6 +73,11 @@ export function crearRouterCRUD(config) {
 
   const router = Router();
   const permiso = (accion) => `${modulo}.${accion}`;
+  // Sub-fase D: solo los módulos que declararon 'sucursal_id' en
+  // columnasFiltroExacto (hoy, inventario) activan el candado de abajo en
+  // PUT/DELETE -- un módulo que no lo declaró (ej. clientes) sigue exactamente
+  // igual que siempre, restricción de sucursal o no.
+  const filtraPorSucursal = columnasFiltroExacto.includes('sucursal_id');
 
   // esEdicion:true (PUT) -- una columna AUSENTE del body (no enviada) no se
   // toca: se excluye de `datos` entera para que el UPDATE dinámico de abajo
@@ -116,7 +122,18 @@ export function crearRouterCRUD(config) {
   // Todo lo de este router requiere sesión válida CON empresa resuelta Y esa
   // empresa con el módulo contratado; cada ruta abajo agrega, encima, el
   // permiso específico de esa acción.
-  router.use(auth, requireEmpresa, requireModulo(modulo));
+  //
+  // Sub-fase D: resolverRestriccionSucursal solo se monta si el módulo
+  // declaró 'sucursal_id' en columnasFiltroExacto -- inventario.js ya lo
+  // monta también en su propio router.use exterior (llega dos veces, sin
+  // problema, auth()/requireEmpresa() ya se re-ejecutan así hoy), pero un
+  // módulo FUTURO que use crudFactory.js DIRECTO (sin wrapper manual) y
+  // declare esa columna necesita que esto corra acá, o req.sucursalRestringida
+  // quedaría sin definir y el candado de PUT/DELETE de abajo nunca activaría.
+  const middlewares = [auth, requireEmpresa];
+  if (filtraPorSucursal) middlewares.push(resolverRestriccionSucursal);
+  middlewares.push(requireModulo(modulo));
+  router.use(...middlewares);
 
   // GET /?desde=AAAA-MM-DD&hasta=AAAA-MM-DD&buscar=texto&limite=20
   // ?buscar= solo tiene efecto si el módulo declaró columnasBusqueda -- si no
@@ -159,9 +176,16 @@ export function crearRouterCRUD(config) {
     // siempre. Solo columnas que el propio módulo declaró de antemano en
     // columnasFiltroExacto pueden filtrarse así (nunca un nombre de columna
     // que venga del cliente), así que sigue siendo seguro interpolarlo.
+    //
+    // 'sucursal_id' es especial (Sub-fase D): si el usuario está restringido
+    // a una sucursal (req.sucursalRestringida, ver middleware/sucursal.js),
+    // esa es la que SIEMPRE se usa para este filtro -- nunca el query param
+    // del cliente en ese caso (un pedido explícito de otra ya lo cortó ese
+    // middleware con 403 antes de llegar acá; esto es lo que define el
+    // valor EFECTIVO, no una simple relectura de req.query).
     columnasFiltroExacto.forEach(c => {
-      const v = req.query[c];
-      if (v !== undefined && v !== '') {
+      const v = (c === 'sucursal_id' && req.sucursalRestringida != null) ? req.sucursalRestringida : req.query[c];
+      if (v !== undefined && v !== null && v !== '') {
         valores.push(v);
         condiciones.push(`${c} = $${valores.length}`);
       }
@@ -236,22 +260,43 @@ export function crearRouterCRUD(config) {
     if (errores.length) return res.status(400).json({ error: errores.join(', ') });
     if (!Object.keys(datos).length) return res.status(400).json({ error: 'No se envió ningún campo para actualizar.' });
     const cols = Object.keys(datos);
+    // Sub-fase D: si el módulo respeta sucursal (ver filtraPorSucursal arriba)
+    // y el usuario está restringido, la condición va DIRECTO en el WHERE de
+    // la query de selección inicial -- nunca "traer y comparar después" (así
+    // ni siquiera se llega a cargar en memoria una fila de otra sucursal).
+    //
+    // OJO: la referencia a la columna "sucursal_id" en el SQL solo puede
+    // aparecer cuando filtraPorSucursal es true -- la mayoría de las tablas
+    // de este proyecto (clientes, vehiculos, compras...) NI SIQUIERA TIENEN
+    // esa columna, y Postgres valida que la columna exista al parsear la
+    // query, sin importar qué valor termine llevando el parámetro. Por eso
+    // el trozo de SQL es condicional (condSucursal), no solo el valor.
+    const restringido = filtraPorSucursal && req.sucursalRestringida != null;
+    const condSucursalSelect = restringido ? ' AND sucursal_id = $3' : '';
+    const valoresSelect = restringido
+      ? [req.params.id, req.usuario.empresa_id, req.sucursalRestringida]
+      : [req.params.id, req.usuario.empresa_id];
     try {
       // Se lee el registro ANTES de pisarlo -- es la única forma de saber,
       // después, qué cambió de verdad (y no solo que "alguien editó algo").
-      // Scoped por empresa_id: si el id existe pero es de otra empresa, se
-      // responde 404 (no 403) para no confirmar que ese id existe en otro lado.
+      // Scoped por empresa_id (y, si aplica, por sucursal): si el id existe
+      // pero es de otra empresa/sucursal, se responde 404 (no 403) para no
+      // confirmar que ese id existe en otro lado.
       const { rows: antesRows } = await pool.query(
-        `SELECT * FROM ${tabla} WHERE id=$1 AND empresa_id=$2`,
-        [req.params.id, req.usuario.empresa_id]
+        `SELECT * FROM ${tabla} WHERE id=$1 AND empresa_id=$2${condSucursalSelect}`,
+        valoresSelect
       );
       if (!antesRows.length) return res.status(404).json({ error: 'Registro no encontrado.' });
       const antes = antesRows[0];
 
+      const paramSucursal = cols.length + 3;
+      const condSucursalUpdate = restringido ? ` AND sucursal_id = $${paramSucursal}` : '';
+      const valoresUpdate = [...cols.map(c => datos[c]), req.params.id, req.usuario.empresa_id];
+      if (restringido) valoresUpdate.push(req.sucursalRestringida);
       const { rows } = await pool.query(
         `UPDATE ${tabla} SET ${cols.map((c, i) => `${c}=$${i + 1}`).join(',')}, actualizado_el=now()
-         WHERE id=$${cols.length + 1} AND empresa_id=$${cols.length + 2} RETURNING *`,
-        [...cols.map(c => datos[c]), req.params.id, req.usuario.empresa_id]
+         WHERE id=$${cols.length + 1} AND empresa_id=$${cols.length + 2}${condSucursalUpdate} RETURNING *`,
+        valoresUpdate
       );
       if (!rows.length) return res.status(404).json({ error: 'Registro no encontrado.' });
       res.json(rows[0]);
@@ -274,19 +319,27 @@ export function crearRouterCRUD(config) {
 
   // DELETE /:id
   router.delete('/:id', verificarPermiso(permiso('eliminar')), async (req, res) => {
+    // Mismo criterio que el PUT de arriba: el SQL de la condición de
+    // sucursal es condicional en sí mismo (no solo el valor), porque la
+    // columna ni siquiera existe en la mayoría de las tablas.
+    const restringido = filtraPorSucursal && req.sucursalRestringida != null;
+    const condSucursal = restringido ? ' AND sucursal_id = $3' : '';
+    const valores = restringido
+      ? [req.params.id, req.usuario.empresa_id, req.sucursalRestringida]
+      : [req.params.id, req.usuario.empresa_id];
     try {
       // Se guarda una "foto" completa del registro en el detalle de
       // auditoría -- una vez borrado, es la única forma de saber después
       // qué era exactamente lo que se eliminó (nombre, stock que tenía, etc).
       const { rows: antesRows } = await pool.query(
-        `SELECT * FROM ${tabla} WHERE id=$1 AND empresa_id=$2`,
-        [req.params.id, req.usuario.empresa_id]
+        `SELECT * FROM ${tabla} WHERE id=$1 AND empresa_id=$2${condSucursal}`,
+        valores
       );
       if (!antesRows.length) return res.status(404).json({ error: 'Registro no encontrado.' });
 
       const { rowCount } = await pool.query(
-        `DELETE FROM ${tabla} WHERE id=$1 AND empresa_id=$2`,
-        [req.params.id, req.usuario.empresa_id]
+        `DELETE FROM ${tabla} WHERE id=$1 AND empresa_id=$2${condSucursal}`,
+        valores
       );
       if (!rowCount) return res.status(404).json({ error: 'Registro no encontrado.' });
       res.status(204).end();

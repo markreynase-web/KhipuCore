@@ -546,7 +546,13 @@ router.post('/empresas/:id/impersonar', async (req, res) => {
       empresa_nombre: empresa.nombre,
       rol: 'administrador',
       permisos,
-      impersonando: true
+      impersonando: true,
+      // Sub-fase D: soporte impersonando SIEMPRE sin restricción de
+      // sucursal, explícito -- no tiene fila real en usuario_empresa (ver
+      // nota arriba sobre por qué esta sesión ya se salta requireModulo del
+      // mismo modo), así que no hay de dónde leer una sucursal asignada, y
+      // aunque la hubiera, soporte necesita ver la empresa completa.
+      sucursal_id: null
     };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: DURACION_IMPERSONACION });
 

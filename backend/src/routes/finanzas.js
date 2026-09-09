@@ -14,11 +14,12 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { auth, requireEmpresa, requireModulo } from '../middleware/auth.js';
+import { resolverRestriccionSucursal } from '../middleware/sucursal.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { registrarAuditoria } from '../registroAuditoria.js';
 
 const router = Router();
-router.use(auth, requireEmpresa, requireModulo('finanzas'));
+router.use(auth, requireEmpresa, resolverRestriccionSucursal, requireModulo('finanzas'));
 
 function numeroOCero(v) {
   const n = Number(v);
@@ -36,7 +37,11 @@ router.get('/', verificarPermiso('finanzas.ver'), async (req, res) => {
   if (hasta) { valores.push(hasta); condiciones.push(`fecha <= $${valores.length}`); }
   // Opt-in, igual que en ventas.js/inventario.js -- sin el query param, se
   // sigue viendo todo el detalle de la empresa como siempre.
-  if (sucursal_id) { valores.push(sucursal_id); condiciones.push(`sucursal_id = $${valores.length}`); }
+  //
+  // Sub-fase D: si el usuario está restringido, su sucursal SIEMPRE gana --
+  // nunca el query param del cliente en ese caso (ver ventas.js GET, mismo criterio).
+  const sucursalEfectiva = req.sucursalRestringida ?? sucursal_id;
+  if (sucursalEfectiva) { valores.push(sucursalEfectiva); condiciones.push(`sucursal_id = $${valores.length}`); }
   const where = `WHERE ${condiciones.join(' AND ')}`;
   try {
     const paginaCruda = pagina ?? page;
@@ -82,11 +87,21 @@ router.get('/', verificarPermiso('finanzas.ver'), async (req, res) => {
 router.get('/resumen-sucursales', verificarPermiso('finanzas.ver'), async (req, res) => {
   const { desde, hasta } = req.query;
   const empresaId = req.usuario.empresa_id;
+  // Sub-fase D: un usuario restringido a una sucursal solo ve SU propia
+  // fila -- ni las demás sucursales, ni el bucket "sin asignar" (eso es
+  // información a nivel empresa, no de su sede). No hay pedido explícito
+  // de otra sucursal que rechazar acá (este endpoint no acepta
+  // ?sucursal_id=), así que no aplica el 403 -- se resuelve filtrando la
+  // query en sí misma.
+  const restringido = req.sucursalRestringida ?? null;
   try {
     const condicionesJoin = ['f.sucursal_id = s.id', 'f.empresa_id = s.empresa_id'];
     const valoresJoin = [empresaId];
     if (desde) { valoresJoin.push(desde); condicionesJoin.push(`f.fecha >= $${valoresJoin.length}`); }
     if (hasta) { valoresJoin.push(hasta); condicionesJoin.push(`f.fecha <= $${valoresJoin.length}`); }
+
+    const condicionesSucursales = ['s.empresa_id = $1'];
+    if (restringido != null) { valoresJoin.push(restringido); condicionesSucursales.push(`s.id = $${valoresJoin.length}`); }
 
     const condicionesSin = ['empresa_id = $1', 'sucursal_id IS NULL'];
     const valoresSin = [empresaId];
@@ -100,17 +115,21 @@ router.get('/resumen-sucursales', verificarPermiso('finanzas.ver'), async (req, 
                 COALESCE(SUM(CASE WHEN f.tipo = 'egreso' THEN f.monto ELSE 0 END), 0) AS egresos
          FROM sucursales s
          LEFT JOIN finanzas f ON ${condicionesJoin.join(' AND ')}
-         WHERE s.empresa_id = $1
+         WHERE ${condicionesSucursales.join(' AND ')}
          GROUP BY s.id, s.nombre, s.principal
          ORDER BY s.principal DESC, s.nombre ASC`,
         valoresJoin
       ),
-      pool.query(
-        `SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END), 0) AS ingresos,
-                COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto ELSE 0 END), 0) AS egresos
-         FROM finanzas WHERE ${condicionesSin.join(' AND ')}`,
-        valoresSin
-      )
+      // Restringido: nunca consulta el bucket "sin asignar" -- no es su
+      // sucursal, así que ni vale la pena la query.
+      restringido != null
+        ? Promise.resolve({ rows: [{ ingresos: 0, egresos: 0 }] })
+        : pool.query(
+            `SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END), 0) AS ingresos,
+                    COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto ELSE 0 END), 0) AS egresos
+             FROM finanzas WHERE ${condicionesSin.join(' AND ')}`,
+            valoresSin
+          )
     ]);
 
     const conGanancia = (r) => ({ ingresos: +Number(r.ingresos).toFixed(2), egresos: +Number(r.egresos).toFixed(2), ganancia: +(Number(r.ingresos) - Number(r.egresos)).toFixed(2) });
@@ -133,6 +152,12 @@ router.get('/resumen-sucursales', verificarPermiso('finanzas.ver'), async (req, 
   }
 });
 
+// D.5 (Sub-fase D): sucursal_id es OPCIONAL para un usuario sin restricción
+// -- puede elegir etiquetar el movimiento (aparece en su sucursal en el
+// resumen) o dejarlo sin asignar (cae en el bucket "sinSucursal" de
+// siempre). Para un usuario restringido, resolverRestriccionSucursal ya
+// rechazó con 403 cualquier valor que no sea el suyo -- si no mandó nada,
+// se autocompleta acá abajo, igual que en inventario.js POST.
 router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
   const { fecha, tipo, categoria, concepto, monto, notas } = req.body;
   const errores = [];
@@ -143,12 +168,34 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
   // monto negativo aquí resta de los totales de ingresos/egresos en vez de
   // sumar, sin ningún error.
   if (monto !== undefined && monto !== '' && numeroOCero(monto) < 0) errores.push('monto no puede ser negativo');
+
+  // '' y null/undefined se tratan igual ("no lo especificó") -- un usuario
+  // restringido que mande sucursal_id:'' de todos modos cae en la suya, no
+  // se le permite "vaciarlo" a propósito (D.5: no puede dejar costos sin
+  // asignar, tiene que quedar atribuido a su sucursal).
+  const bodyVacio = req.body.sucursal_id === undefined || req.body.sucursal_id === null || req.body.sucursal_id === '';
+  const sucursalIdCruda = bodyVacio ? (req.sucursalRestringida ?? null) : req.body.sucursal_id;
+  let sucursalId = null;
+  if (sucursalIdCruda !== null && sucursalIdCruda !== undefined && sucursalIdCruda !== '') {
+    const n = Number(sucursalIdCruda);
+    if (!Number.isInteger(n)) errores.push('sucursal_id debe ser un número entero, o vacío para dejarlo sin asignar.');
+    else sucursalId = n;
+  }
   if (errores.length) return res.status(400).json({ error: errores.join(', ') });
 
   try {
+    // 404 si mandaron una sucursal que no existe o es de otra empresa --
+    // misma razón de "no confirmar existencia ajena" que en inventario.js.
+    // Defensa en profundidad: aunque el middleware ya validó que coincide
+    // con la del usuario restringido (si aplica), la query es quien decide.
+    if (sucursalId !== null) {
+      const { rows: sucursalRows } = await pool.query('SELECT id FROM sucursales WHERE id = $1 AND empresa_id = $2', [sucursalId, req.usuario.empresa_id]);
+      if (!sucursalRows.length) return res.status(404).json({ error: 'La sucursal indicada no existe.' });
+    }
+
     const { rows } = await pool.query(
-      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, notas, empresa_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [fecha, tipo, categoria || null, concepto, numeroOCero(monto), notas || null, req.usuario.empresa_id]
+      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, notas, empresa_id, sucursal_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [fecha, tipo, categoria || null, concepto, numeroOCero(monto), notas || null, req.usuario.empresa_id, sucursalId]
     );
     res.status(201).json(rows[0]);
     registrarAuditoria(pool, { usuario: req.usuario, accion: 'crear', modulo: 'finanzas', registroId: rows[0].id, detalle: rows[0] });
@@ -160,7 +207,13 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
 
 router.put('/:id', verificarPermiso('finanzas.editar'), async (req, res) => {
   const empresaId = req.usuario.empresa_id;
-  const { rows: actuales } = await pool.query(`SELECT * FROM finanzas WHERE id = $1 AND empresa_id = $2`, [req.params.id, empresaId]);
+  // Sub-fase D: acceso indirecto por id -- en el WHERE de la SELECT inicial.
+  // Un restringido tampoco puede editar un movimiento "sin asignar" (NULL):
+  // no es suyo, es de nivel empresa.
+  const { rows: actuales } = await pool.query(
+    `SELECT * FROM finanzas WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR sucursal_id = $3)`,
+    [req.params.id, empresaId, req.sucursalRestringida ?? null]
+  );
   if (!actuales.length) return res.status(404).json({ error: 'Movimiento no encontrado.' });
   if (actuales[0].origen_modulo) {
     return res.status(409).json({ error: 'Este movimiento viene de una venta. Anúlala en Ventas para revertirlo; no se edita directo aquí.' });
@@ -207,14 +260,21 @@ router.put('/:id', verificarPermiso('finanzas.editar'), async (req, res) => {
 
 router.delete('/:id', verificarPermiso('finanzas.eliminar'), async (req, res) => {
   const empresaId = req.usuario.empresa_id;
-  const { rows: actuales } = await pool.query(`SELECT * FROM finanzas WHERE id = $1 AND empresa_id = $2`, [req.params.id, empresaId]);
+  // Sub-fase D: mismo criterio que PUT -- ver comentario arriba.
+  const { rows: actuales } = await pool.query(
+    `SELECT * FROM finanzas WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR sucursal_id = $3)`,
+    [req.params.id, empresaId, req.sucursalRestringida ?? null]
+  );
   if (!actuales.length) return res.status(404).json({ error: 'Movimiento no encontrado.' });
   if (actuales[0].origen_modulo) {
     return res.status(409).json({ error: 'Este movimiento viene de una venta. Anúlala en Ventas para revertirlo; no se borra directo aquí.' });
   }
 
   try {
-    await pool.query(`DELETE FROM finanzas WHERE id = $1 AND empresa_id = $2`, [req.params.id, empresaId]);
+    await pool.query(
+      `DELETE FROM finanzas WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR sucursal_id = $3)`,
+      [req.params.id, empresaId, req.sucursalRestringida ?? null]
+    );
     res.status(204).end();
     registrarAuditoria(pool, { usuario: req.usuario, accion: 'eliminar', modulo: 'finanzas', registroId: req.params.id, detalle: { eliminado: actuales[0] } });
   } catch (err) {

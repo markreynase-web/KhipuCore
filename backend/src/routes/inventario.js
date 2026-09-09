@@ -17,6 +17,7 @@ import multer from 'multer';
 import Papa from 'papaparse';
 import { pool } from '../db.js';
 import { auth, requireEmpresa, requireModulo } from '../middleware/auth.js';
+import { resolverRestriccionSucursal } from '../middleware/sucursal.js';
 import { verificarPermiso } from '../middleware/permisos.js';
 import { crearRouterCRUD } from '../crudFactory.js';
 import { registrarAuditoria } from '../registroAuditoria.js';
@@ -24,7 +25,11 @@ import { registrarAuditoria } from '../registroAuditoria.js';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
-router.use(auth, requireEmpresa, requireModulo('inventario'));
+// resolverRestriccionSucursal va ACÁ, antes que cualquier ruta (manual o
+// del crudFactory montado más abajo) -- así deja req.sucursalRestringida
+// seteado para TODO lo que cuelga de este router, sin importar por qué
+// camino se llegue (Sub-fase D).
+router.use(auth, requireEmpresa, resolverRestriccionSucursal, requireModulo('inventario'));
 
 function numeroOCero(v) {
   const n = Number(v);
@@ -35,7 +40,7 @@ function numeroOCero(v) {
 // por ese stock inicial. Va todo en una transacción: o se crea el producto
 // y su egreso juntos, o no se crea nada.
 router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
-  const { fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, costo_unitario, fecha_vencimiento, notas, sucursal_id } = req.body;
+  const { fecha_registro, nombre, categoria, stock, stock_minimo, precio_unitario, costo_unitario, fecha_vencimiento, notas } = req.body;
   if (!fecha_registro || !nombre) return res.status(400).json({ error: 'fecha_registro y nombre son requeridos' });
 
   // Sub-fase B (sucursales): a partir de acá todo producto nuevo queda
@@ -43,8 +48,14 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
   // la migración 036, por el backfill) empieza a llenarse siempre. No
   // alcanza con "no vacío": tiene que ser un entero real, porque más abajo
   // se usa directo en una consulta a la tabla sucursales.
-  const sucursalIdNum = Number(sucursal_id);
-  if (!sucursal_id || !Number.isInteger(sucursalIdNum)) {
+  //
+  // Sub-fase D: si el usuario está restringido a una sucursal y no mandó
+  // sucursal_id, se autocompleta con la suya. Si lo mandó distinto,
+  // resolverRestriccionSucursal (montado arriba, en router.use) ya cortó
+  // con 403 antes de llegar hasta acá -- este POST nunca ve ese caso.
+  const sucursalIdCruda = req.body.sucursal_id ?? req.sucursalRestringida ?? undefined;
+  const sucursalIdNum = Number(sucursalIdCruda);
+  if (!sucursalIdCruda || !Number.isInteger(sucursalIdNum)) {
     return res.status(400).json({ error: 'sucursal_id es requerido y debe ser un número entero.' });
   }
 
@@ -67,12 +78,16 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
   try {
     await cliente.query('BEGIN');
 
-    // 404 (no 400) si la sucursal no existe O es de otra empresa -- mismo
-    // criterio de no confirmar existencia ajena que usa el resto del
-    // proyecto (ver PUT genérico de crudFactory.js).
+    // 404 (no 400) si la sucursal no existe, es de otra empresa, O (Sub-fase
+    // D) el usuario está restringido a otra -- mismo criterio de no
+    // confirmar existencia ajena que usa el resto del proyecto (ver PUT
+    // genérico de crudFactory.js). Esta condición es la que de verdad manda
+    // -- defensa en profundidad: aunque el middleware de arriba ya debería
+    // haber cortado antes, la query de la base es quien decide al final,
+    // no la lógica de la ruta.
     const { rows: sucursalRows } = await cliente.query(
-      `SELECT id FROM sucursales WHERE id = $1 AND empresa_id = $2`,
-      [sucursalIdNum, empresaId]
+      `SELECT id FROM sucursales WHERE id = $1 AND empresa_id = $2 AND ($3::int IS NULL OR id = $3)`,
+      [sucursalIdNum, empresaId, req.sucursalRestringida ?? null]
     );
     if (!sucursalRows.length) {
       await cliente.query('ROLLBACK');
@@ -118,10 +133,18 @@ router.post('/', verificarPermiso('inventario.crear'), async (req, res) => {
 // en Finanzas (para no dejarlo huérfano apuntando a un producto que ya no existe).
 router.delete('/:id', verificarPermiso('inventario.eliminar'), async (req, res) => {
   const empresaId = req.usuario.empresa_id;
+  // Sub-fase D: acceso INDIRECTO por id (no un query param explícito) -- si
+  // el producto es de otra sucursal, 404, mismo criterio que empresa_id.
+  // Va directo en el WHERE de la query de selección, nunca "traer y
+  // comparar después".
+  const sucursalCond = req.sucursalRestringida != null;
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
-    const { rows } = await cliente.query(`SELECT * FROM inventario WHERE id = $1 AND empresa_id = $2 FOR UPDATE`, [req.params.id, empresaId]);
+    const { rows } = await cliente.query(
+      `SELECT * FROM inventario WHERE id = $1 AND empresa_id = $2 ${sucursalCond ? 'AND sucursal_id = $3' : ''} FOR UPDATE`,
+      sucursalCond ? [req.params.id, empresaId, req.sucursalRestringida] : [req.params.id, empresaId]
+    );
     if (!rows.length) { await cliente.query('ROLLBACK'); return res.status(404).json({ error: 'Producto no encontrado.' }); }
     const producto = rows[0];
 
@@ -184,12 +207,22 @@ router.post('/import', verificarPermiso('inventario.crear'), upload.single('arch
         continue;
       }
 
-      let sucursalId = principal.id;
+      // Sub-fase D: un usuario restringido siempre importa a SU sucursal --
+      // ni la principal de la empresa, ni ninguna otra que la fila pida. Se
+      // lee de req.sucursalRestringida (viene del JWT), no de req.body -- en
+      // /import el body multipart todavía no está parseado cuando corre
+      // resolverRestriccionSucursal (ver ese archivo), así que este chequeo
+      // por fila es la única línea de defensa acá, no una redundancia.
+      let sucursalId = req.sucursalRestringida ?? principal.id;
       const sucursalCruda = cruda.sucursal_id;
       if (sucursalCruda !== undefined && sucursalCruda !== '' && sucursalCruda !== null) {
         const n = Number(sucursalCruda);
         if (!Number.isInteger(n) || !idsValidos.has(n)) {
           erroresDetalle.push(`Fila ${i + 2}: sucursal_id "${sucursalCruda}" no corresponde a una sucursal de esta empresa`);
+          continue;
+        }
+        if (req.sucursalRestringida != null && n !== req.sucursalRestringida) {
+          erroresDetalle.push(`Fila ${i + 2}: no tienes acceso a la sucursal "${sucursalCruda}"`);
           continue;
         }
         sucursalId = n;

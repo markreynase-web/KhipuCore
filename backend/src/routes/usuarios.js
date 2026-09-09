@@ -43,11 +43,16 @@ router.get('/roles', verificarPermiso('usuarios.ver'), async (req, res) => {
 // GET /api/usuarios -- solo los miembros de la empresa activa.
 router.get('/', verificarPermiso('usuarios.ver'), async (req, res) => {
   try {
+    // Sub-fase D: sucursal_id/sucursal_nombre para que la pantalla de
+    // Usuarios pueda mostrar a qué sucursal está restringido cada uno (o
+    // "todas" si es null) -- LEFT JOIN porque la mayoría va a seguir sin
+    // restricción, no tiene por qué tener fila de sucursal.
     const { rows } = await pool.query(
-      `SELECT u.id, u.nombre, u.email, r.nombre AS rol, ue.activo, u.creado_el
+      `SELECT u.id, u.nombre, u.email, r.nombre AS rol, ue.activo, ue.sucursal_id, s.nombre AS sucursal_nombre, u.creado_el
        FROM usuario_empresa ue
        JOIN usuarios u ON u.id = ue.usuario_id
        JOIN roles r ON r.id = ue.rol_id
+       LEFT JOIN sucursales s ON s.id = ue.sucursal_id
        WHERE ue.empresa_id = $1
        ORDER BY u.nombre`,
       [req.usuario.empresa_id]
@@ -167,6 +172,16 @@ router.put('/:id', verificarPermiso('usuarios.editar'), async (req, res) => {
   const empresaId = req.usuario.empresa_id;
   const idObjetivo = Number(req.params.id);
 
+  // Sub-fase D: mismo patrón "provisto" que plan_id en superadmin.js -- un
+  // PUT que no manda sucursal_id no debe tocarla; uno que la manda null
+  // debe poder "quitar" la restricción (vuelve a ver todas las sucursales).
+  // COALESCE no alcanza para distinguir "no vino" de "vino vacío a propósito".
+  const sucursalProvista = Object.prototype.hasOwnProperty.call(req.body || {}, 'sucursal_id');
+  const sucursalIdBody = req.body?.sucursal_id;
+  if (sucursalProvista && sucursalIdBody !== null && sucursalIdBody !== undefined && !Number.isInteger(sucursalIdBody)) {
+    return res.status(400).json({ error: 'sucursal_id debe ser un número entero, o null para quitar la restricción.' });
+  }
+
   if (rol) {
     // Nadie cambia su propio rol -- es una acción que otra persona toma
     // sobre vos, nunca vos mismo (mismo criterio que el auto-borrado del
@@ -193,13 +208,22 @@ router.put('/:id', verificarPermiso('usuarios.editar'), async (req, res) => {
       rolId = rolRows[0].id;
     }
 
+    // Sub-fase D: 404 (no 400) si la sucursal indicada no existe o es de
+    // otra empresa -- mismo criterio de "no confirmar existencia ajena" que
+    // el resto del proyecto.
+    if (sucursalProvista && sucursalIdBody !== null && sucursalIdBody !== undefined) {
+      const { rows: sucursalRows } = await pool.query('SELECT id FROM sucursales WHERE id = $1 AND empresa_id = $2', [sucursalIdBody, empresaId]);
+      if (!sucursalRows.length) return res.status(404).json({ error: 'La sucursal indicada no existe.' });
+    }
+
     const { rows: membresia } = await pool.query(
       `UPDATE usuario_empresa SET
          rol_id = COALESCE($1, rol_id),
-         activo = COALESCE($2, activo)
+         activo = COALESCE($2, activo),
+         sucursal_id = CASE WHEN $5 THEN $6 ELSE sucursal_id END
        WHERE usuario_id = $3 AND empresa_id = $4
-       RETURNING usuario_id, rol_id, activo`,
-      [rolId, activo === undefined ? null : activo, req.params.id, empresaId]
+       RETURNING usuario_id, rol_id, activo, sucursal_id`,
+      [rolId, activo === undefined ? null : activo, req.params.id, empresaId, sucursalProvista, sucursalIdBody ?? null]
     );
     if (!membresia.length) return res.status(404).json({ error: 'Usuario no encontrado en esta empresa.' });
 
@@ -208,8 +232,9 @@ router.put('/:id', verificarPermiso('usuarios.editar'), async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT u.id, u.nombre, u.email, r.nombre AS rol, ue.activo
+      `SELECT u.id, u.nombre, u.email, r.nombre AS rol, ue.activo, ue.sucursal_id, s.nombre AS sucursal_nombre
        FROM usuario_empresa ue
+       LEFT JOIN sucursales s ON s.id = ue.sucursal_id
        JOIN usuarios u ON u.id = ue.usuario_id
        JOIN roles r ON r.id = ue.rol_id
        WHERE ue.usuario_id = $1 AND ue.empresa_id = $2`,

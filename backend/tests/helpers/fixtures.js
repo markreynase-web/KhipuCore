@@ -61,7 +61,10 @@ export async function crearSucursal(ctx, empresaId, nombre = 'Sucursal') {
   return rows[0].id;
 }
 
-export async function crearUsuario(ctx, { empresaId, rolNombre = 'administrador', activo = true }) {
+// sucursalId opcional (Sub-fase D): si se pasa, este usuario queda
+// restringido a esa sucursal desde que se crea -- evita un PUT extra en
+// cada test que solo necesita "un usuario ya restringido".
+export async function crearUsuario(ctx, { empresaId, rolNombre = 'administrador', activo = true, sucursalId = null }) {
   const { rows: rolRows } = await pool.query(`SELECT id FROM roles WHERE nombre = $1`, [rolNombre]);
   if (!rolRows.length) throw new Error(`Rol de prueba "${rolNombre}" no existe en la base.`);
   const rolId = rolRows[0].id;
@@ -76,8 +79,8 @@ export async function crearUsuario(ctx, { empresaId, rolNombre = 'administrador'
   ctx.usuarioIds.push(usuarioId);
 
   await pool.query(
-    `INSERT INTO usuario_empresa (usuario_id, empresa_id, rol_id, activo) VALUES ($1,$2,$3,$4)`,
-    [usuarioId, empresaId, rolId, activo]
+    `INSERT INTO usuario_empresa (usuario_id, empresa_id, rol_id, activo, sucursal_id) VALUES ($1,$2,$3,$4,$5)`,
+    [usuarioId, empresaId, rolId, activo, sucursalId]
   );
 
   return { usuarioId, email, password: PASSWORD_QA };

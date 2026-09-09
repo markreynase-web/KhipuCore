@@ -22,32 +22,36 @@ const DURACION_TOKEN = '8h';
 // tokens invalidados o acortar este valor.
 const DURACION_PREAUTH = '5m';
 
-// Junta el rol y la lista de permisos que tiene un usuario DENTRO de una
-// empresa concreta (join usuario_empresa → roles → rol_permiso → permisos).
-// Se usa al hacer login para "congelar" los permisos dentro del JWT -- ver
-// la nota de trade-off en middleware/permisos.js. A partir de Fase A el rol
-// ya no es un atributo global del usuario (usuarios.rol_id) sino de su
-// membresía a esa empresa (usuario_empresa.rol_id), porque una misma
-// persona puede tener roles distintos en cada empresa a la que pertenece.
+// Junta el rol, la lista de permisos y la sucursal (si la tiene asignada)
+// que tiene un usuario DENTRO de una empresa concreta (join usuario_empresa
+// → roles → rol_permiso → permisos). Se usa al hacer login para "congelar"
+// esto dentro del JWT -- ver la nota de trade-off en middleware/permisos.js
+// (misma lógica aplica ahora a sucursal_id: cambiarla tarda hasta el
+// próximo login, no es instantáneo). A partir de Fase A el rol ya no es un
+// atributo global del usuario (usuarios.rol_id) sino de su membresía a esa
+// empresa (usuario_empresa.rol_id), porque una misma persona puede tener
+// roles distintos en cada empresa a la que pertenece -- sucursal_id sigue
+// el mismo criterio (Sub-fase D).
 async function permisosDeUsuario(usuarioId, empresaId) {
   const { rows } = await pool.query(
-    `SELECT r.nombre AS rol, COALESCE(array_agg(p.nombre) FILTER (WHERE p.nombre IS NOT NULL), '{}') AS permisos
+    `SELECT r.nombre AS rol, ue.sucursal_id,
+            COALESCE(array_agg(p.nombre) FILTER (WHERE p.nombre IS NOT NULL), '{}') AS permisos
      FROM usuario_empresa ue
      JOIN roles r ON r.id = ue.rol_id
      LEFT JOIN rol_permiso rp ON rp.rol_id = r.id
      LEFT JOIN permisos p ON p.id = rp.permiso_id
      WHERE ue.usuario_id = $1 AND ue.empresa_id = $2
-     GROUP BY r.nombre`,
+     GROUP BY r.nombre, ue.sucursal_id`,
     [usuarioId, empresaId]
   );
-  return rows[0] || { rol: null, permisos: [] };
+  return rows[0] || { rol: null, sucursal_id: null, permisos: [] };
 }
 
 // Firma el token completo de una sesión ya resuelta a UNA empresa concreta
 // (ya sea porque el usuario solo pertenece a una, o porque acaba de
 // elegirla en /login/empresa).
 async function firmarSesion(usuario, empresaId, empresaNombre) {
-  const { rol, permisos } = await permisosDeUsuario(usuario.id, empresaId);
+  const { rol, sucursal_id, permisos } = await permisosDeUsuario(usuario.id, empresaId);
   const payload = {
     id: usuario.id,
     nombre: usuario.nombre,
@@ -55,6 +59,12 @@ async function firmarSesion(usuario, empresaId, empresaNombre) {
     empresa_id: empresaId,
     empresa_nombre: empresaNombre,
     rol,
+    // Sub-fase D: null = sin restricción (ve/opera en todas las sucursales
+    // de la empresa). Explícito acá, nunca "el campo simplemente no está" --
+    // ver middleware/sucursal.js, que ya trata undefined igual que null,
+    // pero un payload viejo (JWT emitido antes de esta sub-fase) de verdad
+    // no trae el campo, y eso también debe leerse como sin restricción.
+    sucursal_id: sucursal_id ?? null,
     permisos
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: DURACION_TOKEN });
@@ -93,7 +103,10 @@ router.post('/login', async (req, res) => {
     // membresías en usuario_empresa (v1: no hay selector de modo "entro
     // como super admin" vs "entro como empresa X").
     if (usuario.es_super_admin) {
-      const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, es_super_admin: true };
+      // Sesión de super admin (fuera de una impersonación): no tiene
+      // empresa_id, así que sucursal_id no tiene sentido -- explícito en
+      // null igual que en el resto de sesiones, nunca "el campo no está".
+      const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, es_super_admin: true, sucursal_id: null };
       const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: DURACION_TOKEN });
       return res.json({ token, usuario: payload });
     }
