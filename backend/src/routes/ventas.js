@@ -121,8 +121,13 @@ router.get('/', verificarPermiso('ventas.ver'), async (req, res) => {
 // Sub-fase C (sucursales): el body NO lleva sucursal_id -- se deriva del
 // producto (cada fila de inventario ya pertenece a una sola sucursal desde
 // la Sub-fase B), ver el INSERT INTO ventas más abajo.
+// Sub-fase E (cajas): turno_caja_id es OPCIONAL -- sin él, la venta se
+// comporta exactamente igual que antes de esta sub-fase (sin caja
+// asociada). Si se manda, tiene que ser un turno ABIERTO cuya caja esté en
+// la MISMA sucursal que el producto vendido -- no tendría sentido vender
+// algo de la Sucursal Principal contra un turno abierto en la Sede B.
 router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
-  const { fecha, cliente_id, producto_id, categoria, cantidad, precio_unitario, notas } = req.body;
+  const { fecha, cliente_id, producto_id, categoria, cantidad, precio_unitario, notas, turno_caja_id } = req.body;
   const cant = numeroOCero(cantidad);
   const precio = numeroOCero(precio_unitario);
   const empresaId = req.usuario.empresa_id;
@@ -132,6 +137,9 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
   if (!cliente_id) return res.status(400).json({ error: 'Selecciona un cliente registrado (o crea uno nuevo).' });
   if (cant <= 0) return res.status(400).json({ error: 'La cantidad debe ser mayor a 0.' });
   if (precio <= 0) return res.status(400).json({ error: 'El precio unitario debe ser mayor a 0.' });
+  if (turno_caja_id !== undefined && turno_caja_id !== null && turno_caja_id !== '' && !Number.isInteger(turno_caja_id)) {
+    return res.status(400).json({ error: 'turno_caja_id debe ser un número entero.' });
+  }
 
   const cliente = await pool.connect();
   try {
@@ -183,6 +191,24 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
     }
     const clienteRow = cliRows[0];
 
+    // Sub-fase E: el turno tiene que estar ABIERTO y su caja tiene que
+    // estar en la MISMA sucursal que el producto -- 400 (no 404) porque
+    // esto es una inconsistencia del pedido en sí, no un intento de acceder
+    // a algo ajeno (el usuario eligió ambos, producto y turno, a propósito).
+    let turnoCajaIdFinal = null;
+    if (turno_caja_id !== undefined && turno_caja_id !== null && turno_caja_id !== '') {
+      const { rows: turnoRows } = await cliente.query(
+        `SELECT t.id FROM turnos_caja t JOIN cajas c ON c.id = t.caja_id
+         WHERE t.id = $1 AND t.empresa_id = $2 AND t.estado = 'abierto' AND c.sucursal_id = $3`,
+        [turno_caja_id, empresaId, producto.sucursal_id]
+      );
+      if (!turnoRows.length) {
+        await cliente.query('ROLLBACK');
+        return res.status(400).json({ error: 'El turno indicado no está abierto o no corresponde a la sucursal de este producto.' });
+      }
+      turnoCajaIdFinal = turnoRows[0].id;
+    }
+
     const categoriaFinal = categoria || producto.categoria_catalogo || null;
     const monto = +(cant * precio).toFixed(2);
 
@@ -193,21 +219,24 @@ router.post('/', verificarPermiso('ventas.crear'), async (req, res) => {
     // "sucursal X" mientras el stock que de verdad se descuenta es de la
     // sucursal Y). Mismo criterio que empresa_id: siempre server-side.
     const { rows: ventaRows } = await cliente.query(
-      `INSERT INTO ventas (fecha, cliente, cliente_id, producto, producto_id, categoria, cantidad, precio_unitario, monto, notas, empresa_id, sucursal_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [fecha, clienteRow.nombre, clienteRow.id, producto.nombre, producto.id, categoriaFinal, cant, precio, monto, notas || null, empresaId, producto.sucursal_id]
+      `INSERT INTO ventas (fecha, cliente, cliente_id, producto, producto_id, categoria, cantidad, precio_unitario, monto, notas, empresa_id, sucursal_id, turno_caja_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [fecha, clienteRow.nombre, clienteRow.id, producto.nombre, producto.id, categoriaFinal, cant, precio, monto, notas || null, empresaId, producto.sucursal_id, turnoCajaIdFinal]
     );
     const venta = ventaRows[0];
 
     await cliente.query(`UPDATE inventario SET stock = stock - $1, actualizado_el = now() WHERE id = $2 AND empresa_id = $3`, [cant, producto.id, empresaId]);
 
-    // El ingreso en finanzas hereda la misma sucursal que la venta -- para
-    // que el reporte de ganancia por sucursal (GET /api/finanzas/resumen-
-    // sucursales) no tenga que ir a buscarla con un JOIN contra ventas.
+    // El ingreso en finanzas hereda la misma sucursal Y el mismo
+    // turno_caja_id que la venta -- dos razones: (1) el reporte de
+    // ganancia por sucursal (GET /api/finanzas/resumen-sucursales) no
+    // tiene que ir a buscarla con un JOIN contra ventas, y (2) el arqueo
+    // de cajas.js suma SOLO finanzas, no ventas aparte (ver cajas.js) --
+    // sin esto, cerrar un turno nunca vería esta venta.
     await cliente.query(
-      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id, empresa_id, sucursal_id)
-       VALUES ($1, 'ingreso', 'Ventas', $2, $3, 'ventas', $4, $5, $6)`,
-      [fecha, `Venta de ${producto.nombre} a ${clienteRow.nombre}`, monto, venta.id, empresaId, producto.sucursal_id]
+      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, origen_modulo, origen_id, empresa_id, sucursal_id, turno_caja_id)
+       VALUES ($1, 'ingreso', 'Ventas', $2, $3, 'ventas', $4, $5, $6, $7)`,
+      [fecha, `Venta de ${producto.nombre} a ${clienteRow.nombre}`, monto, venta.id, empresaId, producto.sucursal_id, turnoCajaIdFinal]
     );
 
     await cliente.query(

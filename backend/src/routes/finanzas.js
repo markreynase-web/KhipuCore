@@ -158,8 +158,15 @@ router.get('/resumen-sucursales', verificarPermiso('finanzas.ver'), async (req, 
 // siempre). Para un usuario restringido, resolverRestriccionSucursal ya
 // rechazó con 403 cualquier valor que no sea el suyo -- si no mandó nada,
 // se autocompleta acá abajo, igual que en inventario.js POST.
+// Sub-fase E: turno_caja_id también OPCIONAL -- para poder registrar un
+// retiro/ingreso de efectivo DENTRO de un turno (sin esto, el arqueo de
+// cajas.js nunca vería estos movimientos manuales, y "diferencia" nunca
+// cuadraría). Si se manda, tiene que ser un turno ABIERTO de esta empresa,
+// y su sucursal (la de su caja) GANA sobre cualquier sucursal_id que
+// también se haya mandado -- un movimiento atado a un turno pertenece a la
+// sucursal de ese turno, no puede ser una combinación inconsistente.
 router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
-  const { fecha, tipo, categoria, concepto, monto, notas } = req.body;
+  const { fecha, tipo, categoria, concepto, monto, notas, turno_caja_id } = req.body;
   const errores = [];
   if (!fecha) errores.push('fecha es requerido');
   if (!['ingreso', 'egreso'].includes(tipo)) errores.push('tipo debe ser "ingreso" o "egreso"');
@@ -168,6 +175,9 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
   // monto negativo aquí resta de los totales de ingresos/egresos en vez de
   // sumar, sin ningún error.
   if (monto !== undefined && monto !== '' && numeroOCero(monto) < 0) errores.push('monto no puede ser negativo');
+  if (turno_caja_id !== undefined && turno_caja_id !== null && turno_caja_id !== '' && !Number.isInteger(turno_caja_id)) {
+    errores.push('turno_caja_id debe ser un número entero.');
+  }
 
   // '' y null/undefined se tratan igual ("no lo especificó") -- un usuario
   // restringido que mande sucursal_id:'' de todos modos cae en la suya, no
@@ -184,18 +194,35 @@ router.post('/', verificarPermiso('finanzas.crear'), async (req, res) => {
   if (errores.length) return res.status(400).json({ error: errores.join(', ') });
 
   try {
+    let turnoCajaIdFinal = null;
+    if (turno_caja_id !== undefined && turno_caja_id !== null && turno_caja_id !== '') {
+      const { rows: turnoRows } = await pool.query(
+        `SELECT t.id, c.sucursal_id FROM turnos_caja t JOIN cajas c ON c.id = t.caja_id
+         WHERE t.id = $1 AND t.empresa_id = $2 AND t.estado = 'abierto'`,
+        [turno_caja_id, req.usuario.empresa_id]
+      );
+      if (!turnoRows.length) return res.status(400).json({ error: 'El turno indicado no está abierto o no existe.' });
+      const turno = turnoRows[0];
+      if (req.sucursalRestringida != null && turno.sucursal_id !== req.sucursalRestringida) {
+        return res.status(400).json({ error: 'El turno indicado no corresponde a tu sucursal.' });
+      }
+      turnoCajaIdFinal = turno.id;
+      sucursalId = turno.sucursal_id; // la sucursal del turno gana sobre cualquier sucursal_id mandado
+    }
+
     // 404 si mandaron una sucursal que no existe o es de otra empresa --
     // misma razón de "no confirmar existencia ajena" que en inventario.js.
     // Defensa en profundidad: aunque el middleware ya validó que coincide
     // con la del usuario restringido (si aplica), la query es quien decide.
-    if (sucursalId !== null) {
+    // Se saltea si sucursalId ya vino resuelta y confirmada por el turno.
+    if (sucursalId !== null && turnoCajaIdFinal === null) {
       const { rows: sucursalRows } = await pool.query('SELECT id FROM sucursales WHERE id = $1 AND empresa_id = $2', [sucursalId, req.usuario.empresa_id]);
       if (!sucursalRows.length) return res.status(404).json({ error: 'La sucursal indicada no existe.' });
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, notas, empresa_id, sucursal_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [fecha, tipo, categoria || null, concepto, numeroOCero(monto), notas || null, req.usuario.empresa_id, sucursalId]
+      `INSERT INTO finanzas (fecha, tipo, categoria, concepto, monto, notas, empresa_id, sucursal_id, turno_caja_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [fecha, tipo, categoria || null, concepto, numeroOCero(monto), notas || null, req.usuario.empresa_id, sucursalId, turnoCajaIdFinal]
     );
     res.status(201).json(rows[0]);
     registrarAuditoria(pool, { usuario: req.usuario, accion: 'crear', modulo: 'finanzas', registroId: rows[0].id, detalle: rows[0] });

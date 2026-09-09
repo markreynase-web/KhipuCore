@@ -19,7 +19,7 @@ const PREFIJO = 'QA-TEST (borrar)';
 export function nuevoContexto() {
   return {
     empresaIds: [], usuarioIds: [], productoIds: [], clienteIds: [], ventaIds: [],
-    mascotaIds: [], flotaIds: [], atencionIds: [], sucursalIds: []
+    mascotaIds: [], flotaIds: [], atencionIds: [], sucursalIds: [], cajaIds: []
   };
 }
 
@@ -106,6 +106,26 @@ export async function crearProducto(ctx, empresaId, { nombre = 'Producto', stock
     [empresaId, `${PREFIJO} ${nombre}`, stock, precio_unitario, sucursal]
   );
   ctx.productoIds.push(rows[0].id);
+  return rows[0].id;
+}
+
+// Sub-fase E: caja dentro de una sucursal -- sucursalId opcional, igual que
+// crearProducto(), cae en la principal de la empresa si no se indica.
+export async function crearCaja(ctx, empresaId, { nombre = 'Caja', sucursalId } = {}) {
+  let sucursal = sucursalId;
+  if (!sucursal) {
+    const { rows: sucursalRows } = await pool.query(
+      `SELECT id FROM sucursales WHERE empresa_id = $1 AND principal = true LIMIT 1`,
+      [empresaId]
+    );
+    if (!sucursalRows.length) throw new Error(`La empresa ${empresaId} no tiene sucursal principal -- ¿se creó con crearEmpresa()?`);
+    sucursal = sucursalRows[0].id;
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO cajas (sucursal_id, empresa_id, nombre) VALUES ($1,$2,$3) RETURNING id`,
+    [sucursal, empresaId, `${PREFIJO} ${nombre}`]
+  );
+  ctx.cajaIds.push(rows[0].id);
   return rows[0].id;
 }
 
