@@ -7,4 +7,4 @@
 // config.js) porque pages/login.html la necesita ANTES de que exista
 // cualquier sesión -- no puede depender de una llamada al backend para
 // saber a qué backend llamar.
-export const API_BASE_URL = 'https://khipucore.onrender.com/api';
+export const API_BASE_URL = 'https://api.khipucore.com/api';
