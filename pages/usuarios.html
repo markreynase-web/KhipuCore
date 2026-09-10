@@ -10,6 +10,12 @@
 <link rel="stylesheet" href="../css/forms.css">
 <link rel="stylesheet" href="../css/tables.css">
 <link rel="stylesheet" href="../css/panel-lateral.css">
+<!-- Chart.js local (mismo que el resto de las páginas con gráficos) -- faltaba
+     acá aunque el script de abajo importa js/charts.js y dibuja 4 gráficos.
+     Sin esto, dibujarChartPermisos() explotaba con "Chart is not defined" y
+     cortaba iniciar() ANTES de cargarTabla(), dejando la tabla de usuarios
+     colgada en "Cargando…" para siempre. -->
+<script src="../lib/chart.js"></script>
 </head>
 <body data-modulo="usuarios">
 

@@ -10,12 +10,29 @@ import { fmtCorto, fmtNum } from './utils.js';
 
 const GRID = '#E1E7F0';
 
+// Chart.js se carga como <script src="../lib/chart.js"> en el <head> de cada
+// página con gráficos -- define el global `Chart`. Si esa etiqueta falta (o
+// el archivo no carga: 404, extensión del navegador, etc.), `new Chart(...)`
+// tira "Chart is not defined". Un gráfico es SECUNDARIO -- que falte no debe
+// tumbar el resto de la página. Por eso cada crear*() de abajo chequea esto
+// primero y devuelve null en vez de explotar: los callers ya hacen
+// `if (grafico) grafico.destroy()`, así que un null se maneja solo.
+function chartListo() {
+  if (typeof Chart !== 'undefined') return true;
+  if (!chartListo._avisado) {
+    console.warn('[charts.js] Chart.js no está cargado -- los gráficos no se dibujan, el resto de la página sí. ¿Falta <script src="../lib/chart.js"> en el <head>?');
+    chartListo._avisado = true;
+  }
+  return false;
+}
+
 // Colores para gráficos con varias porciones/series a la vez (dona, barras
 // agrupadas). Se repite en orden -- con las 8 categorías que ya recorta el
 // dashboard (slice(0,8)) alcanza sin repetir.
 export const PALETA_CATEGORICA = ['#E85C4A', '#1A4FBF', '#0F6E56', '#B8871F', '#5B4FE0', '#2FA8A0', '#C8493A', '#7A8CAE'];
 
 export function crearGraficoLineaFecha(ctx, { fechas, valores, label, color, colorFondo }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'line',
     data: { labels: fechas, datasets: [{ label, data: valores, borderColor: color, backgroundColor: colorFondo, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 20, pointHoverBackgroundColor: color, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2, borderWidth: 2 }] },
@@ -36,6 +53,7 @@ export function crearGraficoLineaFecha(ctx, { fechas, valores, label, color, col
 }
 
 export function crearGraficoBarras(ctx, { etiquetas, valores, label, color }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'bar',
     data: { labels: etiquetas, datasets: [{ label, data: valores, backgroundColor: color, borderRadius: 6, borderSkipped: false, maxBarThickness: 46 }] },
@@ -54,6 +72,7 @@ export function crearGraficoBarras(ctx, { etiquetas, valores, label, color }) {
 // (mode:'index' -- al pasar el mouse sobre un mes muestra ambos valores a
 // la vez). Para el panel "Resumen de ingresos vs. egresos" de Inicio.
 export function crearGraficoLineasComparativo(ctx, { etiquetas, serieA, serieB, labelA, labelB, colorA, colorB }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'line',
     data: {
@@ -80,6 +99,7 @@ export function crearGraficoLineasComparativo(ctx, { etiquetas, serieA, serieB, 
 // que es lo que un gráfico circular comunica mejor. El hueco central (cutout)
 // deja espacio para leer las porciones más chicas sin que se aplasten.
 export function crearGraficoDona(ctx, { etiquetas, valores, colores = PALETA_CATEGORICA }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'doughnut',
     data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores, borderColor: '#fff', borderWidth: 2, hoverOffset: 6 }] },
@@ -98,6 +118,7 @@ export function crearGraficoDona(ctx, { etiquetas, valores, colores = PALETA_CAT
 // tooltip combinado que crearGraficoLineasComparativo, pero en barras
 // porque acá se compara categorías discretas, no una tendencia continua.
 export function crearGraficoBarrasComparativo(ctx, { etiquetas, serieA, serieB, labelA, labelB, colorA, colorB }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'bar',
     data: {
@@ -120,6 +141,7 @@ export function crearGraficoBarrasComparativo(ctx, { etiquetas, serieA, serieB, 
 }
 
 export function crearGraficoLineaSecundario(ctx, { fechas, valores, label, color, colorFondo }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'line',
     data: { labels: fechas, datasets: [{ label, data: valores, borderColor: color, backgroundColor: colorFondo, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, pointHitRadius: 20, pointHoverBackgroundColor: color, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2, borderWidth: 2 }] },
@@ -136,6 +158,7 @@ export function crearGraficoLineaSecundario(ctx, { fechas, valores, label, color
 }
 
 export function crearGraficoBarrasSecundario(ctx, { etiquetas, valores, label, color }) {
+  if (!chartListo()) return null;
   return new Chart(ctx, {
     type: 'bar',
     data: { labels: etiquetas, datasets: [{ label, data: valores, backgroundColor: color, borderRadius: 5, borderSkipped: false }] },
