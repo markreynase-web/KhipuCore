@@ -485,7 +485,12 @@ function abrirNuevoUsuario() {
   }
 
   roles = await pedirRoles();
-  sucursales = await pedirSucursales();
+  // Sin await a propósito: sucursales solo hace falta para el select del
+  // panel de "Editar usuario", que se abre después (on-demand) -- no tiene
+  // por qué demorar la carga de la tabla principal. roles SÍ se espera
+  // arriba porque dibujarKpis()/dibujarChartPermisos() (dentro de
+  // cargarTabla()) lo necesitan ya resuelto.
+  pedirSucursales().then(s => { sucursales = s; });
   dibujarRoles();
   dibujarChartPermisos();
 
